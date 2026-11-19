@@ -42,7 +42,7 @@ jobs:
       - name: Install Python dependencies
         run: pip install --quiet -r requirements-dev.txt
       - name: Install the pinned Playwright browser
-        run: npx --yes playwright@${PLAYWRIGHT_VERSION} install --with-deps chromium-headless-shell
+        run: bash tools/ci-install-browser.sh "${PLAYWRIGHT_VERSION}"
       - name: Run everything (pytest, site checks, unit tests, script tests, lints)
         env:
           WSE_PYTHON: python

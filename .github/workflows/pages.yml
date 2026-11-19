@@ -47,7 +47,7 @@ jobs:
         with:
           node-version: "24"
       - name: Install the pinned Playwright browser
-        run: npx --yes playwright@1.64.1 install --with-deps chromium-headless-shell
+        run: bash tools/ci-install-browser.sh 1.64.1
       - name: Assemble dist
         run: bash tools/assemble.sh dist data/latest --canonical-url https://weather-story-explorer.pages.dev/
       - name: Site tests on the live data (deploy tier, fast and offline)
