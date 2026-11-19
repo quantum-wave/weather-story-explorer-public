@@ -1,0 +1,59 @@
+/* Share sheet, notice and inline-save overlay (WP6). Tokens fall back to SPEC section 8 dark values. */
+.share-sheet {
+  position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(6, 8, 10, 0.62); animation: share-fade 200ms ease-out;
+}
+.share-card {
+  width: min(100%, 460px); max-height: 92dvh; overflow: auto; box-sizing: border-box;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); border-radius: 14px 14px 0 0;
+  background: var(--sheet, #12171C); color: var(--text, #E6E9ED); border: 1px solid var(--hairline, #232B33);
+  font: 13px/15px -apple-system, "SF Pro Text", system-ui, sans-serif;
+  display: flex; flex-direction: column; gap: 12px; animation: share-rise 200ms ease-out;
+}
+@media (min-width: 640px) {
+  .share-sheet { align-items: center; }
+  .share-card { border-radius: 14px; }
+}
+.share-title { margin: 0; font: 20px/26px ui-serif, "New York", "Iowan Old Style", Georgia, serif; font-weight: 600; }
+.share-label { color: var(--text-2, #9AA4AF); font-size: 12px; }
+.share-note, .share-status { margin: 0; color: var(--text-2, #9AA4AF); min-height: 15px; }
+.share-headline {
+  box-sizing: border-box; width: 100%; min-height: 44px; padding: 0 12px; border-radius: 10px;
+  border: 1px solid var(--hairline, #232B33); background: var(--bg, #0C1014); color: inherit; font: 16px/1.2 ui-serif, Georgia, serif;
+}
+.share-preview img { display: block; max-width: 100%; max-height: 52dvh; margin: 0 auto; border-radius: 10px; border: 1px solid var(--hairline, #232B33); }
+.share-progress { width: 100%; height: 6px; accent-color: #F0B429; }
+.share-actions, .share-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.share-btn {
+  min-height: 44px; min-width: 44px; padding: 0 16px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--hairline, #232B33); background: transparent; color: inherit; font: inherit; font-size: 14px;
+}
+.share-btn:disabled { opacity: 0.5; cursor: default; }
+.share-btn:focus-visible, .share-headline:focus-visible { outline: 2px solid var(--ring, #F4F1EA); outline-offset: 2px; }
+.share-primary { background: var(--text, #E6E9ED); color: var(--bg, #0C1014); border-color: transparent; font-weight: 600; }
+.share-chip { min-height: 44px; font-size: 13px; }
+.share-close { align-self: flex-end; }
+
+.share-notice {
+  position: fixed; left: 50%; transform: translateX(-50%); top: calc(12px + env(safe-area-inset-top)); z-index: 70;
+  max-width: min(92vw, 420px); padding: 10px 14px; border-radius: 10px; box-sizing: border-box;
+  background: var(--sheet, #12171C); color: var(--text, #E6E9ED); border: 1px solid #F0B429;
+  font: 13px/18px -apple-system, "SF Pro Text", system-ui, sans-serif;
+}
+.share-notice[hidden] { display: none; }
+
+.share-inline {
+  position: fixed; inset: 0; z-index: 80; display: flex; flex-direction: column; align-items: center; gap: 12px;
+  padding: 16px; overflow: auto; background: var(--bg, #0C1014); color: var(--text, #E6E9ED);
+  font: 14px/18px -apple-system, "SF Pro Text", system-ui, sans-serif;
+}
+.share-inline img { max-width: 100%; height: auto; border-radius: 10px; -webkit-touch-callout: default; user-select: auto; }
+
+@keyframes share-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes share-rise { from { transform: translateY(16px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .share-sheet, .share-card { animation: none; } }
+
+.share-tabs { display: flex; gap: 4px; padding: 3px; border-radius: 10px; border: 1px solid var(--hairline, #232B33); }
+.share-tab { flex: 1; min-height: 44px; border: 0; border-radius: 8px; background: transparent; color: var(--text-2, #9AA4AF); font: inherit; font-size: 14px; cursor: pointer; }
+.share-tab[aria-pressed="true"] { background: var(--text, #E6E9ED); color: var(--bg, #0C1014); font-weight: 600; }
+.share-tab:focus-visible { outline: 2px solid var(--ring, #F4F1EA); outline-offset: 2px; }

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#0C1014">
+<title>Weather Story Explorer</title>
+<link rel="stylesheet" href="css/shell.css">
+<link rel="stylesheet" href="css/timeline.css">
+<link rel="stylesheet" href="css/share.css">
+<script src="vendor/d3@7.9.2/d3.min.js"></script>
+<script src="vendor/topojson-client@3.1.0/topojson-client.min.js"></script>
+</head>
+<body>
+<div id="app" data-snap="peek">
+  <header id="topbar">
+    <span class="brand"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Weather Story</span></span>
+    <button id="run-label" class="run-label" type="button" aria-label="Forecast run"></button>
+    <span id="sample-badge" class="badge" hidden></span>
+    <span class="spacer"></span>
+    <button id="btn-share" class="icon-btn" type="button" data-share="still" aria-label="Share this view" title="Share this view"></button>
+    <button id="btn-theme" class="icon-btn" type="button" aria-label="Switch to light theme" title="Switch theme"></button>
+  </header>
+
+  <main id="stage">
+    <canvas id="map" width="640" height="360" role="img" aria-label="Animated map of the upper-air pattern"></canvas>
+    <div id="map-tools">
+      <div id="view-switch" class="seg" role="group" aria-label="Map view">
+        <button type="button" data-view="np">Regional</button>
+        <button type="button" data-view="nh">Hemisphere</button>
+        <button type="button" data-view="gl">Global</button>
+      </div>
+      <button id="btn-layers" class="tool-btn" type="button" aria-expanded="false" aria-controls="layers-panel"><span class="tool-label">Layers</span></button>
+    </div>
+    <div id="layers-panel" class="panel" hidden></div>
+    <div id="legend" aria-label="Map legend"></div>
+    <div id="map-status" role="status"></div>
+  </main>
+
+  <div id="timeline"></div>
+
+  <aside id="home" class="sheet" aria-label="Your plan">
+    <button id="sheet-handle" class="sheet-handle" type="button" aria-label="Resize panel"><span></span></button>
+    <div id="focus-card" class="focus-card"></div>
+    <div id="home-body" class="home-body"></div>
+  </aside>
+  <div id="toasts" aria-live="polite"></div>
+</div>
+<div id="live" class="sr-only" aria-live="polite"></div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

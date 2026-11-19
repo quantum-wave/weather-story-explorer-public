@@ -1,0 +1,15 @@
+.DS_Store
+.env
+.venv/
+__pycache__/
+node_modules/
+dist/
+data/raw/
+data/processed/
+renders/
+*.grib2
+*.grib
+*.nc
+.pytest_cache/
+site/data/
+out/

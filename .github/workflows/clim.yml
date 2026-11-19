@@ -1,0 +1,50 @@
+# Build the climatology (annual mean + 3 harmonics for 500 hPa height and 850 hPa temperature) and publish it as
+# `harmonics.npz` on the orphan `clim` branch. Run it once by hand before the first `data` run; it only needs
+# re-running if the baseline should change. Primary baseline WeatherBench2 ERA5 1990-2019; if the anonymous bucket
+# refuses, it falls back to NOAA PSL NCEP/NCAR 1991-2020 (daily, then monthly) and records which it used.
+name: clim
+on:
+  workflow_dispatch:
+    inputs:
+      prefer:
+        description: "wb2 (WeatherBench2, with PSL as the fallback) or psl (PSL only)"
+        type: choice
+        options: [wb2, psl]
+        default: wb2
+permissions:
+  contents: write
+concurrency:
+  group: clim
+  cancel-in-progress: false
+jobs:
+  clim:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: pip install --quiet -r requirements.txt xarray==2026.9.0 netCDF4==1.7.5.1.post1 zarr==3.4.2 gcsfs==2026.10.1
+      - name: Build harmonics.npz
+        env:
+          PREFER: ${{ inputs.prefer }}
+        run: python -I pipeline/run.py clim --out out/clim/harmonics.npz --workdir out/clim/work --prefer "$PREFER"
+      - name: Summarise the baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -I - <<'PY' | tee out/clim/summary.txt
+          import json, numpy as np
+          z = np.load("out/clim/harmonics.npz")
+          m = json.loads(str(z["meta_json"]))
+          print("baseline:", m["baseline"]); print("attempt:", m["attempt"], "| skipped:", m["skipped"])
+          print("z500 mean over 40-60N:", float(z["z500"][0][(z["lat"] >= 40) & (z["lat"] <= 60)].mean()))
+          PY
+          { echo "### clim"; echo '```'; cat out/clim/summary.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish to the clim branch
+        run: python -I pipeline/run.py publish --branch clim --src out/clim/harmonics.npz --dest harmonics.npz --message "climatology"

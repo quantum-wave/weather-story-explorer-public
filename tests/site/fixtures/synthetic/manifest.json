@@ -1,0 +1,570 @@
+{
+ "schema": 1,
+ "sample": true,
+ "sample_note": "synthetic test data",
+ "model": "Synthetic test wave",
+ "run": "2026-11-17T00:00Z",
+ "generated": "2026-11-17T23:50Z",
+ "attribution": "synthetic test data, no source",
+ "climatology": {
+  "label": "synthetic",
+  "source": "analytic",
+  "method": "analytic"
+ },
+ "cases": {
+  "A": {
+   "label": "Synthetic travelling wave",
+   "fields": [
+    "z500",
+    "z500a",
+    "z500sd",
+    "ws250",
+    "tp6",
+    "t850a"
+   ]
+  },
+  "C": {
+   "label": "Synthetic motion demo",
+   "fields": [
+    "t2a"
+   ]
+  }
+ },
+ "domains": {
+  "g1": {
+   "lon0": -180,
+   "lat0": 90,
+   "dlon": 10.285714285714286,
+   "dlat": -10,
+   "nx": 36,
+   "ny": 19
+  },
+  "np05": {
+   "lon0": 150,
+   "lat0": 75,
+   "dlon": 4.571428571428571,
+   "dlat": -3.611111111111111,
+   "nx": 36,
+   "ny": 19
+  }
+ },
+ "fields": {
+  "z500": {
+   "units": "gpm",
+   "scale": 1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      9
+     ],
+     "files": {
+      "g1": {
+       "path": "z500.g1.a.bin",
+       "bytes": 1439,
+       "sha256": "daef8f54a7cc0d20663cb812dc0a4b3783f7aa24cb86c074c631bca2c3ecf625"
+      },
+      "np05": {
+       "path": "z500.np05.a.bin",
+       "bytes": 3386,
+       "sha256": "0b8ad9e736c7a657d75e2660ac6f3a4777d65d93f1989b71949ff945bbca126f"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "synthetic analytic travelling wave",
+    "valid": null
+   }
+  },
+  "z500a": {
+   "units": "gpm",
+   "scale": 1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      9
+     ],
+     "files": {
+      "g1": {
+       "path": "z500a.g1.a.bin",
+       "bytes": 1258,
+       "sha256": "dc08fd7dddec7aeaa9d0d7e92b6a97e917ba9f7b44057866db0a428192ef6111"
+      },
+      "np05": {
+       "path": "z500a.np05.a.bin",
+       "bytes": 3321,
+       "sha256": "85d35b2575a1e3aeb3b62c6f657a0e97cf1ae682ddd29346092e2df2e9b6c5ef"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "synthetic analytic travelling wave",
+    "valid": null
+   }
+  },
+  "z500sd": {
+   "units": "gpm",
+   "scale": 0.1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      9
+     ],
+     "files": {
+      "g1": {
+       "path": "z500sd.g1.a.bin",
+       "bytes": 460,
+       "sha256": "cf0bdf70da68835b376bdbb714d60a544cf0dd43be097291e9d51b8ce82a4ada"
+      },
+      "np05": {
+       "path": "z500sd.np05.a.bin",
+       "bytes": 492,
+       "sha256": "1370fad8659553d1673831ee7c11b7df15faa3bc6cc48ff1cf7a266a2e252673"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "synthetic analytic travelling wave",
+    "valid": null
+   }
+  },
+  "ws250": {
+   "units": "m/s",
+   "scale": 0.1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      9
+     ],
+     "files": {
+      "g1": {
+       "path": "ws250.g1.a.bin",
+       "bytes": 1041,
+       "sha256": "8b1c1a5d17f63d3214cdb3ca638bd30d215d9faa8b7480c9fdafb5dd31133bb4"
+      },
+      "np05": {
+       "path": "ws250.np05.a.bin",
+       "bytes": 3213,
+       "sha256": "568d09acdec33982451ee1952c134e1e1d66e920f1fc1772c6e694f7ad5eb471"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "synthetic analytic travelling wave",
+    "valid": null
+   }
+  },
+  "tp6": {
+   "units": "mm",
+   "scale": 0.1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48
+   ],
+   "domains": [
+    "g1"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      8
+     ],
+     "files": {
+      "g1": {
+       "path": "tp6.g1.a.bin",
+       "bytes": 460,
+       "sha256": "525591d623b0dd58fb02594e175d53a95b5d4673f4d69b416e36baef1044f7f6"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "synthetic analytic travelling wave",
+    "valid": null
+   }
+  },
+  "t850a": {
+   "units": "K",
+   "scale": 0.1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48
+   ],
+   "domains": [
+    "g1"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      9
+     ],
+     "files": {
+      "g1": {
+       "path": "t850a.g1.a.bin",
+       "bytes": 1129,
+       "sha256": "3e99127f119f042af8ccba88d687a0fecf1a5aa11c0a1b223dceb2cc537494e7"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "synthetic analytic travelling wave",
+    "valid": null
+   }
+  },
+  "t2a": {
+   "units": "K",
+   "scale": 0.1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48
+   ],
+   "domains": [
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      9
+     ],
+     "files": {
+      "np05": {
+       "path": "t2a.np05.a.bin",
+       "bytes": 2672,
+       "sha256": "76b6459b4cd7fd82dea9e5271bafedbfae690c87a72b07a5155aab66cc16d12c"
+      }
+     }
+    }
+   ],
+   "case": "C",
+   "source": {
+    "dataset": "synthetic analytic travelling wave",
+    "valid": null
+   }
+  }
+ },
+ "probes": [
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": 85
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": 82
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": 85
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": 89
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": 69
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": 58
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": -12
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": -13
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": -53
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": -69
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": 82
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 24,
+   "value": -85
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 24,
+   "value": -82
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 24,
+   "value": -85
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 24,
+   "value": -89
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 24,
+   "value": -69
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 24,
+   "value": -58
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 24,
+   "value": 12
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 24,
+   "value": 13
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 24,
+   "value": 53
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 24,
+   "value": 69
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 24,
+   "value": -82
+  }
+ ]
+}

@@ -1,0 +1,525 @@
+{
+ "schema": 1,
+ "sample": true,
+ "sample_note": "real fixture data, rebased; not a forecast",
+ "model": "Sample data (ERA5, GFS, NCEP reanalysis fixtures)",
+ "run": "2026-11-17T00:00Z",
+ "generated": "2026-11-17T23:50Z",
+ "attribution": "ERA5 (Copernicus/ECMWF), NOAA GFS, NCEP/NCAR reanalysis; xarray-data and cfgrib test files",
+ "climatology": {
+  "label": "ERA-Interim January mean, period not documented",
+  "source": "eraint_uvz.nc",
+  "method": "monthly mean"
+ },
+ "cases": {
+  "A": {
+   "label": "ERA5, 1-2 Jan 2017",
+   "fields": [
+    "z500",
+    "z500a",
+    "z500sd"
+   ]
+  },
+  "B": {
+   "label": "GFS, Hurricane Irma, 5-6 Sep 2017",
+   "fields": [
+    "ws250"
+   ]
+  },
+  "C": {
+   "label": "Motion demo: surface temperature, Jan 2013",
+   "fields": [
+    "t2a"
+   ]
+  }
+ },
+ "domains": {
+  "g1": {
+   "lon0": -180,
+   "lat0": 90,
+   "dlon": 1,
+   "dlat": -1,
+   "nx": 361,
+   "ny": 181
+  },
+  "np05": {
+   "lon0": 150,
+   "lat0": 75,
+   "dlon": 0.5,
+   "dlat": -0.5,
+   "nx": 321,
+   "ny": 131
+  }
+ },
+ "fields": {
+  "z500": {
+   "units": "gpm",
+   "scale": 1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    12,
+    24,
+    36
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      4
+     ],
+     "files": {
+      "g1": {
+       "path": "z500.g1.a.bin",
+       "bytes": 117837,
+       "sha256": "f9a4ab559e3b2f2b4dc461aa39456d6a4d2637907a8381e68513d0842046ed51"
+      },
+      "np05": {
+       "path": "z500.np05.a.bin",
+       "bytes": 57750,
+       "sha256": "464312c62a9be58a3dbce107b51daad7dc8fd4a7781072afe583e2c62b696a39"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "ERA5 EDA (era5-levels-members.grib), 3 deg, bilinear",
+    "file": "era5-levels-members.grib",
+    "valid": [
+     "2017-01-01T00:00Z",
+     "2017-01-01T12:00Z",
+     "2017-01-02T00:00Z",
+     "2017-01-02T12:00Z"
+    ]
+   }
+  },
+  "z500a": {
+   "units": "gpm",
+   "scale": 1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    12,
+    24,
+    36
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      4
+     ],
+     "files": {
+      "g1": {
+       "path": "z500a.g1.a.bin",
+       "bytes": 119836,
+       "sha256": "4ca9feff3c366ddc18be50dd206e44f42f8c46e47d7c6ee2d076ac19d638a0f0"
+      },
+      "np05": {
+       "path": "z500a.np05.a.bin",
+       "bytes": 59982,
+       "sha256": "4a5b8e19d1c1763bc9931eb175ae361c288dae3cdf70146b3c24f05146ef5e65"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "ERA5 EDA (era5-levels-members.grib), 3 deg, bilinear",
+    "file": "era5-levels-members.grib",
+    "valid": [
+     "2017-01-01T00:00Z",
+     "2017-01-01T12:00Z",
+     "2017-01-02T00:00Z",
+     "2017-01-02T12:00Z"
+    ]
+   }
+  },
+  "z500sd": {
+   "units": "gpm",
+   "scale": 0.1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    12,
+    24,
+    36
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      4
+     ],
+     "files": {
+      "g1": {
+       "path": "z500sd.g1.a.bin",
+       "bytes": 100558,
+       "sha256": "89224ab12cbe248742a2522667faaad66a070de2f8828abc2b1c2de8e742c4e3"
+      },
+      "np05": {
+       "path": "z500sd.np05.a.bin",
+       "bytes": 50972,
+       "sha256": "202780472491d96f17d80f2cbaa3f226a06e5947d20fff36f623d000611d7faf"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "ERA5 EDA (era5-levels-members.grib), 3 deg, bilinear",
+    "file": "era5-levels-members.grib",
+    "valid": [
+     "2017-01-01T00:00Z",
+     "2017-01-01T12:00Z",
+     "2017-01-02T00:00Z",
+     "2017-01-02T12:00Z"
+    ]
+   }
+  },
+  "ws250": {
+   "units": "m/s",
+   "scale": 0.1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24
+   ],
+   "domains": [
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      5
+     ],
+     "files": {
+      "np05": {
+       "path": "ws250.np05.a.bin",
+       "bytes": 49084,
+       "sha256": "2f1b856c394c83f3082e330670b0fd0258690d3f9c9a183597b84f2536f45667"
+      }
+     }
+    }
+   ],
+   "case": "B",
+   "source": {
+    "dataset": "NOAA GFS 0.5 deg, Hurricane Irma example (irma_gfs_example.nc)",
+    "file": "irma_gfs_example.nc",
+    "valid": [
+     "2017-09-05T12:00Z",
+     "2017-09-05T18:00Z",
+     "2017-09-06T00:00Z",
+     "2017-09-06T06:00Z",
+     "2017-09-06T12:00Z"
+    ]
+   }
+  },
+  "t2a": {
+   "units": "K",
+   "scale": 0.1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48,
+    54,
+    60,
+    66,
+    72,
+    78,
+    84,
+    90,
+    96,
+    102,
+    108,
+    114,
+    120
+   ],
+   "domains": [
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      21
+     ],
+     "files": {
+      "np05": {
+       "path": "t2a.np05.a.bin",
+       "bytes": 234187,
+       "sha256": "96b96cb91e3a562996dbd6912c670ae6715f88cb26d69b42b541887dd4025ef8"
+      }
+     }
+    }
+   ],
+   "case": "C",
+   "source": {
+    "dataset": "NCEP/NCAR reanalysis 4xdaily air temperature (air_temperature.nc), minus 2013-2014 mean",
+    "file": "air_temperature.nc",
+    "valid": [
+     "2013-01-01T00:00Z",
+     "2013-01-01T06:00Z",
+     "2013-01-01T12:00Z",
+     "2013-01-01T18:00Z",
+     "2013-01-02T00:00Z",
+     "2013-01-02T06:00Z",
+     "2013-01-02T12:00Z",
+     "2013-01-02T18:00Z",
+     "2013-01-03T00:00Z",
+     "2013-01-03T06:00Z",
+     "2013-01-03T12:00Z",
+     "2013-01-03T18:00Z",
+     "2013-01-04T00:00Z",
+     "2013-01-04T06:00Z",
+     "2013-01-04T12:00Z",
+     "2013-01-04T18:00Z",
+     "2013-01-05T00:00Z",
+     "2013-01-05T06:00Z",
+     "2013-01-05T12:00Z",
+     "2013-01-05T18:00Z",
+     "2013-01-06T00:00Z"
+    ]
+   }
+  }
+ },
+ "probes": [
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": -116
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": -114
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": -126
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": -112
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": -34
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": -38
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": -69
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": -69
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": 38
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": 41
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": 105
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 24,
+   "value": -149
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 24,
+   "value": -145
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 24,
+   "value": -287
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 24,
+   "value": -295
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 24,
+   "value": -96
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 24,
+   "value": -96
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 24,
+   "value": -21
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 24,
+   "value": -20
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 24,
+   "value": 200
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 24,
+   "value": 199
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 24,
+   "value": 2
+  }
+ ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "wse-gazetteer-tool",
+  "private": true,
+  "type": "module",
+  "description": "Tool-time only: builds site/geo/cities.json from all-the-cities (GeoNames, CC-BY-4.0).",
+  "scripts": { "build": "node build.mjs" },
+  "dependencies": {
+    "all-the-cities": "3.1.0",
+    "pbf": "3.2.1"
+  }
+}

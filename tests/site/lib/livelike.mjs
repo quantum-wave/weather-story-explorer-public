@@ -1,0 +1,33 @@
+// Make a live-like data folder from a fixture: the shape the pipeline publishes (sample:false, no `cases`, no per-field
+// `case`, a recent run) over the same chunk files. The weather stays synthetic and the manifest still says so, so
+// tools/assemble.sh refuses to publish it. Usage: node tests/site/lib/livelike.mjs <dst> [<src>]
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+export const SYNTHETIC = path.join(here, '..', 'fixtures', 'synthetic');
+
+export function makeLiveLike(dst, src = SYNTHETIC) {
+  fs.rmSync(dst, { recursive: true, force: true });
+  fs.mkdirSync(dst, { recursive: true });
+  for (const f of fs.readdirSync(src)) fs.copyFileSync(path.join(src, f), path.join(dst, f));
+  const mp = path.join(dst, 'manifest.json');
+  const m = JSON.parse(fs.readFileSync(mp, 'utf8'));
+  const now = new Date();
+  const run = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), Math.floor(now.getUTCHours() / 12) * 12));
+  const iso = (d) => d.toISOString().slice(0, 16) + 'Z';
+  m.sample = false;
+  delete m.sample_note;
+  delete m.cases;
+  for (const f of Object.values(m.fields)) delete f.case;
+  m.run = iso(run);
+  m.generated = iso(new Date(run.getTime() + 9.5 * 3600e3));
+  fs.writeFileSync(mp, JSON.stringify(m, null, 1));
+  return dst;
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  if (!process.argv[2]) { console.error('usage: livelike.mjs <dst> [<src>]'); process.exit(2); }
+  console.log(makeLiveLike(path.resolve(process.argv[2]), process.argv[3] ? path.resolve(process.argv[3]) : undefined));
+}

@@ -1,0 +1,69 @@
+# Deploy the site and the newest forecast data to Cloudflare Pages (https://weather-story-explorer.pages.dev/).
+# Runs after the `data` workflow succeeds, and on demand. Does nothing unless the repo secret
+# CLOUDFLARE_API_TOKEN is set (scripts/bootstrap-mac.sh --pages sets it and CLOUDFLARE_ACCOUNT_ID).
+# The `data` branch holds the built forecast in latest/ (an orphan branch force-pushed by data.yml).
+name: pages
+on:
+  workflow_run:
+    workflows: [data]
+    types: [completed]
+  workflow_dispatch:
+concurrency:
+  group: pages
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  gate:
+    # A secret cannot be tested in a job condition, so this job reports whether it is set.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    outputs:
+      deploy: ${{ steps.check.outputs.deploy }}
+    steps:
+      - id: check
+        env:
+          HAS_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
+          UPSTREAM: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+        run: |
+          if [ "$UPSTREAM" != "true" ]; then echo "data run did not succeed: nothing to deploy"; echo "deploy=false" >> "$GITHUB_OUTPUT"
+          elif [ "$HAS_TOKEN" != "true" ]; then echo "CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID not set: skipping the deploy (run scripts/bootstrap-mac.sh --pages)"; echo "deploy=false" >> "$GITHUB_OUTPUT"
+          else echo "deploy=true" >> "$GITHUB_OUTPUT"; fi
+  deploy:
+    needs: gate
+    if: needs.gate.outputs.deploy == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/checkout@v4
+        with:
+          ref: data
+          path: data
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Assemble dist
+        run: bash tools/assemble.sh dist data/latest --canonical-url https://weather-story-explorer.pages.dev/
+      - name: Site tests on the live data
+        run: node tests/site/run.mjs --data data/latest
+      - name: Create the Pages project (first run only)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if out="$(npx --yes wrangler@4 pages project create weather-story-explorer --production-branch main 2>&1)"; then
+            echo "$out"
+          elif echo "$out" | grep -qi "already exists"; then
+            echo "Pages project already exists"
+          else
+            echo "$out"; exit 1
+          fi
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4 pages deploy dist --project-name weather-story-explorer --branch main --commit-dirty=true

@@ -1,0 +1,7 @@
+# Runtime for the data pipeline (pipeline/, .github/workflows/data.yml). Python 3.12.
+numpy==2.5.3
+eccodes==2.50.1
+eccodeslib==2.50.0.34
+ecmwf-opendata==0.3.35
+jsonschema==4.26.0
+requests==2.34.2
