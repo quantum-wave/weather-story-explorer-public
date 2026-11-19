@@ -44,7 +44,9 @@ test('the five honesty checks carry tier deploy', async () => {
 });
 test('pages.yml installs the pinned browser, uses Node 24 and runs --tier deploy; test.yml pins Playwright and Node 24', () => {
   const pages = fs.readFileSync(`${root}.github/workflows/pages.yml`, 'utf8');
-  assert.match(pages, /playwright@\d+\.\d+\.\d+ install/); assert.match(pages, /node-version: "24"/); assert.match(pages, /run\.mjs --data data\/latest --tier deploy/);
+  assert.match(pages, /ci-install-browser\.sh \d+\.\d+\.\d+/); assert.match(pages, /node-version: "24"/); assert.match(pages, /run\.mjs --data data\/latest --tier deploy/);
   const t = fs.readFileSync(`${root}.github/workflows/test.yml`, 'utf8');
-  assert.match(t, /PLAYWRIGHT_VERSION: "\d+\.\d+\.\d+"/); assert.match(t, /node-version: "24"/); assert.match(t, /upload-artifact/);
+  assert.match(t, /PLAYWRIGHT_VERSION: "\d+\.\d+\.\d+"/); assert.match(t, /ci-install-browser\.sh "\$\{PLAYWRIGHT_VERSION\}"/);
+  const inst = fs.readFileSync(`${root}tools/ci-install-browser.sh`, 'utf8');
+  assert.match(inst, /playwright@\$v" install chromium-headless-shell/); assert.match(inst, /CHROME_BIN=\$shell" >> "\$GITHUB_ENV"/); assert.match(t, /node-version: "24"/); assert.match(t, /upload-artifact/);
 });
