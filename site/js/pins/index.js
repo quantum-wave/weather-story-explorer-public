@@ -50,6 +50,7 @@ export function createPins({ storage, gazetteer = gaz, eventBus = bus, today = (
   let kind = be.kind;
   let area = be.area;
   let writeOk = true;
+  let lastError = '';
   let doc = fresh();
   let loadedRaw = null;
 
@@ -132,7 +133,9 @@ export function createPins({ storage, gazetteer = gaz, eventBus = bus, today = (
       changed({ id: pin.id, op: 'add' });
       return pin.id;
     },
+    /** Returns true when stored, false when nothing was stored (unknown id, or an inverted trip range: see lastError()). */
     update(id, patch = {}) {
+      lastError = '';
       const f = findIdx(id);
       if (!f) return false;
       const o = doc[f.list][f.i];
@@ -149,8 +152,10 @@ export function createPins({ storage, gazetteer = gaz, eventBus = bus, today = (
         if ('city' in patch) { const c = gaz.snapshotCity(patch.city); if (c) next.city = c; }
         if ('start' in patch && isISO(patch.start)) next.start = patch.start;
         if ('end' in patch && isISO(patch.end)) next.end = patch.end;
-        if (next.end < next.start) { if ('start' in patch && !('end' in patch)) next.end = next.start; else next.start = next.end; }
+        // An inverted range is rejected, never swapped or clamped: the caller shows the message and nothing is stored.
+        if (next.end < next.start) { lastError = 'Ends before it starts'; return false; }
       }
+      lastError = '';
       next.updated = Date.now();
       doc[f.list][f.i] = next;
       changed({ id, op: 'update' });
@@ -249,6 +254,8 @@ export function createPins({ storage, gazetteer = gaz, eventBus = bus, today = (
     exportCSV: () => toCSV(doc),
     storageOk: () => kind === 'local' && writeOk,
     storageKind: () => kind,
+    /** Why the last update() stored nothing ('' after a successful one). */
+    lastError: () => lastError,
     needsBackupPrompt() { const n = doc.pins.length, d = doc.meta.backupDismissedAt || 0; return n >= 10 && (d === 0 || n >= d + 10); },
     dismissBackupPrompt() { doc.meta.backupDismissedAt = doc.pins.length; changed({ meta: true }); },
     /** Test and settings hook: forget everything (keeps nothing). Returns undo(). */

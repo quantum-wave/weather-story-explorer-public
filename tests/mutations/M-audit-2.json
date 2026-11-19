@@ -1,0 +1,13 @@
+{
+  "id": "audit-2",
+  "file": "site/js/story/index.js",
+  "find": "if (noData || past10) svgEl('rect',",
+  "replace": "if (true) svgEl('rect',",
+  "checks": [
+    "S-STORY",
+    "S-HONEST",
+    "S-SAMPLE"
+  ],
+  "expect": "known-survivor",
+  "note": "AUDIT-TESTS row 1 and section 1: hatching every Your-week day passes S-STORY, S-HONEST and S-SAMPLE; killed by the W2-06 hatch assertions, which re-target this mutant"
+}

@@ -3,6 +3,7 @@
 import { mount } from '../wp2/shot.mjs';
 
 export const id = 'S-DECODE';
+export const tier = 'deploy'; // fast, offline, about data honesty: the data and Pages workflows run it
 export const freshProfile = false;
 export const timeoutMs = 90000;
 

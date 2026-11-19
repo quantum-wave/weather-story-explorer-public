@@ -1,0 +1,11 @@
+{
+ "id": "sheet-1",
+ "file": "site/js/ui/sheet.js",
+ "find": "  return api;",
+ "replace": "  new MutationObserver(() => { resize(); }).observe(body, { subtree: true, childList: true, characterData: true }); return api;",
+ "checks": [
+  "S-SHEET"
+ ],
+ "expect": "killed",
+ "note": "Animate on every mutation: the sheet follows its content on any DOM or text change, so a text change that wraps moves the height. S-SHEET's zero-height-change-on-text assertion must fail (design spec 8.1, Josh point 10, P-C4)."
+}

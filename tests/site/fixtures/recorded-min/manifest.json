@@ -1,0 +1,634 @@
+{
+ "schema": 1,
+ "sample": true,
+ "sample_note": "synthetic test data in the shape of one recorded run; not a forecast",
+ "sample_label": "Recorded run shape (synthetic stand-in), run 2026-11-17 00Z",
+ "model": "Synthetic test fixture (recorded shape)",
+ "run": "2026-11-17T00:00Z",
+ "generated": "2026-11-17T23:50Z",
+ "attribution": "synthetic test data, no source",
+ "climatology": {
+  "label": "synthetic",
+  "source": "analytic",
+  "method": "analytic"
+ },
+ "domains": {
+  "g1": {
+   "lon0": -180,
+   "lat0": 90,
+   "dlon": 2,
+   "dlat": -2,
+   "nx": 181,
+   "ny": 91
+  },
+  "np05": {
+   "lon0": 150,
+   "lat0": 75,
+   "dlon": 1,
+   "dlat": -1,
+   "nx": 161,
+   "ny": 66
+  }
+ },
+ "fields": {
+  "z500": {
+   "units": "gpm",
+   "scale": 1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    12,
+    24,
+    36,
+    48,
+    60,
+    72,
+    84,
+    96,
+    108,
+    120,
+    132,
+    144,
+    156,
+    168,
+    180,
+    192,
+    204,
+    216,
+    228,
+    240
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      11
+     ],
+     "files": {
+      "g1": {
+       "path": "z500.g1.a.bin",
+       "bytes": 55614,
+       "sha256": "edd8d5ee1bd41640067847bbc3f698434aa23037be39783305c35034d940df2c"
+      },
+      "np05": {
+       "path": "z500.np05.a.bin",
+       "bytes": 54209,
+       "sha256": "4f0033a4f4423b341c3d318362a1c8dd1c66ba4db64a97ad61e1491aa09cd12f"
+      }
+     }
+    },
+    {
+     "id": "b",
+     "steps": [
+      11,
+      21
+     ],
+     "files": {
+      "g1": {
+       "path": "z500.g1.b.bin",
+       "bytes": 50176,
+       "sha256": "4575782eba4c7d8ea3dd98c805a68c30530c93e85d633fe1ed8c60b0860e987a"
+      },
+      "np05": {
+       "path": "z500.np05.b.bin",
+       "bytes": 48086,
+       "sha256": "60a12930bcc33f90af633db7f2c38fc2310ff175933214a8da1fb4333e9501ff"
+      }
+     }
+    }
+   ],
+   "source": {
+    "dataset": "synthetic recorded-shape fixture (W1-02), analytic",
+    "valid": [
+     "2026-11-17T00:00Z",
+     "2026-11-17T12:00Z",
+     "2026-11-18T00:00Z",
+     "2026-11-18T12:00Z",
+     "2026-11-19T00:00Z",
+     "2026-11-19T12:00Z",
+     "2026-11-20T00:00Z",
+     "2026-11-20T12:00Z",
+     "2026-11-21T00:00Z",
+     "2026-11-21T12:00Z",
+     "2026-11-22T00:00Z",
+     "2026-11-22T12:00Z",
+     "2026-11-23T00:00Z",
+     "2026-11-23T12:00Z",
+     "2026-11-24T00:00Z",
+     "2026-11-24T12:00Z",
+     "2026-11-25T00:00Z",
+     "2026-11-25T12:00Z",
+     "2026-11-26T00:00Z",
+     "2026-11-26T12:00Z",
+     "2026-11-27T00:00Z"
+    ]
+   }
+  },
+  "z500a": {
+   "units": "gpm",
+   "scale": 1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    12,
+    24,
+    36,
+    48,
+    60,
+    72,
+    84,
+    96,
+    108,
+    120,
+    132,
+    144,
+    156,
+    168,
+    180,
+    192,
+    204,
+    216,
+    228,
+    240
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      11
+     ],
+     "files": {
+      "g1": {
+       "path": "z500a.g1.a.bin",
+       "bytes": 43809,
+       "sha256": "29e09f2065b30ee4c8e979078c555444e3a88ed2bcf8dd8d6935899ffcd22f06"
+      },
+      "np05": {
+       "path": "z500a.np05.a.bin",
+       "bytes": 53350,
+       "sha256": "bde44c4b8ab37fbff4352d45e8ddaf31e53240efcad44b01c2e7467cb0080888"
+      }
+     }
+    },
+    {
+     "id": "b",
+     "steps": [
+      11,
+      21
+     ],
+     "files": {
+      "g1": {
+       "path": "z500a.g1.b.bin",
+       "bytes": 39765,
+       "sha256": "befaa37ae4d3f3845621362a34829f7052f647b9623afe2072164876a963cd03"
+      },
+      "np05": {
+       "path": "z500a.np05.b.bin",
+       "bytes": 47525,
+       "sha256": "c17ca5032e6f047b6a7099ce19108adde218b53637c8bf0b110c8b7198667eb9"
+      }
+     }
+    }
+   ],
+   "source": {
+    "dataset": "synthetic recorded-shape fixture (W1-02), analytic",
+    "valid": [
+     "2026-11-17T00:00Z",
+     "2026-11-17T12:00Z",
+     "2026-11-18T00:00Z",
+     "2026-11-18T12:00Z",
+     "2026-11-19T00:00Z",
+     "2026-11-19T12:00Z",
+     "2026-11-20T00:00Z",
+     "2026-11-20T12:00Z",
+     "2026-11-21T00:00Z",
+     "2026-11-21T12:00Z",
+     "2026-11-22T00:00Z",
+     "2026-11-22T12:00Z",
+     "2026-11-23T00:00Z",
+     "2026-11-23T12:00Z",
+     "2026-11-24T00:00Z",
+     "2026-11-24T12:00Z",
+     "2026-11-25T00:00Z",
+     "2026-11-25T12:00Z",
+     "2026-11-26T00:00Z",
+     "2026-11-26T12:00Z",
+     "2026-11-27T00:00Z"
+    ]
+   }
+  },
+  "z500sd": {
+   "units": "gpm",
+   "scale": 0.1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    12,
+    24,
+    36,
+    48,
+    60,
+    72,
+    84,
+    96,
+    108,
+    120,
+    132,
+    144,
+    156,
+    168,
+    180,
+    192,
+    204,
+    216,
+    228,
+    240
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      11
+     ],
+     "files": {
+      "g1": {
+       "path": "z500sd.g1.a.bin",
+       "bytes": 9111,
+       "sha256": "d6a94974a71f058f6f5a7d8e610349f7bb488c860e26fa0fe973bd7f0461ae38"
+      },
+      "np05": {
+       "path": "z500sd.np05.a.bin",
+       "bytes": 5618,
+       "sha256": "0664484aa1a27b381d74c91d085ccccfc8871f56e3417741fe33c053fb25ecb7"
+      }
+     }
+    },
+    {
+     "id": "b",
+     "steps": [
+      11,
+      21
+     ],
+     "files": {
+      "g1": {
+       "path": "z500sd.g1.b.bin",
+       "bytes": 13048,
+       "sha256": "bc17424440320d3f99d7b4d8f4464be226132f2f9df6e69a6f0874999b727a0e"
+      },
+      "np05": {
+       "path": "z500sd.np05.b.bin",
+       "bytes": 7655,
+       "sha256": "b3c9ce9969c4d3460a754672b58458cbfa580d79f96279871bab0df382c044cb"
+      }
+     }
+    }
+   ],
+   "source": {
+    "dataset": "synthetic recorded-shape fixture (W1-02), analytic",
+    "valid": [
+     "2026-11-17T00:00Z",
+     "2026-11-17T12:00Z",
+     "2026-11-18T00:00Z",
+     "2026-11-18T12:00Z",
+     "2026-11-19T00:00Z",
+     "2026-11-19T12:00Z",
+     "2026-11-20T00:00Z",
+     "2026-11-20T12:00Z",
+     "2026-11-21T00:00Z",
+     "2026-11-21T12:00Z",
+     "2026-11-22T00:00Z",
+     "2026-11-22T12:00Z",
+     "2026-11-23T00:00Z",
+     "2026-11-23T12:00Z",
+     "2026-11-24T00:00Z",
+     "2026-11-24T12:00Z",
+     "2026-11-25T00:00Z",
+     "2026-11-25T12:00Z",
+     "2026-11-26T00:00Z",
+     "2026-11-26T12:00Z",
+     "2026-11-27T00:00Z"
+    ]
+   }
+  }
+ },
+ "probes": [
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": 238
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": 238
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": 259
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": 259
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": 168
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": 176
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": -32
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": -28
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": -173
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": -170
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": 307
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 120,
+   "value": -269
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 120,
+   "value": -269
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 120,
+   "value": -292
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 120,
+   "value": -292
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 120,
+   "value": -1
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 120,
+   "value": -19
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 120,
+   "value": -11
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 120,
+   "value": -9
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 120,
+   "value": 276
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 120,
+   "value": 278
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 120,
+   "value": -239
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500sd",
+   "domain": "g1",
+   "step": 120,
+   "value": 19.4
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500sd",
+   "domain": "np05",
+   "step": 120,
+   "value": 19.4
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500sd",
+   "domain": "g1",
+   "step": 120,
+   "value": 20.0
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500sd",
+   "domain": "np05",
+   "step": 120,
+   "value": 20.0
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500sd",
+   "domain": "g1",
+   "step": 120,
+   "value": 20.8
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500sd",
+   "domain": "np05",
+   "step": 120,
+   "value": 20.8
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500sd",
+   "domain": "g1",
+   "step": 120,
+   "value": 16.4
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500sd",
+   "domain": "np05",
+   "step": 120,
+   "value": 16.3
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500sd",
+   "domain": "g1",
+   "step": 120,
+   "value": 22.6
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500sd",
+   "domain": "np05",
+   "step": 120,
+   "value": 22.8
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "z500sd",
+   "domain": "g1",
+   "step": 120,
+   "value": 24.1
+  }
+ ]
+}

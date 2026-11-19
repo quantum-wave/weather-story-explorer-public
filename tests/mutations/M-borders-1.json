@@ -1,0 +1,11 @@
+{
+  "id": "borders-1",
+  "file": "site/js/render/basemap.js",
+  "find": "  stroke(border, tk.border.casing, tk.border.casingAlpha, tk.border.casingWidth);\n  stroke(coast, tk.coast.casing, tk.coast.casingAlpha, tk.coast.casingWidth);\n",
+  "replace": "",
+  "checks": [
+    "S-LINEART"
+  ],
+  "expect": "killed",
+  "note": "DESIGN-SPEC 4.4: the casing under the core is what keeps a line legible over the deepest band (core alone is 1.85:1 on the deepest blue). Removing both casing strokes must fail S-LINEART where the field is dark (Paper, field on)."
+}

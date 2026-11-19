@@ -59,7 +59,14 @@ cp "$A/site/data/manifest.json" "$A/real-manifest.bak"; echo '{"sample":true,"at
 asm "$A/d6"; [ "$ARC" -ne 0 ] && grep -q 'synthetic' "$A/err"; check "assemble: refuses synthetic data in site/data" $? "rc=$ARC"
 cp "$A/real-manifest.bak" "$A/site/data/manifest.json"
 # the repo's own site/data and the fixture the tests default to
-! grep -qi synthetic "$ROOT/site/data/manifest.json"; check "site/data (shipped by default) is not synthetic" $? "synthetic found"
+SD="${WSE_SITE_DATA_MANIFEST:-$ROOT/site/data/manifest.json}" # wse-lint: ok (presence asserted just below)
+if [ -f "$SD" ]; then
+  ! grep -qi synthetic "$SD"; check "site/data (shipped by default) is not synthetic" $? "synthetic found"
+elif [ -n "${WSE_SKIP_SITE_DATA:-}" ]; then
+  ok "site/data (shipped by default) is not synthetic: SKIPPED explicitly (WSE_SKIP_SITE_DATA), site/data is not built here"
+else
+  bad "site/data (shipped by default) is not synthetic" "site/data/manifest.json is absent: build it, or set WSE_SKIP_SITE_DATA=1 to skip explicitly"
+fi
 
 # the real site, against the real limits
 ( cd "$ROOT" && bash tools/assemble.sh "$WORK/real-dist" tests/site/fixtures/sample-min --canonical-url https://example.pages.dev/ ) > "$A/out" 2> "$A/err"
@@ -91,7 +98,7 @@ done
 for u in "https://cdn.jsdelivr.net/npm/gifenc@1.0.3/dist/gifenc.esm.js" "https://cdn.jsdelivr.net/npm/fflate@0.8.3/esm/browser.js"; do
   grep -qF "'$u'" "$B/art/js/vendor.js"; check "assemble --artifact: vendor.js imports $u" $? "$(cat "$B/art/js/vendor.js")"
 done
-! grep -rq 'vendor/' "$B/art/index.html" "$B/art/js/vendor.js"; check "assemble --artifact: no vendor/ path is left" $? "$(grep -rn 'vendor/' "$B/art/index.html" "$B/art/js/vendor.js")"
+[ -f "$B/art/index.html" ] && [ -f "$B/art/js/vendor.js" ] && ! grep -rq 'vendor/' "$B/art/index.html" "$B/art/js/vendor.js"; check "assemble --artifact: no vendor/ path is left" $? "$(grep -rn 'vendor/' "$B/art/index.html" "$B/art/js/vendor.js")"
 node --input-type=module --check < "$B/art/js/vendor.js" 2>"$B/syn.err"; check "assemble --artifact: vendor.js is still valid JavaScript" $? "$(cat "$B/syn.err")"
 [ "$(cat "$B/art/config.json")" = '{"canonicalUrl":null}' ]; check "assemble --artifact: config.json still written" $? "$(cat "$B/art/config.json")"
 asmb "$B/art" "$B/data-in" --artifact --canonical-url https://claude.ai/x

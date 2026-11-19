@@ -1,0 +1,11 @@
+{
+ "id": "sheet-close-instant",
+ "file": "site/js/ui/sheet.js",
+ "find": "if (reduced()) { finish(); return Promise.resolve(); }",
+ "replace": "{ finish(); return Promise.resolve(); }",
+ "checks": [
+  "S-SHEET"
+ ],
+ "expect": "killed",
+ "note": "Close is instant: S-SHEET's close recordings (intermediate frames, about 180 ms) must fail."
+}

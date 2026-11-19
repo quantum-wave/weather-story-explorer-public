@@ -1,7 +1,10 @@
 // S-PINS (SPEC section 13): `Maya in Portland` adds a person in Portland, OR; `Trip: Tahoe Nov 27-30` resolves South Lake Tahoe;
 // reload keeps both; copy all -> clear -> paste restores them. Driven through the real quick-add field, toast, edit sheet,
 // panel and press-and-hold, mounted into a test container so it does not depend on the shell's layout.
+import fs from 'node:fs';
+import { artifactPath } from '../lib/artifacts.mjs';
 export const id = 'S-PINS';
+export const tier = 'full';
 export const freshProfile = true;
 export const timeoutMs = 90000;
 
@@ -128,7 +131,9 @@ export async function run({ page, baseUrl, assert }) {
   assert.ok(placed && placed.city.name, 'a place at a gazetteer city');
   assert.match(await toastText(), /Added /);
 
-  await page.screenshot('/home/claude/wse-work/wp5-s-pins-phone.png');
+  const shot = artifactPath('S-PINS', 'phone.png');
+  await page.screenshot(shot);
+  assert.ok(fs.existsSync(shot), 'the screenshot is written under $WSE_ARTIFACTS');
   assert.deepEqual(page.errors(), [], 'console errors: ' + JSON.stringify(page.errors()));
   assert.deepEqual(page.externalRequests, []);
 }

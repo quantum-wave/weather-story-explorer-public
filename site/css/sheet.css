@@ -1,0 +1,82 @@
+/* The one sheet (W2-08, design spec 8.1 and 11.4). Phone: a bottom sheet as tall as its content (up to 92% of the visual
+   viewport). From 900 px: a 420 px dialog. Colours come from the section 10.1 tokens; every use carries a fallback so the sheet
+   renders before tokens.css lands. Class names are prefixed wse-sheet- so they never meet the shell's own .sheet-handle/.modal. */
+.wse-sheet-root {
+  --ws-surface: var(--surface, #161A1F);
+  --ws-text: var(--text, #ECEEF1);
+  --ws-text-2: var(--text-2, #A3ACB7);
+  --ws-hairline: var(--hairline, #2A3038);
+  --ws-accent: var(--accent, #F4F1EA);
+  --ws-on-accent: var(--on-accent, #14171A);
+  --ws-danger: var(--danger, #FF6369);
+  --ws-scrim: var(--scrim, rgba(0, 0, 0, 0.5));
+  --ws-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  position: fixed; left: 0; top: var(--wse-vv-top, 0px); width: 100%; height: var(--wse-vv-h, 100%); z-index: 1000;
+  display: flex; align-items: flex-end; justify-content: center;
+  font: 15px/20px -apple-system, "SF Pro Text", system-ui, sans-serif; color: var(--ws-text); color-scheme: dark;
+  -webkit-text-size-adjust: 100%;
+}
+:root[data-theme="light"] .wse-sheet-root {
+  --ws-surface: var(--surface, #FFFFFF);
+  --ws-text: var(--text, #1A1D21);
+  --ws-text-2: var(--text-2, #5A616B);
+  --ws-hairline: var(--hairline, #DEDAD2);
+  --ws-accent: var(--accent, #1A1D21);
+  --ws-on-accent: var(--on-accent, #FFFFFF);
+  --ws-danger: var(--danger, #C62A2F);
+  --ws-scrim: var(--scrim, rgba(20, 23, 26, 0.35));
+  --ws-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  color-scheme: light;
+}
+.wse-sheet-root[data-pending] { visibility: hidden; }
+
+.wse-sheet-scrim { position: absolute; inset: 0; background: var(--ws-scrim); }
+
+.wse-sheet {
+  position: relative; box-sizing: border-box; width: 100%; max-height: var(--wse-max, 92%); display: flex; flex-direction: column;
+  background: var(--ws-surface); color: var(--ws-text); border: 1px solid var(--ws-hairline); border-bottom: 0;
+  border-radius: 14px 14px 0 0; box-shadow: var(--ws-shadow); overflow: hidden; outline: none;
+}
+
+/* the drag zone: handle and title row (touch-action none so a finger drag reaches the pointer handlers) */
+.wse-sheet-top { flex: none; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+.wse-sheet-handle { display: flex; justify-content: center; padding: 8px 0 4px; }
+.wse-sheet-handle span { display: block; width: 36px; height: 4px; border-radius: 2px; background: var(--ws-hairline); }
+.wse-sheet-head { display: flex; align-items: center; gap: 8px; padding: 4px 8px 4px 16px; min-height: 44px; }
+.wse-sheet-title { flex: 1; min-width: 0; margin: 0; font: 600 17px/22px -apple-system, "SF Pro Text", system-ui, sans-serif; color: var(--ws-text); overflow-wrap: anywhere; }
+.wse-sheet-close {
+  flex: none; width: 44px; height: 44px; padding: 0; display: grid; place-items: center; font: 17px/1 -apple-system, "SF Pro Text", system-ui, sans-serif;
+  color: var(--ws-text-2); background: none; border: 0; border-radius: 8px; cursor: pointer; touch-action: manipulation;
+}
+.wse-sheet-close:hover { color: var(--ws-text); }
+
+.wse-sheet-body { flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding: 4px 16px 16px; }
+.wse-sheet-actions {
+  flex: none; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--ws-hairline); background: var(--ws-surface);
+}
+.wse-sheet-buttons { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; width: 100%; }
+.wse-sheet-buttons[hidden], .wse-sheet-confirm[hidden] { display: none; }
+.wse-sheet-confirm { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; width: 100%; }
+.wse-sheet-confirm p { margin: 0 auto 0 0; font-weight: 600; }
+
+.wse-sheet-btn {
+  min-height: 44px; min-width: 44px; padding: 0 16px; box-sizing: border-box; font: 600 15px/20px -apple-system, "SF Pro Text", system-ui, sans-serif;
+  color: var(--ws-text); background: none; border: 1px solid var(--ws-hairline); border-radius: 8px; cursor: pointer; touch-action: manipulation;
+}
+.wse-sheet-btn[data-kind="primary"] { background: var(--ws-accent); color: var(--ws-on-accent); border-color: transparent; }
+.wse-sheet-btn[data-kind="danger"] { color: var(--ws-danger); border-color: transparent; margin-right: auto; }
+.wse-sheet-btn:disabled { opacity: 0.45; cursor: default; }
+.wse-sheet-btn:focus-visible, .wse-sheet-close:focus-visible { outline: 2px solid var(--ws-accent); outline-offset: 2px; }
+
+@media (min-width: 900px) {
+  .wse-sheet-root { align-items: center; }
+  .wse-sheet { width: 420px; max-width: calc(100% - 32px); border-bottom: 1px solid var(--ws-hairline); border-radius: 14px; }
+  .wse-sheet-handle { display: none; }
+  .wse-sheet-top { cursor: default; touch-action: auto; }
+  .wse-sheet-head { padding-top: 8px; }
+  .wse-sheet-actions { padding-bottom: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wse-sheet-root * { animation: none !important; transition: none !important; }
+}

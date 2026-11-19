@@ -5,8 +5,8 @@
   python -m pipeline.build --run 2026111800 --fields z500,z500a,tp6 --model aifs ...
 
 Live runs fetch one step at a time (missing steps are dropped), reduce on the native grid, subtract the climatology,
-quantize and write the chunk files, then validate. Exit 2 means "do not publish" (validation failed, or z500a does
-not reach 168 h).
+quantize and write the chunk files, then validate. Exit 2 means "do not publish" (a REQUIRED field failed, or z500a does
+not reach 168 h); an optional field that is absent or fails a check is dropped and listed in `missing`.
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ import numpy as np
 from . import fetch, reduce, runs
 from .anomaly import Climatology
 from .encode import ManifestWriter, iso_minute
-from .validate import ValidationError, validate
+from .validate import REQUIRED, ValidationError, validate_dropping_optional
 
 LOG = logging.getLogger("pipeline.build")
 
@@ -65,18 +65,26 @@ def build_live(run, model, fields, out, clim_path=None, retriever=None, workers=
     if not res:
         raise RuntimeError("no step could be fetched: is the run posted, and is the source reachable?")
     w = ManifestWriter(out)
+    missing = []
+
+    def skipped(fid, why):
+        LOG.warning("%s: %s, skipped", fid, why)
+        if fid not in REQUIRED:
+            missing.append({"field": fid, "reason": why})
+
     for fid in fields:
         if fid == "tp6":
             cum = {s: v["tp_cum"] for s, v in res.items() if "tp_cum" in v}
             st, grids = reduce.tp6_from_cumulative(cum)
             if not st:
-                LOG.warning("tp6: no consecutive 6-hourly steps, skipped")
+                skipped(fid, "no consecutive 6-hourly steps arrived")
                 continue
             grids = {d: grids[d] for d in FIELD_DOMAINS[fid] if d in grids}
         else:
             st = sorted(s for s, v in res.items() if fid in v)
             if not st:
-                LOG.warning("%s: no step arrived, skipped", fid)
+                skipped(fid, "ensemble files not yet published" if fid in runs.ENSEMBLE_FIELDS
+                        else "no step arrived")
                 continue
             grids = {d: np.stack([res[s][fid][d] for s in st]) for d in FIELD_DOMAINS[fid]}
         w.add_field(fid, st, grids, source={"dataset": f"{MODEL_LABEL[model]} 0.25 deg open data: {DATASET[fid]}",
@@ -87,6 +95,8 @@ def build_live(run, model, fields, out, clim_path=None, retriever=None, workers=
         "attribution": "ECMWF open data CC-BY-4.0",
         "climatology": clim.description if clim else {"label": "none", "source": "none", "method": "none"},
     }
+    if missing:
+        head["missing"] = missing
     return w.write(head)
 
 
@@ -135,7 +145,8 @@ def main(argv=None):
     retriever = fetch.Retriever(a.workdir, a.model, sources)
     try:
         build_live(run, a.model, fields, a.out, a.clim, retriever, a.workers, max_step)
-        res = validate(a.out, require_z500a_hours=MIN_Z500A_HOURS if "z500a" in fields else None)
+        res = validate_dropping_optional(a.out, require_z500a_hours=MIN_Z500A_HOURS if "z500a" in fields else None,
+                                         require_fields=fields, max_step=max_step)
     except (ValidationError, FileNotFoundError, RuntimeError) as e:
         print(f"BUILD FAILED, nothing to publish: {e}", file=sys.stderr)
         return 2
@@ -143,6 +154,8 @@ def main(argv=None):
         if not a.keep_raw:
             shutil.rmtree(a.workdir, ignore_errors=True)
     print(f"live build ok: run {run:%Y%m%d%H}, {res['files']} files, {res['bytes']} bytes, fields {res['fields']}")
+    if res["missing"]:
+        print(f"::warning::published without optional field(s): {', '.join(res['missing'])}")
     return 0
 
 

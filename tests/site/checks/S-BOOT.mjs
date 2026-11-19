@@ -1,6 +1,7 @@
 // S-BOOT: the page loads, no console error, no external request, __wse.ready true.
 // Integration only (later): no `// STUB` left in site/js/.
 export const id = 'S-BOOT';
+export const tier = 'deploy'; // fast, offline, about data honesty: the data and Pages workflows run it
 export const freshProfile = false;
 export async function run({ page, baseUrl, assert, dataDir }) {
   const man = JSON.parse((await import('node:fs')).readFileSync((await import('node:path')).join(dataDir, 'manifest.json'), 'utf8'));

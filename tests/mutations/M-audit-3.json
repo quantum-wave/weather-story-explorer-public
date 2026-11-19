@@ -1,0 +1,11 @@
+{
+  "id": "audit-3",
+  "file": "site/js/render/index.js",
+  "find": "if (s.view === 'nh' && g.xf.k === 1) {",
+  "replace": "if (false && s.view === 'nh' && g.xf.k === 1) {",
+  "checks": [
+    "S-PROJ"
+  ],
+  "expect": "killed",
+  "note": "AUDIT-TESTS section 1: hemisphere spin disabled, the positive control; S-PROJ fails on 'the point under the finger follows it'"
+}

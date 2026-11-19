@@ -2,11 +2,12 @@
 # Tests for scripts/bootstrap-mac.sh (stub gh, git, security on PATH) and tools/assemble.sh.
 #   bash tests/scripts/bootstrap.test.sh
 # Prints PASS/FAIL per check and "SCRIPTS: <n> passed, <m> failed"; exit 1 on any failure.
-# Fakes live in a temp folder under $TMPDIR and are removed on every exit path.
+# Fakes live in a temp folder under $WSE_ARTIFACTS (default out/test-artifacts) and are removed on every exit path.
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd -P)"
 ROOT="$(cd "$HERE/../.." && pwd -P)"
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/wse-scripts-test.XXXXXX")" || exit 1
+ART="${WSE_ARTIFACTS:-$ROOT/out/test-artifacts}"; mkdir -p "$ART" || exit 1
+WORK="$(mktemp -d "$ART/wse-scripts-test.XXXXXX")" || exit 1
 cleanup() { rm -rf "$WORK"; }
 trap cleanup EXIT
 trap 'exit 130' INT

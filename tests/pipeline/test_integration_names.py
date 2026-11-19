@@ -2,6 +2,7 @@
 import re
 from pathlib import Path
 
+import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -39,8 +40,11 @@ def test_clim_branch_name_is_shared():
         assert "--branch clim" in text or "clim" in text
 
 
+# Private-only: GUIDE.md is not in tools/export-public.sh's allowlist, so the public mirror has no copy. The test runs in the
+# private repo and is skipped (with this reason shown) in the mirror.
+@pytest.mark.skipif(not (ROOT / "GUIDE.md").exists(), reason="private-only: GUIDE.md is not exported to the public mirror")  # wse-lint: ok
 def test_guide_documents_the_launcher_not_dash_m():
-    guide = (ROOT / "GUIDE.md").read_text()
+    guide = (ROOT / "GUIDE.md").read_text()  # wse-lint: ok (private-only test, skipped when absent)
     assert "pipeline/run.py" in guide
     assert "python -I -m pipeline" not in guide.replace("`python -I -m pipeline.build` cannot work", "")
     assert "tests/scripts/bootstrap.test.sh" in guide

@@ -2,6 +2,7 @@
 import { mount, shoot, stats, meanChroma, purpleShare } from '../wp2/shot.mjs';
 
 export const id = 'S-RENDER';
+export const tier = 'deploy'; // fast, offline, about data honesty: the data and Pages workflows run it
 export const freshProfile = false;
 export const timeoutMs = 120000;
 const DARK = [12, 16, 20], LIGHT = [249, 246, 242];

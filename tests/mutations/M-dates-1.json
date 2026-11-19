@@ -1,0 +1,11 @@
+{
+ "id": "M-dates-1",
+ "file": "site/js/pins/index.js",
+ "find": "if (next.end < next.start) { lastError = 'Ends before it starts'; return false; }",
+ "replace": "if (next.end < next.start) { if ('start' in patch && !('end' in patch)) next.end = next.start; else next.start = next.end; }",
+ "checks": [
+  "unit:wp5.pins.test.mjs"
+ ],
+ "expect": "killed",
+ "note": "Swap-instead-of-reject: the pre-W2-07 behaviour that corrupted a trip while typing (UX-3). The inverted-range tests must fail."
+}

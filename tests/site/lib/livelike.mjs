@@ -1,9 +1,10 @@
 // Make a live-like data folder from a fixture: the shape the pipeline publishes (sample:false, no `cases`, no per-field
 // `case`, a recent run) over the same chunk files. The weather stays synthetic and the manifest still says so, so
-// tools/assemble.sh refuses to publish it. Usage: node tests/site/lib/livelike.mjs <dst> [<src>]
+// tools/assemble.sh refuses to publish it. Usage: node tests/site/lib/livelike.mjs [<dst> [<src>]]   (dst defaults to $WSE_ARTIFACTS/livelike/data)
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { artifactPath } from './artifacts.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const SYNTHETIC = path.join(here, '..', 'fixtures', 'synthetic');
@@ -28,6 +29,5 @@ export function makeLiveLike(dst, src = SYNTHETIC) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  if (!process.argv[2]) { console.error('usage: livelike.mjs <dst> [<src>]'); process.exit(2); }
-  console.log(makeLiveLike(path.resolve(process.argv[2]), process.argv[3] ? path.resolve(process.argv[3]) : undefined));
+  console.log(makeLiveLike(process.argv[2] ? path.resolve(process.argv[2]) : path.dirname(artifactPath('livelike', 'data', 'x')), process.argv[3] ? path.resolve(process.argv[3]) : undefined));
 }

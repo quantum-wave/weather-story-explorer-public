@@ -24,6 +24,8 @@ FIELD_META = {
     "z500": ("gpm", 1, 0), "z500a": ("gpm", 1, 0), "z500sd": ("gpm", 0.1, 0),
     "ws250": ("m/s", 0.1, 0), "tp6": ("mm", 0.1, 0), "t850a": ("K", 0.1, 0),
     "msl": ("Pa", 10, 101325), "ivt": ("kg/m/s", 1, 0), "t2a": ("K", 0.1, 0),
+    # contract rows for the fields W3-10 builds; same numbers as tools/make_fixtures.py
+    "z500em": ("gpm", 1, 0), "pr1": ("%", 1, 0), "pr10": ("%", 1, 0), "t2m": ("K", 0.1, 0),
 }
 CHUNK_HOURS = {"a": (0, 120), "b": (126, 240), "c": (246, 360)}
 

@@ -157,7 +157,7 @@ def decide(scratch, work, canned, env=None, published=None):
         branch(co, bare, "data", {"latest/manifest.json": published, "latest-aifs/manifest.json": "AIFS"})
     (work / "out.txt").write_text(canned)
     script = step(load("data.yml"), "Is there anything new?")["run"]
-    e = {"MODEL": "ifs", "INPUT_RUN": "", "INPUT_FORCE": "false", "SHIM_LOG": str(work / "log"), "SHIM_OUT": str(work / "out.txt")}
+    e = {"MODEL": "ifs", "FIELDS": "z500,z500a,tp6,z500sd,t850a,ws250", "INPUT_RUN": "", "INPUT_FORCE": "false", "SHIM_LOG": str(work / "log"), "SHIM_OUT": str(work / "out.txt")}
     e.update(env or {})
     r = run_step(co, bindir, script, e, work / "gho")
     log = (work / "log").read_text() if (work / "log").exists() else ""
@@ -223,3 +223,41 @@ def test_validate_step_always_gates_a_live_run(scratch, work, fields):
     assert "validate out/data" in log and "--require-z500a-hours 168" in log
     assert f"--fields {fields}" in log and "--max-step 360" in log
     assert "built run 2026111800 (ifs)" in (work / "gho.sum").read_text()
+
+
+# ---- W2-01 (Josh points 8, 16): the decide step knows the fields; missing optional fields are reported ----------
+
+def test_decide_step_passes_the_fields_to_the_decide_command(scratch, work):
+    r, log, gho = decide(scratch, work, "build=true\nrun=2026111800\nsource=ecmwf\nmax_step=360\nreason=x\n",
+                         env={"FIELDS": "z500,z500a,z500sd"}, published='{"run": "x"}')
+    assert r.returncode == 0, r.stderr
+    assert "--fields z500,z500a,z500sd" in log and "--model ifs" in log
+
+
+def test_decide_step_fields_flag_is_forwarded_for_every_dispatch_shape(scratch, work):
+    r, log, _ = decide(scratch, work, "build=true\nrun=2026111812\nsource=aws\nmax_step=168\nreason=x\n",
+                       env={"FIELDS": "z500,z500a", "INPUT_RUN": "2026111812", "INPUT_FORCE": "true"})
+    assert "--fields z500,z500a" in log and "--run 2026111812" in log and "--force" in log
+
+
+def _validate_step(scratch, work, validate_json):
+    co, bare, bindir = scratch
+    (co / "out").mkdir(exist_ok=True)
+    (work / "out.txt").write_text(validate_json)
+    env = {"FIELDS": "z500,z500a,z500sd", "RUN": "2026111800", "MODEL": "ifs", "MAX_STEP": "360",
+           "SHIM_LOG": str(work / "log"), "SHIM_OUT": str(work / "out.txt")}
+    return run_step(co, bindir, step(load("data.yml"), "Validate")["run"], env, work / "gho")
+
+
+def test_validate_step_warns_and_summarises_missing_optional_fields(scratch, work):
+    r = _validate_step(scratch, work, '{"fields": ["z500", "z500a"], "files": 4, "bytes": 9, "probes": 2, "missing": ["z500sd"]}\n')
+    assert r.returncode == 0, r.stderr
+    assert "::warning::published without optional field(s): z500sd" in r.stdout
+    summary = (work / "gho.sum").read_text()
+    assert "Published without optional field(s): **z500sd**" in summary and "built run 2026111800 (ifs)" in summary
+
+
+def test_validate_step_is_quiet_when_nothing_is_missing(scratch, work):
+    r = _validate_step(scratch, work, '{"fields": ["z500", "z500a", "z500sd"], "files": 4, "bytes": 9, "probes": 2, "missing": []}\n')
+    assert r.returncode == 0, r.stderr
+    assert "::warning::" not in r.stdout and "Published without" not in (work / "gho.sum").read_text()

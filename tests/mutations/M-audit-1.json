@@ -1,0 +1,11 @@
+{
+  "id": "audit-1",
+  "file": "site/js/render/chart-tokens.js",
+  "find": "border: { color: '#1A1D21', alpha: 0.7, width: 1, casing: '#FFFFFF', casingAlpha: 0.9, casingWidth: 2.25 },",
+  "replace": "border: { color: '#1A1D21', alpha: 0, width: 1, casing: '#FFFFFF', casingAlpha: 0, casingWidth: 2.25 },",
+  "checks": [
+    "S-LINEART"
+  ],
+  "expect": "killed",
+  "note": "AUDIT-TESTS row 6 and section 1 (Josh point 6): transparent country borders passed S-PROJ, S-RENDER, S-COLOR and S-BOOT. Re-targeted by W3-02 from render/theme.js to the Paper border token that drawLines now reads; S-LINEART kills it (borders 0:1 on rendered pixels). Replaces W1-01's known-survivor version of this file."
+}

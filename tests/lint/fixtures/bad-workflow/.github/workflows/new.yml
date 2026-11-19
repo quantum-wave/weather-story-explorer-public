@@ -1,0 +1,12 @@
+name: new
+on: push
+jobs:
+  guarded:
+    if: github.repository == 'quantum-wave/weather-story-explorer-public'
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo ok
+  naked:
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo billed

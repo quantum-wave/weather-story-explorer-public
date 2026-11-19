@@ -235,7 +235,8 @@ export function createRenderer(canvas) {
   const offManifest = bus.on('data:manifest', () => { scene.clear(); frameXf = null; gen++; ensureKey = ''; warmKey = ''; firstFieldAt = 0; requestDraw(); });
   let ro = null;
   if (typeof ResizeObserver !== 'undefined') { ro = new ResizeObserver(() => resize()); ro.observe(canvas); }
-  loadBasemap().then(() => { scene.clear(); frameXf = null; gen++; requestDraw(); }).catch((e) => console.warn('basemap failed', e.message));
+  const redrawBase = () => { scene.clear(); frameXf = null; gen++; requestDraw(); };
+  loadBasemap('geo/', { onUpgrade: redrawBase }).then(redrawBase).catch((e) => console.warn('basemap failed', e.message)); // 110 m first, the 50 m swap redraws again
 
   // ---------- public API ----------
   const api = {

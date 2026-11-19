@@ -2,6 +2,7 @@
 // (own server, whatever --data is): header, scrubber, story lines, deep links and share text carry the case's real
 // dates and name the case; no confidence claim from a sample spread; no "this year" date anywhere on the page.
 export const id = 'S-HONEST';
+export const tier = 'deploy'; // fast, offline, about data honesty: the data and Pages workflows run it
 export const data = 'sample-min'; // the real sample fixture, whatever --data is
 export const freshProfile = true;
 export const timeoutMs = 90000;

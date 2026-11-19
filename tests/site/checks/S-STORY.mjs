@@ -1,6 +1,7 @@
 // S-STORY (browser part): the story is built from the loaded data and drives the home. Goldens for the pure
 // functions live in tests/site/unit/wp4.story.test.mjs.
 export const id = 'S-STORY';
+export const tier = 'deploy'; // fast, offline, about data honesty: the data and Pages workflows run it
 export const freshProfile = true;
 export async function run({ page, baseUrl, assert }) {
   await page.goto(baseUrl);

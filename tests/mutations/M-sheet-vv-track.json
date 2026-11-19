@@ -1,0 +1,11 @@
+{
+ "id": "sheet-vv-track",
+ "file": "site/js/ui/sheet.js",
+ "find": "    root.style.setProperty('--wse-vv-h', v.h + 'px');\n",
+ "replace": "",
+ "checks": [
+  "S-SHEET"
+ ],
+ "expect": "killed",
+ "note": "The sheet stops tracking the visual viewport height: with only the visual viewport shrunk (page scale), the action row falls outside it and S-SHEET's keyboard assertion must fail."
+}

@@ -1,0 +1,402 @@
+{
+ "schema": 1,
+ "sample": true,
+ "sample_note": "synthetic test data: the real grids with one exactly circular anomaly; not a forecast",
+ "model": "Synthetic test fixture (hi-res 48 h)",
+ "run": "2026-11-17T00:00Z",
+ "generated": "2026-11-17T23:50Z",
+ "attribution": "synthetic test data, no source",
+ "climatology": {
+  "label": "synthetic",
+  "source": "analytic",
+  "method": "analytic"
+ },
+ "cases": {
+  "A": {
+   "label": "Synthetic circle",
+   "fields": [
+    "z500",
+    "z500a",
+    "z500sd",
+    "ws250",
+    "msl",
+    "tp6"
+   ]
+  }
+ },
+ "domains": {
+  "g1": {
+   "lon0": -180,
+   "lat0": 90,
+   "dlon": 1,
+   "dlat": -1,
+   "nx": 361,
+   "ny": 181
+  },
+  "np05": {
+   "lon0": 150,
+   "lat0": 75,
+   "dlon": 0.5,
+   "dlat": -0.5,
+   "nx": 321,
+   "ny": 131
+  }
+ },
+ "fields": {
+  "z500": {
+   "units": "gpm",
+   "scale": 1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      9
+     ],
+     "files": {
+      "g1": {
+       "path": "z500.g1.a.bin",
+       "bytes": 22480,
+       "sha256": "9bf4ce48094d977f11c6fae50cca397a2c45047a706228d850ecac2da60746c4"
+      },
+      "np05": {
+       "path": "z500.np05.a.bin",
+       "bytes": 37974,
+       "sha256": "ac6b5b35d7be65698af76a720f746d51b55fe2f1924af8dd5373ef70d327c32a"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "synthetic hi-res fixture (W1-02), analytic circle",
+    "valid": null
+   }
+  },
+  "z500a": {
+   "units": "gpm",
+   "scale": 1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      9
+     ],
+     "files": {
+      "g1": {
+       "path": "z500a.g1.a.bin",
+       "bytes": 12022,
+       "sha256": "7a4c567fc5c62ac3b350215d4d572713c9a33066aa39581cbadecf43e2f0b495"
+      },
+      "np05": {
+       "path": "z500a.np05.a.bin",
+       "bytes": 20550,
+       "sha256": "208e10d27530779f080b6da97bd6943737c3446a59249b2d36859dfc87b1dc2f"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "synthetic hi-res fixture (W1-02), analytic circle",
+    "valid": null
+   }
+  },
+  "z500sd": {
+   "units": "gpm",
+   "scale": 0.1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      9
+     ],
+     "files": {
+      "g1": {
+       "path": "z500sd.g1.a.bin",
+       "bytes": 2616,
+       "sha256": "db9313ce46716b409e6fce29ecc3d692329c23d53c3c399006b908d0e4d096fc"
+      },
+      "np05": {
+       "path": "z500sd.np05.a.bin",
+       "bytes": 1822,
+       "sha256": "0d3e44d8b13bcf10a2158edd9017d35246b3dd1f181bc53234f6469b3a3bb819"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "synthetic hi-res fixture (W1-02), analytic circle",
+    "valid": null
+   }
+  },
+  "ws250": {
+   "units": "m/s",
+   "scale": 0.1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      9
+     ],
+     "files": {
+      "g1": {
+       "path": "ws250.g1.a.bin",
+       "bytes": 4321,
+       "sha256": "a11d57607e2122ea383ab66879d69b7698656ede615638d6d2aac5851269b54c"
+      },
+      "np05": {
+       "path": "ws250.np05.a.bin",
+       "bytes": 4589,
+       "sha256": "3ea249e49ee817be76a249357877d86b5caf74d7a838e057ec41ab6c5ae68323"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "synthetic hi-res fixture (W1-02), analytic circle",
+    "valid": null
+   }
+  },
+  "msl": {
+   "units": "Pa",
+   "scale": 10,
+   "offset": 101325,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      9
+     ],
+     "files": {
+      "g1": {
+       "path": "msl.g1.a.bin",
+       "bytes": 4827,
+       "sha256": "558cf4e0ac11d67a337e766a020830c62923d817a2c586bd417012712c700568"
+      },
+      "np05": {
+       "path": "msl.np05.a.bin",
+       "bytes": 2379,
+       "sha256": "ff4960c03d52d682bbaf22102245d3b71e3a6f73c986efc27ebd69145be83483"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "synthetic hi-res fixture (W1-02), analytic circle",
+    "valid": null
+   }
+  },
+  "tp6": {
+   "units": "mm",
+   "scale": 0.1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48
+   ],
+   "domains": [
+    "g1"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      8
+     ],
+     "files": {
+      "g1": {
+       "path": "tp6.g1.a.bin",
+       "bytes": 1418,
+       "sha256": "c36f32fabfa967b8a2fde30084298bdbc1a690e0524dc3b83f594084bbb00421"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "synthetic hi-res fixture (W1-02), analytic circle",
+    "valid": null
+   }
+  }
+ },
+ "probes": [
+  {
+   "name": "circle-centre",
+   "lat": 46,
+   "lon": -160,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": 200
+  },
+  {
+   "name": "circle-edge-east",
+   "lat": 46,
+   "lon": -148,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": 100
+  },
+  {
+   "name": "circle-edge-north",
+   "lat": 58,
+   "lon": -160,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": 100
+  },
+  {
+   "name": "circle-outside",
+   "lat": 46,
+   "lon": -130,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": 3
+  },
+  {
+   "name": "circle-centre",
+   "lat": 46,
+   "lon": -160,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": 200
+  },
+  {
+   "name": "circle-edge-east",
+   "lat": 46,
+   "lon": -148,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": 100
+  },
+  {
+   "name": "circle-edge-north",
+   "lat": 58,
+   "lon": -160,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": 100
+  },
+  {
+   "name": "circle-outside",
+   "lat": 46,
+   "lon": -130,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": 3
+  }
+ ]
+}

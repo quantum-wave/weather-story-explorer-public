@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { artifactTmp } from '../lib/artifacts.mjs';
 
 const site = new URL('../../../site/js/', import.meta.url);
 const load = (p) => import(new URL(p, site).href);
@@ -94,7 +95,7 @@ test('data: fieldAt blends the field own adjacent steps, null outside and when n
 });
 
 test('data: no blending across a gap longer than 12 h (a partial run must not show a made-up frame)', async () => {
-  const dir = fs.mkdtempSync(path.join(process.env.TMPDIR || '/home/claude/wse-work/tmp', 'gap-'));
+  const dir = artifactTmp('wp2-gap-');
   try {
     const src = path.join(fixtures, 'sample-min');
     for (const f of fs.readdirSync(src)) fs.copyFileSync(path.join(src, f), path.join(dir, f));

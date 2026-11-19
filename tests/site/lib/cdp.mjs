@@ -2,10 +2,14 @@
 // Every Chrome started here is tracked; killAll() (also wired to 'exit') kills each process group.
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { chromePath } from './chrome.mjs';
+import { artifactsDir } from './artifacts.mjs';
 
-export const CHROME = process.env.CHROME_BIN || '/usr/bin/google-chrome';
+/** Resolved lazily so importing this module never throws; Browser.launch throws the clear message instead. */
+export function chromeBin() { return chromePath(); }
+/** Kept for existing importers: the resolved browser path, or null when none is installed. */
+export const CHROME = (() => { try { return chromePath(); } catch { return null; } })();
 const live = new Set(); // { child, dir }
 
 function killOne(r) {
@@ -113,9 +117,9 @@ class Conn {
 
 export class Browser {
   /** Launch a headless Chrome with its own fresh --user-data-dir. */
-  static async launch({ baseUrl, width = 1440, height = 900 } = {}) {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wse-chrome-'));
-    const child = spawn(CHROME, ['--headless=new', '--no-sandbox', '--disable-dev-shm-usage', '--no-first-run',
+  static async launch({ baseUrl, width = 1440, height = 900, executablePath, headless = 'new' } = {}) {
+    const dir = fs.mkdtempSync(path.join(artifactsDir(), 'chrome-profile-'));
+    const child = spawn(executablePath || chromeBin(), [`--headless=${headless}`, '--no-sandbox', '--disable-dev-shm-usage', '--no-first-run',
       '--no-default-browser-check', '--disable-extensions', '--disable-background-networking', '--mute-audio',
       `--window-size=${width},${height}`, '--remote-debugging-port=0', `--user-data-dir=${dir}`, 'about:blank'],
     { detached: true, stdio: ['ignore', 'ignore', 'pipe'] });

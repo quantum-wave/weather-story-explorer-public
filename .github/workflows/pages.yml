@@ -45,11 +45,13 @@ jobs:
           fetch-depth: 1
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
+      - name: Install the pinned Playwright browser
+        run: npx --yes playwright@1.64.1 install --with-deps chromium-headless-shell
       - name: Assemble dist
         run: bash tools/assemble.sh dist data/latest --canonical-url https://weather-story-explorer.pages.dev/
-      - name: Site tests on the live data
-        run: node tests/site/run.mjs --data data/latest
+      - name: Site tests on the live data (deploy tier, fast and offline)
+        run: node tests/site/run.mjs --data data/latest --tier deploy
       - name: Create the Pages project (first run only)
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

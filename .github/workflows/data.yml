@@ -5,6 +5,8 @@
 # the standard library only and before any install, whether a newer run (or more steps of the published run) is
 # posted; when nothing is new the job ends in about a minute. No in-job polling: a late run is picked up by the next slot.
 # The previous data stays in place unless the new build validates and its z500a reaches 168 h; otherwise the job fails.
+# Only z500 and z500a are required: when an optional product (the ensemble files) is late the slot waits until the run is
+# 10 h old, then publishes without it (listed as `missing` in the manifest) and a later slot repairs the run when it appears.
 # Needs the `clim` branch (run the `clim` workflow once first). Cost: about 1 billed minute per idle slot.
 name: data
 on:
@@ -54,7 +56,7 @@ jobs:
           set -euo pipefail
           mkdir -p out
           dir=latest; [ "$MODEL" = aifs ] && dir=latest-aifs
-          args=(--model "$MODEL")
+          args=(--model "$MODEL" --fields "$FIELDS")
           if git fetch --quiet --depth 1 origin data 2>/dev/null && git show "FETCH_HEAD:$dir/manifest.json" > out/published.json 2>/dev/null; then
             args+=(--published out/published.json)
           else
@@ -109,9 +111,15 @@ jobs:
           MAX_STEP: ${{ steps.decide.outputs.max_step }}
         run: |
           set -euo pipefail
-          # Always gated: a run missing a requested field, z500a up to 168 h, or with a gap over 12 h never replaces latest/.
+          # Always gated: a run missing z500 or z500a, z500a short of 168 h, or a required field with a gap over 12 h never
+          # replaces latest/. An optional field that is absent or fails is dropped and listed as missing.
           python -I pipeline/run.py validate out/data --require-z500a-hours 168 --fields "$FIELDS" --max-step "$MAX_STEP" | tee out/validate.json
           { echo "### data: built run $RUN ($MODEL)"; echo '```'; cat out/validate.json; echo; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          missing=$(sed -n 's/.*"missing": \[\([^]]*\)\].*/\1/p' out/validate.json | tr -d '" ')
+          if [ -n "$missing" ]; then
+            echo "::warning::published without optional field(s): $missing"
+            echo "Published without optional field(s): **$missing**. A later scheduled slot rebuilds this run when they are posted." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Publish to the data branch
         if: steps.decide.outputs.build == 'true'

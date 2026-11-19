@@ -36,8 +36,10 @@ test('trips: quick add resolves South Lake Tahoe, edit keeps start <= end, remov
   const r = await pins.quickAdd('Trip: Tahoe Nov 27-30');
   const t = pins.get(r.id);
   assert.deepEqual([t.label, t.city.name, t.start, t.end], ['Tahoe', 'South Lake Tahoe', '2026-11-27', '2026-11-30']);
-  pins.update(r.id, { start: '2026-12-05' });
-  assert.deepEqual([pins.get(r.id).start, pins.get(r.id).end], ['2026-12-05', '2026-12-05']);
+  assert.equal(pins.update(r.id, { start: '2026-12-05' }), false, 'a start after the end is rejected, not swapped (W2-07)');
+  assert.deepEqual([pins.get(r.id).start, pins.get(r.id).end], ['2026-11-27', '2026-11-30']);
+  assert.equal(pins.update(r.id, { end: '2026-12-02' }), true);
+  assert.deepEqual([pins.get(r.id).start, pins.get(r.id).end], ['2026-11-27', '2026-12-02']);
   assert.equal(pins.addTrip({ label: 'x', city: t.city, start: 'nope', end: 'nope' }), null);
   const undo = pins.remove(r.id); assert.equal(pins.trips().length, 0); undo(); assert.equal(pins.trips().length, 1);
 });
@@ -185,4 +187,34 @@ test('pin names are data only: a name that looks like markup is stored verbatim'
   const { pins } = make();
   const id = pins.add({ name: '<img src=x onerror=alert(1)>', city: { id: 1, name: 'X', lat: 1, lon: 1 } });
   assert.equal(pins.get(id).name, '<img src=x onerror=alert(1)>');
+});
+
+test('W2-07: pins.update rejects an inverted trip range, stores nothing, and storageKind names the backend', async () => {
+  const { pins, storage } = make();
+  const r = await pins.quickAdd('Trip: Tahoe Nov 27-30');
+  const before = storage.getItem(STORE_KEY);
+  assert.equal(pins.update(r.id, { start: '2026-12-05', end: '2026-12-01' }), false);
+  assert.equal(pins.update(r.id, { end: '2026-11-01' }), false);
+  assert.match(pins.lastError(), /Ends before it starts/);
+  assert.deepEqual([pins.get(r.id).start, pins.get(r.id).end], ['2026-11-27', '2026-11-30']);
+  assert.equal(storage.getItem(STORE_KEY), before, 'nothing written');
+  assert.equal(pins.update(r.id, { start: '2026-11-28' }), true);
+  assert.equal(pins.lastError(), '', 'a good update clears the error');
+  assert.equal(pins.storageKind(), 'local');
+  const blocked = { localStorage: { getItem() { throw new Error('no'); }, setItem() { throw new Error('no'); }, removeItem() {} } };
+  assert.equal(createPins({ storage: { ...blocked, sessionStorage: mem() } }).storageKind(), 'session');
+  assert.equal(createPins({ storage: { ...blocked, sessionStorage: blocked.localStorage } }).storageKind(), 'memory');
+});
+
+test('store-path replay of the audit sequence (UX-3): trip 27-30 Nov never ends up starting 30 Jan', async () => {
+  const { pins } = make();
+  const r = await pins.quickAdd('Trip: Tahoe Nov 27-30');
+  assert.deepEqual([pins.get(r.id).start, pins.get(r.id).end], ['2026-11-27', '2026-11-30']);
+  const seen = [];
+  for (const end of ['2026-01-30', '', '2026-01-30', '', '2026-12-22', '', '2026-12-02']) {
+    pins.update(r.id, { end }); // one call per change, the way edit.js does
+    seen.push(pins.get(r.id).start);
+  }
+  assert.ok(!seen.includes('2026-01-30'), 'the store never held start 2026-01-30: ' + JSON.stringify(seen));
+  assert.deepEqual([pins.get(r.id).start, pins.get(r.id).end], ['2026-11-27', '2026-12-02']);
 });

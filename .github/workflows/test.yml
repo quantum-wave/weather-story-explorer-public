@@ -1,0 +1,58 @@
+# The test suite on every push: lints, pytest, the site checks in a real browser, unit tests, script tests.
+# Runs ONLY in the public mirror: every job carries the repository guard, because the private repo has Actions enabled
+# and would bill its minutes (tests/lint/hygiene.mjs fails any job in a new workflow file that lacks it).
+# Browser: Playwright's chromium-headless-shell, pinned; tests/site/lib/chrome.mjs finds it. Node 24.
+name: test
+on:
+  push:
+  workflow_dispatch:
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+env:
+  PLAYWRIGHT_VERSION: "1.64.1"
+jobs:
+  lint:
+    if: github.repository == 'quantum-wave/weather-story-explorer-public'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Hygiene and workflow-guard lints
+        run: node tests/lint/hygiene.mjs && node --test tests/lint/lint.test.mjs
+  suite:
+    if: github.repository == 'quantum-wave/weather-story-explorer-public'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - name: Install Python dependencies
+        run: pip install --quiet -r requirements-dev.txt
+      - name: Install the pinned Playwright browser
+        run: npx --yes playwright@${PLAYWRIGHT_VERSION} install --with-deps chromium-headless-shell
+      - name: Run everything (pytest, site checks, unit tests, script tests, lints)
+        env:
+          WSE_PYTHON: python
+          WSE_ARTIFACTS: ${{ github.workspace }}/out/test-artifacts
+        run: bash tests/run_all.sh
+      - name: Upload the test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts
+          path: out/test-artifacts
+          if-no-files-found: ignore
+          retention-days: 7
