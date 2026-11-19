@@ -1,13 +1,13 @@
 {
-  "id": "audit-2",
-  "file": "site/js/story/index.js",
-  "find": "if (noData || past10) svgEl('rect',",
-  "replace": "if (true) svgEl('rect',",
-  "checks": [
-    "S-STORY",
-    "S-HONEST",
-    "S-SAMPLE"
-  ],
-  "expect": "known-survivor",
-  "note": "AUDIT-TESTS row 1 and section 1: hatching every Your-week day passes S-STORY, S-HONEST and S-SAMPLE; killed by the W2-06 hatch assertions, which re-target this mutant"
+ "id": "audit-2",
+ "file": "site/js/story/strip.js",
+ "find": "if (noData) el('rect',",
+ "replace": "if (true) el('rect',",
+ "checks": [
+  "S-STORY",
+  "S-HONEST",
+  "S-SAMPLE"
+ ],
+ "expect": "killed",
+ "note": "AUDIT-TESTS row 1 and section 1: hatching every Your-week day passed S-STORY, S-HONEST and S-SAMPLE before W2-06 (known-survivor). Re-targeted to strip.js and now killed by the hatch and column-count assertions (columns equal days with data, zero .hatch-nodata)."
 }

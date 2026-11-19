@@ -18,15 +18,48 @@ import os
 LOG = logging.getLogger("pipeline.fetch")
 
 STEPS = list(range(0, 361, 6))
-# Accumulations start at step 0, so a step-0 file has no `tp`: do not ask.
-NOT_AT_STEP_0 = {"tp"}
+EM_FIRST_STEP = 144   # z500em: the ensemble mean is only used from day 6 (SPEC 13.2)
+PR_WINDOW_H = 24      # `tpg` products are 24 h windows, written as range steps "a-b", one every 12 h
+PR_EVERY_H = 12
+LOW_LEVEL_LAST_STEP = 168  # ivt (00Z run only, MET-10) and t2m (card highs and lows) are built to 7 days
 IVT_LEVELS = [1000, 925, 850, 700, 600, 500, 400, 300]
 
 # field id -> the needs it takes. A need is one request; `sfc` collects the single-level params.
 FIELD_NEEDS = {
     "z500": ("gh500",), "z500a": ("gh500",), "z500sd": ("es",), "ws250": ("wind250",),
     "t850a": ("t850",), "tp6": ("tp",), "msl": ("msl",), "ivt": ("ivt_pl", "ivt_sp"),
+    "z500em": ("em",), "pr1": ("tpg",), "pr10": ("tpg",), "t2m": ("t2m",),
 }
+
+
+def need_applies(need, step):
+    """Whether `need` exists at `step`: accumulations start at step 0 (a step-0 file has no `tp`), the ensemble mean is
+    wanted from 144 h, `ivt` and `t2m` stop at 168 h, and rain-probability windows are keyed by their end hour (24, 36 ... 360)."""
+    if need == "tp":
+        return step > 0
+    if need == "em":
+        return step >= EM_FIRST_STEP
+    if need == "tpg":
+        return step >= PR_WINDOW_H and step % PR_EVERY_H == 0
+    if need in ("ivt_pl", "ivt_sp", "t2m"):
+        return step <= LOW_LEVEL_LAST_STEP
+    return True
+
+
+def pr_windows(max_step=360):
+    """End hours of the 24 h rain-probability windows up to `max_step`: 24, 36 ... 360 (29 of them)."""
+    return list(range(PR_WINDOW_H, max_step + 1, PR_EVERY_H))
+
+
+def pr_window(end):
+    """The index's range step for the window ending at `end`: 252 -> "228-252"."""
+    return f"{end - PR_WINDOW_H}-{end}"
+
+
+def ens_file_hours(end_step):
+    """Which `enfo-ep` file holds a step (or a window, by its END hour): the 240 h one up to 240, else the 360 h one.
+    The ecmwf-opendata client makes the same choice (`end_step(value) <= 240`)."""
+    return 240 if end_step <= 240 else 360
 
 
 def needs_for(fields):
@@ -46,6 +79,9 @@ def request_for(need, model, run, step):
         return dict(base, model="ifs", stream="enfo", type="es", levtype="pl", param="gh", levelist=500)
     if need == "em":
         return dict(base, model="ifs", stream="enfo", type="em", levtype="pl", param="gh", levelist=500)
+    if need == "tpg":  # P(24 h rain >= 1 mm, >= 10 mm): `step` is the window's END hour, requested as a range step
+        return dict(base, step=pr_window(step), model="ifs", stream="enfo", type="ep", levtype="sfc",
+                    param=["tpg1", "tpg10"])
     m = {"ifs": "ifs", "aifs": "aifs-single"}[model]
     base = dict(base, model=m, stream="oper", type="fc")
     if need == "gh500":
@@ -55,10 +91,12 @@ def request_for(need, model, run, step):
         return dict(base, levtype="pl", param=["u", "v"], levelist=250)
     if need == "t850":
         return dict(base, levtype="pl", param="t", levelist=850)
-    if need in ("tp", "msl"):
+    if need in ("tp", "msl", "sp"):
         return dict(base, levtype="sfc", param=need)
     if need == "ivt_pl":
         return dict(base, levtype="pl", param=["q", "u", "v"], levelist=IVT_LEVELS)
+    if need == "t2m":
+        return dict(base, levtype="sfc", param="2t")
     if need == "ivt_sp":
         return dict(base, levtype="sfc", param="sp")
     raise KeyError(need)
@@ -137,7 +175,7 @@ def fetch_steps(retriever, run, steps, needs, reducer, workers=4):
     def one(step):
         paths = {}
         for n in needs:
-            if step == 0 and n in NOT_AT_STEP_0:
+            if not need_applies(n, step):
                 continue
             p = retriever.get(run, step, n)
             if p:

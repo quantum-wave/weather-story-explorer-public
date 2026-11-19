@@ -7,6 +7,11 @@
 # The previous data stays in place unless the new build validates and its z500a reaches 168 h; otherwise the job fails.
 # Only z500 and z500a are required: when an optional product (the ensemble files) is late the slot waits until the run is
 # 10 h old, then publishes without it (listed as `missing` in the manifest) and a later slot repairs the run when it appears.
+# Added by W4-08: t2m (2 m temperature, g1, 0-168 h) is in every run's default fields. ivt (atmospheric rivers, 0-168 h, 0.83 GB of
+# range requests, MET-10) is added to the field list on the SCHEDULED 00Z run only (never on 12Z, never on a manual run, which says
+# what it wants in `fields`). After Validate, tools/compare_grib.py downloads one raw step (24 h) of ECMWF's 500 hPa height and
+# compares it with the decoded z500 at five points; it records checks.grib_compare in the manifest, WARNS on a mismatch and never
+# blocks the publish (design default 33, until a week of runs has shown its tolerance is right).
 # Needs the `clim` branch (run the `clim` workflow once first). Cost: about 1 billed minute per idle slot.
 name: data
 on:
@@ -18,9 +23,9 @@ on:
         description: "Run YYYYMMDDHH (blank = newest posted)"
         required: false
       fields:
-        description: "Fields (comma list); msl and ivt are opt-in, ivt is about 1.9 GB of range requests"
+        description: "Fields (comma list); ivt is added automatically on the scheduled 00Z run (to 168 h, about 0.83 GB of requests); add it here for a manual run. Only z500 and z500a are required; every other field is optional"
         required: false
-        default: "z500,z500a,tp6,z500sd,t850a,ws250"
+        default: "z500,z500a,tp6,z500sd,z500em,pr1,pr10,t850a,ws250,msl,t2m"
       model:
         description: "Model: ifs (HRES, published to latest/) or aifs (AIFS Single, to latest-aifs/)"
         type: choice
@@ -41,7 +46,7 @@ jobs:
     timeout-minutes: 30
     env:
       MODEL: ${{ inputs.model || 'ifs' }}
-      FIELDS: ${{ inputs.fields || 'z500,z500a,tp6,z500sd,t850a,ws250' }}
+      FIELDS: ${{ inputs.fields || 'z500,z500a,tp6,z500sd,z500em,pr1,pr10,t850a,ws250,msl,t2m' }}
       INPUT_RUN: ${{ inputs.run }}
       INPUT_FORCE: ${{ inputs.force }}
       PYTHONUNBUFFERED: "1"
@@ -99,9 +104,13 @@ jobs:
           RUN: ${{ steps.decide.outputs.run }}
           SOURCE: ${{ steps.decide.outputs.source }}
           MAX_STEP: ${{ steps.decide.outputs.max_step }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
+          # atmospheric rivers: the scheduled 00Z IFS run only (the hour is characters 9-10 of YYYYMMDDHH)
+          fields="$FIELDS"
+          if [ "${EVENT_NAME:-}" = schedule ] && [ "$MODEL" = ifs ] && [ "${RUN:8:2}" = 00 ]; then fields="$fields,ivt"; fi
           python -I pipeline/run.py build --run "$RUN" --source "$SOURCE" --max-step "$MAX_STEP" \
-            --model "$MODEL" --fields "$FIELDS" --clim clim/harmonics.npz --out out/data
+            --model "$MODEL" --fields "$fields" --clim clim/harmonics.npz --out out/data
 
       - name: Validate
         if: steps.decide.outputs.build == 'true'
@@ -109,17 +118,33 @@ jobs:
         env:
           RUN: ${{ steps.decide.outputs.run }}
           MAX_STEP: ${{ steps.decide.outputs.max_step }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
+          fields="$FIELDS"
+          if [ "${EVENT_NAME:-}" = schedule ] && [ "$MODEL" = ifs ] && [ "${RUN:8:2}" = 00 ]; then fields="$fields,ivt"; fi
           # Always gated: a run missing z500 or z500a, z500a short of 168 h, or a required field with a gap over 12 h never
           # replaces latest/. An optional field that is absent or fails is dropped and listed as missing.
-          python -I pipeline/run.py validate out/data --require-z500a-hours 168 --fields "$FIELDS" --max-step "$MAX_STEP" | tee out/validate.json
+          python -I pipeline/run.py validate out/data --require-z500a-hours 168 --fields "$fields" --max-step "$MAX_STEP" | tee out/validate.json
           { echo "### data: built run $RUN ($MODEL)"; echo '```'; cat out/validate.json; echo; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           missing=$(sed -n 's/.*"missing": \[\([^]]*\)\].*/\1/p' out/validate.json | tr -d '" ')
           if [ -n "$missing" ]; then
             echo "::warning::published without optional field(s): $missing"
             echo "Published without optional field(s): **$missing**. A later scheduled slot rebuilds this run when they are posted." >> "$GITHUB_STEP_SUMMARY"
           fi
+
+      - name: Cross-check against the raw GRIB
+        if: steps.decide.outputs.build == 'true'
+        continue-on-error: true
+        shell: bash
+        env:
+          RUN: ${{ steps.decide.outputs.run }}
+          SOURCE: ${{ steps.decide.outputs.source }}
+        run: |
+          # one step (24 h), non-blocking: warns and exits 0 on a mismatch; continue-on-error covers a crash of the tool itself
+          python -I tools/compare_grib.py --download "$RUN" --step 24 --model "$MODEL" --source "$SOURCE" out/data \
+            | tee out/compare.txt
+          { echo "### GRIB cross-check"; echo '```'; cat out/compare.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish to the data branch
         if: steps.decide.outputs.build == 'true'

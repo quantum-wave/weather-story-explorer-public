@@ -21,29 +21,58 @@ import numpy as np
 
 from . import fetch, reduce, runs
 from .anomaly import Climatology
+from .anomaly import area_weighted_means
 from .encode import ManifestWriter, iso_minute
+from .gribio import pick, read_messages
+from .grids import DOMAINS
 from .validate import REQUIRED, ValidationError, validate_dropping_optional
 
 LOG = logging.getLogger("pipeline.build")
 
-# First live run (SPEC section 10); msl and ivt are opt-in (IVT is about 1.9 GB of range requests per run).
-DEFAULT_FIELDS = ["z500", "z500a", "tp6", "z500sd", "t850a", "ws250"]
-ALL_FIELDS = DEFAULT_FIELDS + ["msl", "ivt"]
+# SPEC 13.2: the first live run's six fields plus the ensemble mean, the two rain probabilities and sea-level pressure.
+# Only z500 and z500a are required (validate.REQUIRED). t2m (to 168 h, g1) is in the default set. ivt is not: data.yml adds it on the scheduled 00Z run only, to 168 h (0.83 GB of range requests; MET-10).
+DEFAULT_FIELDS = ["z500", "z500a", "tp6", "z500sd", "z500em", "pr1", "pr10", "t850a", "ws250", "msl", "t2m"]
+ALL_FIELDS = DEFAULT_FIELDS + ["ivt"]
 FIELD_DOMAINS = {"z500": ("g1", "np05"), "z500a": ("g1", "np05"), "z500sd": ("g1", "np05"),
-                 "ws250": ("g1", "np05"), "tp6": ("g1",), "t850a": ("g1",), "msl": ("g1", "np05"),
+                 "z500em": ("g1", "np05"), "pr1": ("g1",), "pr10": ("g1",),
+                 "ws250": ("g1", "np05"), "tp6": ("g1",), "t850a": ("g1",), "msl": ("g1", "np05"), "t2m": ("g1",),
                  "ivt": ("g1", "np05")}
 MODEL_LABEL = {"ifs": "ECMWF IFS HRES", "aifs": "ECMWF AIFS Single"}
 DATASET = {
     "z500": "gh 500 hPa", "z500a": "gh 500 hPa minus climatology", "z500sd": "IFS ENS gh 500 hPa spread (es)",
     "ws250": "wind speed from u, v 250 hPa on the native grid", "tp6": "tp, 6 h difference of the accumulation",
-    "t850a": "t 850 hPa minus climatology", "msl": "msl", "ivt": "IVT from q, u, v 1000-300 hPa and sp",
+    "t850a": "t 850 hPa minus climatology, no-data where surface pressure is under 870 hPa",
+    "msl": "msl", "t2m": "2t, 2 m temperature", "ivt": "IVT from q, u, v 1000-300 hPa and sp",
+    "z500em": "IFS ENS gh 500 hPa ensemble mean (em)",
+    "pr1": "IFS ENS probability of 24 h precipitation >= 1 mm (tpg1), stored at the window's end hour",
+    "pr10": "IFS ENS probability of 24 h precipitation >= 10 mm (tpg10), stored at the window's end hour",
 }
 MIN_Z500A_HOURS = 168
+TERRAIN_STEPS = (0, 6, 12)  # surface pressure is read once per run, from the first of these that arrived
+
+
+def load_terrain(retriever, run):
+    """{domain: below-ground mask} from the run's surface pressure, or None when no file could be read. Terrain does
+    not move, so one step serves the whole run (step 0, else 6, else 12)."""
+    for step in TERRAIN_STEPS:
+        path = retriever.get(run, step, "sp")
+        if not path:
+            continue
+        try:
+            m = pick(read_messages(path), "sp")
+            return reduce.terrain_masks(m.data, m.grid)
+        finally:
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+    return None
 
 
 def build_live(run, model, fields, out, clim_path=None, retriever=None, workers=4, max_step=360,
-               generated=None, workdir="out/raw"):
-    """Fetch, reduce and write. `retriever` is injectable (tests); returns the manifest dict."""
+               generated=None, workdir="out/raw", steps=None):
+    """Fetch, reduce and write. `retriever` is injectable (tests); returns the manifest dict. `steps` (the nightly smoke
+    test) limits the run to those lead hours."""
     fields = [f for f in ALL_FIELDS if f in set(fields)]
     need_clim = {"z500a", "t850a"} & set(fields)
     clim = None
@@ -55,16 +84,6 @@ def build_live(run, model, fields, out, clim_path=None, retriever=None, workers=
         clim = Climatology.load(clim_path)
     if retriever is None:
         retriever = fetch.Retriever(workdir, model)
-    needs = fetch.needs_for(fields)
-    if "z500sd" in fields and model != "ifs":
-        LOG.info("%s has no ensemble spread of its own; z500sd comes from the IFS ENS", model)
-    steps = [s for s in fetch.STEPS if s <= max_step]
-    reducer = reduce.StepReducer(run, model, fields, clim)
-    LOG.info("fetching %d steps x %d needs for %s %s", len(steps), len(needs), model, run)
-    res = fetch.fetch_steps(retriever, run, steps, needs, reducer, workers)
-    if not res:
-        raise RuntimeError("no step could be fetched: is the run posted, and is the source reachable?")
-    w = ManifestWriter(out)
     missing = []
 
     def skipped(fid, why):
@@ -72,6 +91,24 @@ def build_live(run, model, fields, out, clim_path=None, retriever=None, workers=
         if fid not in REQUIRED:
             missing.append({"field": fid, "reason": why})
 
+    terrain = None
+    if "t850a" in fields:
+        terrain = load_terrain(retriever, run)
+        if terrain is None:  # never publish an unmasked, below-ground temperature anomaly
+            fields = [f for f in fields if f != "t850a"]
+            skipped("t850a", "surface pressure unavailable, cannot mask below-ground 850 hPa temperature")
+    needs = fetch.needs_for(fields)
+    if any(f in fields for f in ("z500sd", "z500em", "pr1", "pr10")) and model != "ifs":
+        LOG.info("%s has no ensemble products of its own; z500sd, z500em, pr1 and pr10 come from the IFS ENS", model)
+    steps = [s for s in fetch.STEPS if s <= max_step and (steps is None or s in steps)]
+    reducer = reduce.StepReducer(run, model, fields, clim, terrain=terrain)
+    LOG.info("fetching %d steps x %d needs for %s %s", len(steps), len(needs), model, run)
+    res = fetch.fetch_steps(retriever, run, steps, needs, reducer, workers)
+    if not res:
+        raise RuntimeError("no step could be fetched: is the run posted, and is the source reachable?")
+    w = ManifestWriter(out)
+    first_step = {"z500em": fetch.EM_FIRST_STEP, "pr1": fetch.PR_WINDOW_H, "pr10": fetch.PR_WINDOW_H}
+    z500a_g1 = None
     for fid in fields:
         if fid == "tp6":
             cum = {s: v["tp_cum"] for s, v in res.items() if "tp_cum" in v}
@@ -83,10 +120,15 @@ def build_live(run, model, fields, out, clim_path=None, retriever=None, workers=
         else:
             st = sorted(s for s, v in res.items() if fid in v)
             if not st:
-                skipped(fid, "ensemble files not yet published" if fid in runs.ENSEMBLE_FIELDS
-                        else "no step arrived")
+                if fid in first_step and max_step < first_step[fid]:
+                    skipped(fid, f"the run stops at {max_step} h, before this field's first step ({first_step[fid]} h)")
+                else:
+                    skipped(fid, "ensemble files not yet published" if fid in runs.ENSEMBLE_FIELDS
+                            else "no step arrived")
                 continue
             grids = {d: np.stack([res[s][fid][d] for s in st]) for d in FIELD_DOMAINS[fid]}
+            if fid == "z500a":
+                z500a_g1 = (st[0], grids["g1"][0])
         w.add_field(fid, st, grids, source={"dataset": f"{MODEL_LABEL[model]} 0.25 deg open data: {DATASET[fid]}",
                                              "valid": None})
     head = {
@@ -97,6 +139,12 @@ def build_live(run, model, fields, out, clim_path=None, retriever=None, workers=
     }
     if missing:
         head["missing"] = missing
+    if z500a_g1 is not None:
+        means = area_weighted_means(z500a_g1[1], DOMAINS["g1"])
+        if all(v is not None for v in means.values()):
+            head["checks"] = {"mean_anomaly_gpm": means}
+            print(f"mean z500a vs the fixed baseline at step {z500a_g1[0]} h (area-weighted, gpm): "
+                  f"global {means['global']:+.1f}, 20-90N {means['nh']:+.1f}, tropics {means['tropics']:+.1f}")
     return w.write(head)
 
 
@@ -111,6 +159,10 @@ def main(argv=None):
     ap.add_argument("--source", help="ecmwf, aws, google or a base URL (default: the first that has the run)")
     ap.add_argument("--clim", default="clim/harmonics.npz")
     ap.add_argument("--max-step", type=int, default=360)
+    ap.add_argument("--steps", help="comma list of lead hours (the nightly smoke build, e.g. 6,144): only those steps are "
+                                    "fetched and the 168 h publish gate is waived, every other check still runs")
+    ap.add_argument("--strict", action="store_true", help="fail when any requested field is missing from the build "
+                                                          "(the nightly real-download test: nothing may be dropped)")
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--workdir", default="out/raw")
     ap.add_argument("--keep-raw", action="store_true")
@@ -143,10 +195,20 @@ def main(argv=None):
     # a custom URL (tests, a private mirror) is used alone; the named sources back each other up per step
     sources = [first] if first.startswith("http") else [first] + [s for s in runs.SOURCES if s != first]
     retriever = fetch.Retriever(a.workdir, a.model, sources)
+    smoke = [int(x) for x in a.steps.split(",") if x.strip()] if a.steps else None
+    if smoke:
+        max_step = max(smoke)
     try:
-        build_live(run, a.model, fields, a.out, a.clim, retriever, a.workers, max_step)
-        res = validate_dropping_optional(a.out, require_z500a_hours=MIN_Z500A_HOURS if "z500a" in fields else None,
-                                         require_fields=fields, max_step=max_step)
+        build_live(run, a.model, fields, a.out, a.clim, retriever, a.workers, max_step, steps=smoke)  # prints the mean anomaly
+        if smoke:  # two steps cannot satisfy the coverage and 168 h rules; schema, ranges, hashes and budgets still run
+            res = validate_dropping_optional(a.out)
+        else:
+            res = validate_dropping_optional(a.out, require_z500a_hours=MIN_Z500A_HOURS if "z500a" in fields else None,
+                                             require_fields=fields, max_step=max_step)
+        if a.strict:
+            absent = [f for f in fields if f not in res["fields"]]
+            if absent:
+                raise ValidationError(f"strict: requested field(s) missing from the build: {', '.join(absent)}")
     except (ValidationError, FileNotFoundError, RuntimeError) as e:
         print(f"BUILD FAILED, nothing to publish: {e}", file=sys.stderr)
         return 2

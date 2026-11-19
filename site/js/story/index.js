@@ -1,57 +1,69 @@
-// Story functions (SPEC section 6): day classes, summary sentence, day line, notability, strip.
-// classifyDay, summarize and dayLine are pure. buildDays, notability and stripSVG read the data facade
-// or the DOM. All wording lives in phrases.js.
+// Story functions (DESIGN-SPEC sections 3, 7.2, 7.3, 15): day classes, local-day binning, coverage, the sentence builders
+// and the strip. classifyDay and daysFromSeries are pure; buildDays and notability read the data facade. All wording
+// lives in phrases.js, all confidence logic in confidence.js, local-day arithmetic in localday.js, drawing in strip.js.
+//
+// buildDays returns the day classes as an array (so existing callers keep working) that also carries
+// `.days` (the same array), `.series` (with `.windows`) and `.coverage`: {requested, withData, firstDate, lastDate,
+// nextUpdate, todayDate, kind, ...}. It holds only local days that have data: the number of columns equals the number of
+// days with data, never a hatched phantom day.
 import * as data from '../data/index.js';
-import { bus } from '../state.js';
-import { anomalyRGBA } from '../render/colormap.js';
+import { store, bus } from '../state.js';
+import { isLive, isMultiCase, isRecorded, staleness } from '../data/kind.js';
 import * as P from './phrases.js';
+import { signalAt, confidenceAt } from './confidence.js';
+import { offsetMinutes, viewerOffsetMinutes, localDate, dayWindowsAt, weekdayShort as wkShort } from './localday.js';
+import { stripSVG as drawStrip } from './strip.js';
+
+export { reasonPhrase, tripState, tripLine, weekTitle, coverageNote, laterDaysNote, daysOfData, summaryConfidence } from './phrases.js';
+export { zones, zoneAt, signalAt, confidenceAt, CAPTIONS, NO_CLEAR_SIGNAL } from './confidence.js';
+export { dayLabel, offsetMinutes } from './localday.js';
 
 const HOUR = 3600e3;
 const DAY = 24 * HOUR;
+const MIN = 60e3;
 const pad = (n) => String(n).padStart(2, '0');
 
 let manifest = null;
 export function setManifest(m) { manifest = m; }
 bus.on('data:manifest', setManifest);
 const mf = () => manifest || data.getManifest?.() || null;
-/** Valid time for the story: sample data is read as case A at its real dates, whichever case the map shows. */
-const vt = (h) => data.validTime(h, mf()?.sample ? 'A' : undefined);
+
+/** The case the map shows (data.activeCase once the data client has it), else case A of a multi-case manifest. */
+const activeCaseId = () => {
+  const m = mf();
+  const c = data.activeCase?.();
+  if (c) return c;
+  return isMultiCase(m) ? (store.get().case || 'A') : undefined;
+};
+/** Valid time for the story: the dataset's own clock, at the active case's real dates for a multi-case sample. */
+const vt = (h) => data.validTime(h, activeCaseId());
 
 // ---------- day windows ----------
 
 /**
- * Local-day windows in forecast hours.
- * tz 'viewer': days in the viewer's time zone (home and trips); an integer: a fixed UTC offset in hours
- * (other pins: round(lon / 15)). Returns [{date: 'YYYY-MM-DD', startH, endH}] relative to originMs (step 0).
+ * Local-day windows in forecast hours (kept for existing callers).
+ * tz 'viewer': days in the viewer's time zone; an integer: a fixed UTC offset in hours (round(lon / 15)).
+ * Returns [{date: 'YYYY-MM-DD', startH, endH}] relative to originMs (step 0).
  */
 export function dayWindows(originMs, startMs, count, tz = 'viewer') {
+  if (tz !== 'viewer') return dayWindowsAt(originMs, startMs, count, tz * 60);
   const out = [];
-  if (tz === 'viewer') {
-    const d0 = new Date(startMs);
-    let s = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate());
-    for (let i = 0; i < count; i++) {
-      const e = new Date(s.getFullYear(), s.getMonth(), s.getDate() + 1);
-      out.push({ date: `${s.getFullYear()}-${pad(s.getMonth() + 1)}-${pad(s.getDate())}`, startH: (s - originMs) / HOUR, endH: (e - originMs) / HOUR });
-      s = e;
-    }
-  } else {
-    const off = tz * HOUR;
-    let s = Math.floor((startMs + off) / DAY) * DAY - off;
-    for (let i = 0; i < count; i++) {
-      out.push({ date: new Date(s + off).toISOString().slice(0, 10), startH: (s - originMs) / HOUR, endH: (s + DAY - originMs) / HOUR });
-      s += DAY;
-    }
+  const d0 = new Date(startMs);
+  let s = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate());
+  for (let i = 0; i < count; i++) {
+    const e = new Date(s.getFullYear(), s.getMonth(), s.getDate() + 1);
+    out.push({ date: `${s.getFullYear()}-${pad(s.getMonth() + 1)}-${pad(s.getDate())}`, startH: (s - originMs) / HOUR, endH: (e - originMs) / HOUR });
+    s = e;
   }
   return out;
 }
 
-/** Fixed offset for a pin that is not home or a trip. */
-export const tzForLon = (lon) => Math.round(lon / 15);
+/** Fixed offset in hours for a place: round(lon / 15). */
+export const tzForLon = (lon) => offsetMinutes(lon) / 60;
 
-const dayDate = (date) => new Date(date + 'T12:00:00Z');
 /** 'Thu' for 'YYYY-MM-DD' (zone independent). */
-export const weekdayShort = (date) => dayDate(date).toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
-export const weekdayInitial = (date) => 'SMTWTFS'[dayDate(date).getUTCDay()];
+export const weekdayShort = wkShort;
+export const weekdayInitial = (date) => 'SMTWTFS'[new Date(date + 'T12:00:00Z').getUTCDay()];
 
 // ---------- classification ----------
 
@@ -70,26 +82,30 @@ function within(f, w, closedEnd = false) {
 const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
 
 /**
- * @param {{windows:{date:string,startH:number,endH:number}[], z500a?:object, z500sd?:object,
- *   ws250max?:object, tp6?:object, t850a?:object}} series fields are {steps (forecast hours), values}
- *   in the units of SPEC section 9 (gpm, m/s, mm, K); a missing field is null or absent.
+ * @param {{windows:{date:string,startH:number,endH:number}[], z500a?:object, z500sd?:object, ws250max?:object,
+ *   tp6?:object, t850a?:object, t2m?:object, pr1?:object, pr10?:object, originMs?:number, offsetMin?:number}} series
+ *   fields are {steps (forecast hours), values} in the stored units (gpm, m/s, mm, K, %); a missing field is null.
  * @param {number} dayIndex index into series.windows
  * @param {number} lead 1 for the first day
- * @returns {import('../contract.js').DayClass}
  */
 export function classifyDay(series, dayIndex, lead) {
   const w = series.windows[dayIndex];
   const nextW = series.windows[dayIndex + 1];
 
-  // Pattern (dam)
+  // Pattern (dam) and the doubt about it
   const z = within(series.z500a, w).map((v) => v / 10);
+  const sd = within(series.z500sd, w).map((v) => v / 10);
+  const anomDam = z.length ? mean(z) : NaN;
+  const spreadDam = sd.length ? mean(sd) : NaN;
+  const signal = z.length ? signalAt({ anomDam, spreadDam, hasSpread: sd.length > 0 }) : 'clear';
   let pattern = 'none';
   if (z.length) {
-    const m = mean(z), lo = Math.min(...z), hi = Math.max(...z);
+    const lo = Math.min(...z), hi = Math.max(...z);
     const nz = nextW ? within(series.z500a, nextW).map((v) => v / 10) : [];
     const nm = nz.length ? mean(nz) : null;
-    if (m >= 6) pattern = 'ridge';
-    else if (m <= -6) pattern = 'trough';
+    if (signal === 'none') pattern = 'no-signal';
+    else if (anomDam >= 6) pattern = 'ridge';
+    else if (anomDam <= -6) pattern = 'trough';
     else if (lo <= -6 || (nm !== null && nm <= -6)) pattern = 'trough-arriving';
     else if (hi >= 6 || (nm !== null && nm >= 6)) pattern = 'ridge-building';
     else pattern = 'near-normal';
@@ -97,151 +113,79 @@ export function classifyDay(series, dayIndex, lead) {
   const jet = within(series.ws250max, w);
   const stormTrack = jet.length > 0 && Math.max(...jet) >= 50;
 
-  // Wet
-  const rain = within(series.tp6, w, true);
-  let wet = 'none';
-  let wetPhrase;
-  if (lead > 10) wetPhrase = '';
-  else if (!rain.length) wetPhrase = P.NOT_IN_RUN;
-  else {
-    const sum = rain.reduce((x, y) => x + y, 0);
-    wet = sum < 1 ? 'dry' : sum < 5 ? 'light' : sum <= 20 ? 'moderate' : 'heavy';
-    wetPhrase = P.wetPhraseFor(wet, lead);
+  // Wet: tp6 summed over the local day for days 1-3, pr1 / pr10 from day 4 (the window ending nearest the day's end)
+  const rainField = !!(series.tp6 || series.pr1);
+  const rainMissing = lead <= 10 && !rainField;
+  let wet = 'none', wetPhrase = '', wetSource = 'none', rainMm, pr1, pr10, prEndHour;
+  if (lead <= 10) {
+    if (lead >= 4 && series.pr1) {
+      let best = -1, bd = Infinity;
+      series.pr1.steps.forEach((s, i) => {
+        if (!finite(series.pr1.values[i]) || s <= w.startH) return;
+        const d = Math.abs(s - w.endH);
+        if (d <= 6 && d < bd) { bd = d; best = i; }
+      });
+      if (best >= 0) {
+        pr1 = series.pr1.values[best];
+        const k = series.pr10 ? series.pr10.steps.indexOf(series.pr1.steps[best]) : -1;
+        pr10 = k >= 0 && finite(series.pr10.values[k]) ? series.pr10.values[k] : NaN;
+        const r = P.wetFromProbability(pr1, pr10);
+        wet = r.wet; wetPhrase = r.phrase; wetSource = 'pr';
+        if (finite(series.originMs) && finite(series.offsetMin)) {
+          const endMs = series.originMs + series.pr1.steps[best] * HOUR + series.offsetMin * MIN;
+          prEndHour = (((endMs % DAY) + DAY) % DAY) / HOUR;
+        }
+      }
+    }
+    if (wetSource === 'none') {
+      const rain = within(series.tp6, w, true);
+      if (rain.length) {
+        rainMm = rain.reduce((x, y) => x + y, 0);
+        wet = P.wetFromAmount(rainMm);
+        wetPhrase = P.wetPhraseFor(wet, lead);
+        wetSource = 'tp6';
+      } else if (rainMissing) wetPhrase = P.NOT_IN_RUN;
+    }
   }
-  if (lead > 10) wet = 'none';
 
-  // Air mass (K)
+  // Air mass (K): dropped where the field is masked to no-data (high ground), and never reported missing then
   const t = within(series.t850a, w);
   let airMass = 'none';
   if (t.length) {
     const m = mean(t);
     airMass = m >= 5 ? 'much-warmer' : m >= 2 ? 'warmer' : m <= -5 ? 'much-cooler' : m <= -2 ? 'cooler' : 'near-normal';
   }
+  const tempMissing = lead <= 10 && !series.t850a && !series.t2m;
+
+  // High and low through day 7 from t2m (K), "near" because 6-hourly steps miss the extremes by a degree or two
+  let hi, lo;
+  const tt = within(series.t2m, w);
+  if (lead <= 7 && tt.length >= 2) { hi = Math.max(...tt) - 273.15; lo = Math.min(...tt) - 273.15; }
 
   // Pattern confidence
-  const anyData = z.length || rain.length || t.length || within(series.z500sd, w).length;
+  const anyData = z.length || wet !== 'none' || t.length || sd.length;
   let confidence = 'none';
   if (anyData) {
-    if (lead > 10) confidence = 'pattern-only';
-    else {
-      const sd = within(series.z500sd, w).map((v) => v / 10);
-      if (sd.length) { const m = mean(sd); confidence = m < 3 ? 'high' : m <= 6 ? 'medium' : 'low'; }
-      else confidence = lead <= 4 ? 'high' : lead <= 7 ? 'medium' : 'low';
-      if (lead >= 8 && confidence === 'high') confidence = 'medium';
-      if (lead > 3 && (wet === 'light' || wet === 'moderate' || wet === 'heavy') && confidence === 'high') confidence = 'medium';
-    }
+    const c = confidenceAt((lead - 0.5) * 24, { spreadDam, hasSpread: sd.length > 0 });
+    confidence = c.level;
+    if (lead > 3 && (wet === 'light' || wet === 'moderate' || wet === 'heavy') && confidence === 'high') confidence = 'medium';
   }
-  return { dayIndex, date: w.date, lead, pattern, stormTrack, wet, wetPhrase, airMass, confidence };
+  return {
+    dayIndex, date: w.date, lead, pattern, signal, anomDam, spreadDam, stormTrack,
+    wet, wetPhrase, wetSource, rainMm, pr1, pr10, prEndHour, rainMissing, airMass, tempMissing, hi, lo, confidence,
+    partial: false,
+  };
 }
 
-export const hasData = (c) => c.pattern !== 'none' || c.wet === 'dry' || c.wet === 'light' || c.wet === 'moderate' || c.wet === 'heavy' || c.airMass !== 'none';
-const wetKnown = (c) => c.wet !== 'none';
-const lowerFirst = (s) => s.charAt(0).toLowerCase() + s.slice(1);
-const upperFirst = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+export const hasData = P.hasStoryData;
+export const coherent = P.coherent;
 
-/**
- * What the day feels like. Without rain data a live run still says "Settled"/"Unsettled" from the pattern; a
- * sample has no rain, so it states only what it has: the pattern itself (`patternOnly`).
- */
-function consequence(c, patternOnly = false) {
-  const fam = P.PATTERN_FAMILY[c.pattern];
-  const base = wetKnown(c) ? upperFirst(c.wetPhrase) : patternOnly ? upperFirst(P.PATTERN_PLAIN[c.pattern] || '') : P.FAMILY_CONSEQUENCE[fam];
-  const tail = P.AIR_MASS_TAIL[c.airMass] || '';
-  if (!base) return tail ? upperFirst(tail.replace(/^ and /, '')) : '';
-  return base + tail;
-}
-/**
- * Meteorological coherence: a ridge (high pressure aloft) does not go with moderate or heavy rain, and a trough
- * does not go with a dry day. When the data say so anyway we state both facts but never link them ("rain under a
- * ridge", "dry as a trough moves in"), and a storm track is not reported overhead of a ridge.
- */
-export function coherent(family, c) {
-  if (family === 'ridge') return c.wet !== 'moderate' && c.wet !== 'heavy';
-  if (family === 'trough') return c.wet !== 'dry';
-  return true;
-}
-const spellKey = (c) => {
-  const air = c.airMass === 'warmer' || c.airMass === 'much-warmer' ? 'warm' : c.airMass === 'cooler' || c.airMass === 'much-cooler' ? 'cool' : 'n';
-  if (wetKnown(c)) return `${c.wet === 'dry' ? 'dry' : 'wet'}|${air}`;
-  return `p:${P.PATTERN_FAMILY[c.pattern]}|${air}`;
-};
-const CONF_RANK = { low: 0, 'pattern-only': 0, medium: 1, high: 2 };
+// ---------- sentences (the one implementation is phrases.js; these are the stable entry points) ----------
 
-/**
- * One plain sentence about the days given (SPEC section 6). Only days with lead 1 to 7 count; days without
- * data are skipped and the sentence says where the data stops.
- * @param {import('../contract.js').DayClass[]} days
- */
-export function summarize(days, opts = {}) {
-  const week = days.filter((d) => d.lead <= 7);
-  const used = week.filter(hasData);
-  if (!used.length) return '';
-  const name = (c) => weekdayShort(c.date);
-  const first = used[0];
-  const idx = used.findIndex((c, i) => i > 0 && spellKey(c) !== spellKey(first));
-  let sentence, conf;
-  if (idx < 0) {
-    const last = used[used.length - 1];
-    const span = used.length >= 7 ? 'all week' : used.length === 1 ? `on ${name(first)}` : `through ${name(last)}`;
-    const fam = P.PATTERN_FAMILY[first.pattern];
-    const po = !!opts.sample && !wetKnown(first);
-    const linked = !po && used.every((c) => coherent(P.PATTERN_FAMILY[c.pattern], c)) && coherent(fam, first);
-    const under = !linked ? '' : fam === 'ridge' ? P.PATTERN_PLAIN.ridge : fam === 'trough' ? P.PATTERN_PLAIN.trough : '';
-    const onItsWay = po && used.every((c) => c.pattern === first.pattern) && (first.pattern === 'trough-arriving' || first.pattern === 'ridge-building');
-    sentence = onItsWay
-      ? `${upperFirst(first.pattern === 'trough-arriving' ? P.PATTERN_PLAIN.trough : P.PATTERN_PLAIN.ridge)} ${first.pattern === 'trough-arriving' ? 'moves in' : 'builds'} by ${name(last)}.`
-      : `${consequence(first, po)} ${span}${under ? ' under ' + under : ''}.`;
-    const known = used.map((c) => c.confidence).filter((c) => c !== 'none');
-    conf = known.sort((a, b) => CONF_RANK[a] - CONF_RANK[b])[0] || 'none';
-  } else {
-    const c2 = used[idx];
-    const poFirst = !!opts.sample && !wetKnown(first), poSecond = !!opts.sample && !wetKnown(c2);
-    const part1 = `${consequence(first, poFirst)} ${idx === 1 ? 'on' : 'through'} ${name(used[idx - 1])}`;
-    let fam = P.PATTERN_FAMILY[c2.pattern];
-    if (fam === 'normal' || fam === 'none') fam = P.PATTERN_FAMILY[used[idx - 1].pattern];
-    const cause = !poSecond && coherent(fam, c2) ? P.CAUSE[fam] || '' : '';
-    const lastOne = idx === used.length - 1;
-    const part2 = `${lowerFirst(consequence(c2, poSecond))} ${lastOne ? 'on' : 'from'} ${name(c2)}${cause ? ' ' + cause : ''}`;
-    sentence = `${part1}; ${part2}.`;
-    conf = c2.confidence !== 'none' ? c2.confidence : first.confidence;
-  }
-  const out = [sentence];
-  // Sample spreads are not forecast spreads (SPEC section 11): no confidence claim in sample mode.
-  const phrase = opts.sample ? '' : P.SUMMARY_CONFIDENCE[conf];
-  if (phrase) out.push(phrase);
-  const lastWithData = used[used.length - 1];
-  if (week.length && lastWithData.lead < Math.min(7, week[week.length - 1].lead) ) out.push(P.EMPTY.noData(name(lastWithData)) + '.');
-  return out.join(' ');
-}
-
-/**
- * Day line for a focused place. `opts.sample` swaps "not in this run" for "not in this sample".
- */
-export function dayLine(label, dayName, cls, opts = {}) {
-  const miss = opts.sample ? 'in this sample' : 'in this run';
-  const parts = [];
-  let noRain = false, noAir = false;
-  if (cls.wet === 'none') { if (cls.wetPhrase !== '') noRain = true; }
-  else if (cls.wet === 'dry' || cls.lead > 7) parts.push(cls.wetPhrase);
-  else parts.push(`${cls.wetPhrase} in the latest forecast`);
-  if (cls.airMass !== 'none') parts.push(P.AIR_MASS_WORDS[cls.airMass]);
-  else if (cls.lead <= 10) noAir = true;
-  const fam = P.PATTERN_FAMILY[cls.pattern];
-  let pat = coherent(fam, cls) ? P.PATTERN_PLAIN[cls.pattern] : '';
-  const track = cls.stormTrack && fam !== 'ridge';
-  if (track) pat = pat ? `${pat}, ${P.STORM_TRACK_PLAIN}` : P.STORM_TRACK_PLAIN;
-  let line = `${label} · ${dayName}:`;
-  if (!hasData(cls)) return `${line} no forecast data.`;
-  // consequence first: what the data say, then what it lacks
-  if (parts.length) line += ` ${parts.join(', ')}${pat ? ` — ${pat}` : ''}.`;
-  else if (pat) line += ` ${upperFirst(pat)}${!track && (cls.pattern === 'ridge' || cls.pattern === 'trough') ? ' overhead' : ''}.`;
-  const lacking = noRain && noAir ? 'Rain and temperature aren’t' : noRain ? 'Rain isn’t' : noAir ? 'Temperature isn’t' : '';
-  if (lacking) line += ` ${lacking} ${miss}.`;
-  if (opts.sample) { /* sample spread is not a forecast spread: no confidence claim */ }
-  else if (cls.confidence === 'pattern-only') line += ' Pattern only, not specifics.';
-  else if (P.CONFIDENCE_WORDS[cls.confidence]) line += ` Pattern: ${P.CONFIDENCE_WORDS[cls.confidence]}.`;
-  return line;
-}
+/** One plain sentence about the first seven days (consequence plus cause, at most 110 characters). */
+export function summarize(days, opts = {}) { return P.summary(days, opts); }
+/** Day line for a focused place. `opts.sample` swaps "not in this run" for "not in this sample". */
+export function dayLine(label, dayName, cls, opts = {}) { return P.dayLine(cls, { ...opts, label, dayName }); }
 
 // ---------- reading the data facade ----------
 
@@ -258,21 +202,21 @@ export function domainFor(fieldId, lat, lon) {
   return doms.includes('g1') ? 'g1' : doms[0];
 }
 
-/** Fields the story may combine: in sample mode only case A (cases are never mixed). */
+/** Fields the story may combine: for a multi-case manifest only the active case's (cases are never mixed). */
 function allowedFields() {
   const m = mf();
   if (!m) return null;
-  if (m.sample) return new Set(m.cases?.A?.fields || []);
+  if (isMultiCase(m)) return new Set(m.cases[activeCaseId()]?.fields || []);
   return new Set(Object.keys(m.fields || {}));
 }
-const STORY_FIELDS = ['z500a', 'z500sd', 'tp6', 't850a', 'ws250'];
+const STORY_FIELDS = ['z500a', 'z500sd', 'tp6', 't850a', 't2m', 'pr1', 'pr10', 'ws250'];
 
 /** Synchronous series for a place from whatever the facade has loaded (windows left empty). */
 export function seriesFor(lat, lon) {
   const ok = allowedFields();
-  const get = (f) => {
+  const get = (f, pattern) => {
     if (ok && !ok.has(f)) return null;
-    try { return data.sampleSeries(f, lat, lon) || null; } catch { return null; }
+    try { return (pattern && data.patternSeries?.(f, lat, lon)) || data.sampleSeries(f, lat, lon) || null; } catch { return null; }
   };
   let ws = null;
   if (!ok || ok.has('ws250')) {
@@ -282,14 +226,21 @@ export function seriesFor(lat, lon) {
       if (steps.length && values.some(finite)) ws = { steps, values };
     } catch { ws = null; }
   }
-  return { windows: [], z500a: get('z500a'), z500sd: get('z500sd'), tp6: get('tp6'), t850a: get('t850a'), ws250max: ws };
+  // hasMean: the run carries the ensemble mean (z500em), so the zones table has its blend and mean rows (DESIGN-SPEC
+  // 7.2). Unknown (no manifest) counts as no mean: nothing then implies a blend toward an average.
+  return {
+    hasMean: !!ok?.has('z500em'),
+    windows: [], z500a: get('z500a', true), z500sd: get('z500sd'), tp6: get('tp6'), t850a: get('t850a'),
+    t2m: get('t2m'), pr1: get('pr1'), pr10: get('pr10'), ws250max: ws,
+  };
 }
 
 /** Loads every chunk of the story fields for the place's domain (the facade samples whatever is loaded). */
 export async function ensureStoryData(lat, lon) {
   const ok = allowedFields();
   const jobs = [];
-  for (const f of STORY_FIELDS) {
+  const fields = data.patternSeries ? [...STORY_FIELDS, 'z500em'] : STORY_FIELDS;
+  for (const f of fields) {
     if (ok && !ok.has(f)) continue;
     let steps; try { steps = data.fieldSteps(f); } catch { continue; }
     if (!steps?.length) continue;
@@ -301,46 +252,105 @@ export async function ensureStoryData(lat, lon) {
 }
 
 /**
- * Where "day 1" starts: now when it falls inside the loaded range, else the first valid time (sample data is
- * rebased and old by the time it is opened).
+ * Where "day 1" starts: now when it falls inside a live run's range, else the first valid time (a recorded forecast
+ * starts at its own first local day; old sample data is rebased and old by the time it is opened).
  */
 export function anchorMs(now = Date.now()) {
   const o = vt(0).getTime();
+  if (!isLive(mf())) return o;
   let last = o;
   try { const st = data.fieldSteps('z500a'); if (st.length) last = vt(st[st.length - 1]).getTime(); } catch { /* origin only */ }
   return now >= o && now <= last ? now : o;
 }
 
-/**
- * Day classes for a place, from the local day of `from` to the day of `to`, at most 15 days.
- * `from` and `to` are Dates or epoch ms; a number under a million counts days from the anchor (0, 7 is eight
- * days from day 1). Awaits the chunks it needs. The array carries its `series` and `windows` for stripSVG.
- * @param {{tz?:'viewer'|number, anchor?:number}} opts tz defaults to the viewer's zone (tzForLon(lon) for other
- *   pins); anchor is the start of day 1 for lead grading (default anchorMs())
- * @returns {Promise<import('../contract.js').DayClass[]>}
- */
-export async function buildDays(lat, lon, from, to, opts = {}) {
-  const origin = vt(0).getTime();
-  const tz = opts.tz ?? 'viewer';
-  const anchor = opts.anchor ?? anchorMs();
-  const abs = (v) => (v instanceof Date ? +v : typeof v === 'number' && Math.abs(v) < 1e6 ? anchor + v * DAY : +v);
-  const fromMs = abs(from), toMs = abs(to);
-  const probe = dayWindows(origin, fromMs, 16, tz);
-  const firstAfter = probe.findIndex((w) => origin + w.startH * HOUR > toMs);
-  const windows = probe.slice(0, firstAfter < 1 ? (firstAfter === 0 ? 1 : 15) : Math.min(firstAfter, 15));
-  await ensureStoryData(lat, lon);
-  const series = seriesFor(lat, lon);
-  series.windows = windows;
-  const base = dayWindows(origin, anchor, 1, tz)[0].startH;
-  const days = windows.map((w, i) => classifyDay(series, i, Math.round((w.startH - base) / 24) + 1));
-  days.series = series;
-  days.windows = windows;
-  return days;
+// ---------- building the days ----------
+
+const SPAN_FIELDS = ['z500a', 'z500sd', 'tp6', 't850a', 't2m', 'pr1', 'pr10', 'ws250max'];
+/** [first, last] forecast hour across the story fields that hold any value, or null. */
+function spanOf(series) {
+  let a = Infinity, b = -Infinity;
+  for (const k of SPAN_FIELDS) {
+    const f = series[k];
+    if (!f?.steps) continue;
+    f.steps.forEach((s, i) => { if (finite(f.values[i])) { if (s < a) a = s; if (s > b) b = s; } });
+  }
+  return a <= b ? [a, b] : null;
 }
 
 /**
- * Notability of a place over the first seven days (SPEC section 2): max |z500a| in dam over 6·f, with
+ * The pure core of buildDays: local days from the day containing fromMs, up to the day containing toMs (at most 15),
+ * keeping only days the data overlap. `o` = {originMs, fromMs, toMs, anchorMs, offsetMin, nowMs?, manifest?, placeName?}.
+ */
+export function daysFromSeries(series, o) {
+  const { originMs, offsetMin } = o;
+  const m = o.manifest || null;
+  const probe = dayWindowsAt(originMs, o.fromMs, 16, offsetMin);
+  const firstAfter = probe.findIndex((w) => originMs + w.startH * HOUR > o.toMs);
+  const asked = probe.slice(0, firstAfter < 1 ? (firstAfter === 0 ? 1 : 15) : Math.min(firstAfter, 15));
+  const span = spanOf(series);
+  const windows = span ? asked.filter((w) => w.startH < span[1] && w.endH > span[0]) : [];
+  series.windows = windows;
+  series.originMs = originMs;
+  series.offsetMin = offsetMin;
+  const base = dayWindowsAt(originMs, o.anchorMs ?? o.fromMs, 1, offsetMin)[0].startH;
+  const days = windows.map((w, i) => {
+    const c = classifyDay(series, i, Math.max(1, Math.round((w.startH - base) / 24) + 1));
+    c.partial = w.startH < span[0] || w.endH > span[1];
+    return c;
+  });
+
+  const nowMs = o.nowMs ?? Date.now();
+  const kind = !m || isLive(m) ? 'live' : isRecorded(m) ? 'recorded' : 'multi';
+  const stale = m ? staleness(m, nowMs) : 'fresh';
+  const nowH = (nowMs - originMs) / HOUR;
+  const inRun = span && nowH >= span[0] && nowH <= span[1];
+  const todayMode = kind === 'live' && inRun && stale !== 'very-stale';
+  const todayDate = todayMode ? localDate(nowMs, offsetMin) : null;
+  if (todayMode) days.forEach((c) => { if (c.date === todayDate) { c.today = true; c.passedH = nowH; } });
+  const requested = asked.length;
+  let nextUpdate = null;
+  if (kind === 'live' && days.length < requested && m?.generated) {
+    const g = Date.parse(String(m.generated).length === 17 ? m.generated.replace(/Z$/, ':00Z') : m.generated);
+    if (g === g) { let t = g + 12 * HOUR; while (t < nowMs) t += 12 * HOUR; nextUpdate = new Date(t); }
+  }
+  const coverage = {
+    requested, withData: days.length, firstDate: days[0]?.date ?? null, lastDate: days[days.length - 1]?.date ?? null,
+    nextUpdate, todayDate, kind, staleness: stale, offsetMin, viewerOffset: viewerOffsetMinutes(nowMs), placeName: o.placeName || '',
+    nowH: todayMode ? nowH : null, nowLocalHour: todayMode ? (((nowMs + offsetMin * MIN) % DAY) + DAY) % DAY / HOUR : 0,
+  };
+  // each day class carries the coverage (not enumerable), so dayLine(c) can say today/tomorrow and the place's zone
+  days.forEach((c) => Object.defineProperty(c, 'coverage', { value: coverage, enumerable: false, writable: true, configurable: true }));
+  for (const [k, v] of Object.entries({ days, series, windows, coverage })) Object.defineProperty(days, k, { value: v, enumerable: false, writable: true, configurable: true });
+  return days;
+}
+
+function context(lat, lon, from, to, opts) {
+  const origin = vt(0).getTime();
+  const anchor = opts.anchor ?? anchorMs(opts.now);
+  const abs = (v) => (v instanceof Date ? +v : typeof v === 'number' && Math.abs(v) < 1e6 ? anchor + v * DAY : +v);
+  // A place's days are binned in its own local time, from its longitude to the nearest hour. tz 'viewer' (the old
+  // home and trip default) now means the same: the place's own days, so every viewer sees the same columns.
+  const offsetMin = typeof opts.tz === 'number' ? opts.tz * 60 : offsetMinutes(lon);
+  return { originMs: origin, fromMs: abs(from), toMs: abs(to), anchorMs: anchor, offsetMin, nowMs: opts.now, manifest: mf(), placeName: opts.placeName };
+}
+
+/**
+ * Day classes for a place, from the local day of `from` to the day of `to`, at most 15 days, only the days that have
+ * data. `from` and `to` are Dates or epoch ms; a number under a million counts days from the anchor (0, 6 is seven
+ * days from day 1). Awaits the chunks it needs.
+ * @param {{tz?:'viewer'|number, anchor?:number, now?:number, placeName?:string}} opts tz: a UTC offset in hours
+ *   overrides the longitude-derived one; anchor is the start of day 1 for lead grading (default anchorMs()); now is the clock
+ * @returns {Promise<object[] & {days:object[], series:object, coverage:object, windows:object[]}>}
+ */
+export async function buildDays(lat, lon, from, to, opts = {}) {
+  await ensureStoryData(lat, lon);
+  return daysFromSeries(seriesFor(lat, lon), context(lat, lon, from, to, opts));
+}
+
+/**
+ * Notability of a place over the first seven days (docs/SPEC.md section 2): max |z500a| in dam over 6·f, with
  * f = clamp(|lat| / 45, 0.5, 1.5), plus the precipitation sum in mm over 10. Synchronous; uses what is loaded.
+ * The reason is the place's reason phrase ("Rain likely from Sunday", "Under a trough from Sun 1 Jan").
  * @returns {{score:number, reason:string}}
  */
 export function notability(lat, lon) {
@@ -349,130 +359,27 @@ export function notability(lat, lon) {
   if (!has(s.z500a) && !has(s.tp6)) return { score: 0, reason: '' };
   const f = clamp(Math.abs(lat) / 45, 0.5, 1.5);
   const hMax = 168;
-  let zPeak = 0, zStep = 0;
-  if (s.z500a) s.z500a.steps.forEach((st, i) => { const v = Math.abs(s.z500a.values[i]) / 10; if (st <= hMax && finite(v) && v > zPeak) { zPeak = v; zStep = i; } });
+  let zPeak = 0;
+  if (s.z500a) s.z500a.steps.forEach((st, i) => { const v = Math.abs(s.z500a.values[i]) / 10; if (st <= hMax && finite(v) && v > zPeak) zPeak = v; });
   let rain = 0;
   if (s.tp6) s.tp6.steps.forEach((st, i) => { if (st <= hMax && finite(s.tp6.values[i])) rain += s.tp6.values[i]; });
   const score = zPeak / (6 * f) + rain / 10;
-  // Reason: the wettest local day if it is notable, else the strongest pattern day, else settled.
-  let reason = has(s.z500a) ? 'Settled' : '';
-  const perDay = new Map();
-  if (s.tp6) s.tp6.steps.forEach((st, i) => { if (st > hMax || !finite(s.tp6.values[i])) return; const d = vt(st - 3).toLocaleDateString('en-CA'); perDay.set(d, (perDay.get(d) || 0) + s.tp6.values[i]); });
-  let wetDay = null, wetMax = 0;
-  for (const [d, v] of perDay) if (v > wetMax) { wetMax = v; wetDay = d; }
-  if (wetMax > 20) reason = `Heavy rain ${weekdayShort(wetDay)}`;
-  else if (wetMax >= 5) reason = `Rain ${weekdayShort(wetDay)}`;
-  else if (zPeak >= 6) {
-    const kind = s.z500a.values[zStep] > 0 ? 'Ridge' : 'Trough';
-    reason = `${kind} ${weekdayShort(vt(s.z500a.steps[zStep]).toLocaleDateString('en-CA'))}`;
-  } else if (wetMax >= 1) reason = `Light rain ${weekdayShort(wetDay)}`;
+  let reason = '';
+  try {
+    const a = anchorMs();
+    reason = P.reasonPhrase(daysFromSeries(s, context(lat, lon, a, a + 6 * DAY, { anchor: a })));
+  } catch { reason = ''; }
   return { score, reason };
 }
 
 // ---------- the strip ----------
 
-const NS = 'http://www.w3.org/2000/svg';
-let stripId = 0;
-function svgEl(tag, attrs = {}, parent) {
-  const e = document.createElementNS(NS, tag);
-  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
-  if (parent) parent.appendChild(e);
-  return e;
-}
-const BAR_H = { dry: 1.5, light: 5, moderate: 10, heavy: 16 };
-
 /**
- * The strip (SPEC section 6): 56 px tall. Top: the z500a line filled in the anomaly colours inside a band of
- * +/- z500sd; bottom: daily rain bars; day initials beneath; days without data or past day 10 hatched.
- * Each day is a tappable rect with data-day and data-t (forecast hour to scrub to).
- * @param {import('../contract.js').DayClass[]} days
- * @param {object} series as returned by seriesFor with windows set (defaults to days.series)
- * @param {'dark'|'light'} theme
- * @param {{width?:number, activeDay?:number, label?:(c:object)=>string}} opts
+ * The strip (DESIGN-SPEC section 3.3). Legacy call `stripSVG(days, series, 'dark' | 'light', {width, activeDay, label})`
+ * and the new `stripSVG(days, series, {compact, range, phone, width, activeDay, label, ground})` both work; the
+ * drawing is story/strip.js.
  */
-export function stripSVG(days, series = days?.series, theme = 'dark', opts = {}) {
-  const width = opts.width || 336;
-  const H = 56, mid = 13, chartH = 26, barsBottom = 44;
-  const svg = svgEl('svg', { viewBox: `0 0 ${width} ${H}`, width, height: H, class: 'strip', role: 'group', 'aria-label': 'Forecast strip for the coming days' });
-  const n = days?.length || 0;
-  if (!n || !series?.windows?.length) return svg;
-  const wins = series.windows;
-  const h0 = wins[0].startH, h1 = wins[n - 1].endH;
-  const colW = width / n;
-  const X = (h) => ((h - h0) / (h1 - h0)) * width;
-  const id = `hatch${++stripId}`;
-  const defs = svgEl('defs', {}, svg);
-  const pat = svgEl('pattern', { id, width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, defs);
-  svgEl('line', { x1: 0, y1: 0, x2: 0, y2: 6, style: 'stroke:var(--hairline);stroke-width:2' }, pat);
-
-  // zero line
-  svgEl('line', { x1: 0, y1: mid, x2: width, y2: mid, style: 'stroke:var(--hairline);stroke-width:1' }, svg);
-
-  // anomaly line, fill, spread band
-  const z = series.z500a;
-  const PX = 12 / 18; // px per dam
-  if (z && z.steps.length) {
-    const pts = [];
-    z.steps.forEach((st, i) => {
-      const v = z.values[i];
-      if (!finite(v) || st < h0 || st > h1) return;
-      pts.push({ x: X(st), dam: clamp(v / 10, -24, 24), sd: series.z500sd ? interp(series.z500sd, st) / 10 : 0 });
-    });
-    const rgba = (dam) => { const c = anomalyRGBA(dam, theme); return c[3] ? `rgba(${c[0]},${c[1]},${c[2]},${(c[3] / 255).toFixed(3)})` : null; };
-    for (let i = 0; i + 1 < pts.length; i++) {
-      const a = pts[i], b = pts[i + 1];
-      const fill = rgba((a.dam + b.dam) / 2);
-      if (!fill) continue;
-      svgEl('path', { d: `M${a.x} ${mid}L${a.x} ${mid - a.dam * PX}L${b.x} ${mid - b.dam * PX}L${b.x} ${mid}Z`, style: `fill:${fill};stroke:${fill};stroke-width:.5` }, svg);
-    }
-    if (pts.length > 1 && pts.some((p) => p.sd * PX >= 0.6)) {
-      const up = pts.map((p) => `${p.x},${mid - (p.dam + p.sd) * PX}`);
-      const dn = pts.slice().reverse().map((p) => `${p.x},${mid - (p.dam - p.sd) * PX}`);
-      svgEl('polygon', { points: [...up, ...dn].join(' '), style: 'fill:var(--ink);opacity:.14' }, svg);
-    }
-    if (pts.length === 1) svgEl('circle', { cx: pts[0].x, cy: mid - pts[0].dam * PX, r: 2.5, style: 'fill:var(--ink)' }, svg);
-    if (pts.length > 1) svgEl('path', { d: 'M' + pts.map((p) => `${p.x} ${mid - p.dam * PX}`).join('L'), style: 'fill:none;stroke:var(--ink);stroke-width:1.25;stroke-linejoin:round' }, svg);
-  }
-
-  let patternOnlyDone = false;
-  days.forEach((c, i) => {
-    const x = i * colW;
-    // rain bars
-    if (BAR_H[c.wet] && c.lead <= 10) {
-      const bh = BAR_H[c.wet];
-      svgEl('rect', { x: x + colW * 0.2, y: barsBottom - bh, width: colW * 0.6, height: bh, rx: 1.5, class: `bar bar-${c.wet}`, style: c.wet === 'dry' ? 'fill:var(--hairline)' : 'fill:var(--rain)' }, svg);
-    }
-    const noData = !hasData(c);
-    const past10 = c.lead > 10;
-    if (noData || past10) svgEl('rect', { x, y: 0, width: colW, height: barsBottom + 2, fill: `url(#${id})`, class: noData ? 'hatch-nodata' : 'hatch-pattern-only', opacity: noData ? 1 : 0.6 }, svg);
-    if (past10 && !noData && !patternOnlyDone) {
-      patternOnlyDone = true;
-      const room = width - x;
-      const t = svgEl('text', { x: room >= 84 ? x + 4 : width - 2, y: 9, 'text-anchor': room >= 84 ? 'start' : 'end', style: 'fill:var(--ink-2);font:12px var(--font-ui)', class: 'strip-note' }, svg);
-      t.textContent = 'pattern only';
-    }
-    const t = svgEl('text', { x: x + colW / 2, y: 55, 'text-anchor': 'middle', class: 'strip-initial', style: `fill:${i === opts.activeDay ? 'var(--ink)' : 'var(--ink-2)'};font:${i === opts.activeDay ? 600 : 400} 12px var(--font-ui)` }, svg);
-    t.textContent = weekdayInitial(c.date);
-    if (i === opts.activeDay) svgEl('rect', { x: x + 2, y: 0, width: colW - 4, height: 48, rx: 4, style: 'fill:none;stroke:var(--ring);stroke-width:1' }, svg);
-    const w = wins[i];
-    const zs = series.z500a?.steps;
-    const first = zs?.[0] ?? w.startH, last = zs?.[zs.length - 1] ?? w.endH;
-    const lo = Math.max(w.startH, first), hi = Math.min(w.endH, last);
-    const mid = hi > lo ? (lo + hi) / 2 : Math.min(last, Math.max(first, w.startH)); // never past the loaded range
-    const tap = svgEl('rect', { x, y: 0, width: colW, height: H, fill: 'transparent', class: 'strip-day', role: 'button', tabindex: 0, 'data-day': i, 'data-t': mid.toFixed(1), 'aria-label': opts.label ? opts.label(c) : `${weekdayShort(c.date)}` }, svg);
-    tap.style.cursor = 'pointer';
-  });
-  return svg;
-}
-
-function interp(f, h) {
-  const s = f.steps, v = f.values;
-  if (!s.length) return 0;
-  if (h <= s[0]) return finite(v[0]) ? v[0] : 0;
-  for (let i = 0; i + 1 < s.length; i++) if (h <= s[i + 1]) {
-    const a = v[i], b = v[i + 1];
-    if (!finite(a) || !finite(b)) return 0;
-    return a + ((b - a) * (h - s[i])) / (s[i + 1] - s[i]);
-  }
-  return finite(v[v.length - 1]) ? v[v.length - 1] : 0;
+export function stripSVG(days, series = days?.series, themeOrOpts = 'dark', opts = {}) {
+  const o = typeof themeOrOpts === 'string' ? { ...opts, ground: themeOrOpts === 'light' ? 'paper' : 'night' } : { ...themeOrOpts };
+  return drawStrip(days, series, o);
 }

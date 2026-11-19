@@ -74,6 +74,7 @@ class Store:
                     chunk = data
                     self.send_response(200)
                 self.send_header("Accept-Ranges", "bytes")
+                self.send_header("Content-Type", "application/octet-stream")
                 self.send_header("Content-Length", str(len(chunk)))
                 self.end_headers()
                 if body_too:
@@ -106,11 +107,18 @@ def _index_and_blob(entries):
     return blob, ("\n".join(lines) + "\n").encode()
 
 
-def publish_run(store, run, steps, model="ifs", skip=(), lat=None, lon=None, fields=None, es_steps=None):
+def publish_run(store, run, steps, model="ifs", skip=(), lat=None, lon=None, fields=None, es_steps=None, sp_field=None,
+                ivt=False):
     """Put one run into `store` using the open-data layout. `skip` = {(kind, step)} to leave out (404).
 
     Values (constants plus east-longitude/360, so tests can predict every result and spot a shifted grid): gh500 = 5500 + step, u250 = 30, v250 = 40,
     t850 = 270 + step/10, tp = 0.0005 * step metres accumulated, msl = 101325, es(gh500) = 5 + step/2.
+    tpg1 = 20 + end/12 and tpg10 = end/12 (percent, 24 h windows "end-24"-"end" published for every end hour that is
+    a multiple of 12 and in `es_steps`/`steps`; ends <= 240 go in the 240 h file, later ones in the 360 h file),
+    plus a tpg5 decoy. `sp_field` (ny, nx) replaces the constant 100000 Pa surface pressure (the terrain mask tests).
+    t2m = 280 + step/10 + ramp (`2t`, surface, level 2). `ivt=True` replaces the u/v decoys at 850 and 500 hPa with the
+    eight IVT levels (q 0.01 kg/kg, u 10, v 0 m/s, no ramp), so every column's IVT is 0.01*10*70000/g = 713.8 kg/m/s.
+    skip kinds: ("es", s), ("em", s), ("pr", end), ("t2m", s), ("ivt_pl", s).
     Decoy messages (other levels) are included so tests can prove a request downloads only what it asked for.
     """
     lat = np.linspace(90, -90, 361) if lat is None else lat
@@ -143,14 +151,20 @@ def publish_run(store, run, steps, model="ifs", skip=(), lat=None, lon=None, fie
         add("gh500", gh_name, 500, gh_val(500))
         add("gh500", gh_name, 850, gh_val(850))   # decoys
         add("gh500", gh_name, 250, gh_val(250))
-        for lv in (250, 500, 850):
+        for lv in ((250,) if ivt else (250, 500, 850)):
             add("wind250", "u", lv, 30.0 if lv == 250 else 1.0)
             add("wind250", "v", lv, 40.0 if lv == 250 else 2.0)
+        if ivt:
+            for lv in (1000, 925, 850, 700, 600, 500, 400, 300):
+                add("ivt_pl", "q", lv, 0.01, rmp=False)
+                add("ivt_pl", "u", lv, 10.0, rmp=False)
+                add("ivt_pl", "v", lv, 0.0, rmp=False)
+        add("t2m", "2t", 2, 280.0 + s / 10, "heightAboveGround", "sfc")
         add("t850", "t", 850, 270.0 + s / 10)
         add("t850", "t", 500, 250.0)
         add("tp", "tp", 0, 0.0005 * s, "surface", "sfc", rmp=False)  # a real accumulation is 0 at step 0, no ramp
         add("msl", "msl", 0, 101325.0, "meanSea", "sfc")
-        add("ivt_sp", "sp", 0, 100000.0, "surface", "sfc")
+        add("ivt_sp", "sp", 0, 100000.0 if sp_field is None else np.asarray(sp_field, np.float64), "surface", "sfc")
         if ent:
             blob, idx = _index_and_blob(ent)
             base = f"/{ymd}/{hh}z/{mdir}/0p25/oper/{stamp}-{s}h-oper-fc"
@@ -159,13 +173,18 @@ def publish_run(store, run, steps, model="ifs", skip=(), lat=None, lon=None, fie
     # ensemble mean and spread live in the -240h / -360h enfo-ep files (steps <= 240, then beyond)
     for end, lo, hi in ((240, 0, 240), (360, 246, 360)):
         ent = []
-        for s in [x for x in (es_steps if es_steps is not None else steps) if lo <= x <= hi]:
-            if ("es", s) in skip:
-                continue
-            for typ, val in (("es", 5.0 + s / 2), ("em", 5500.0 + s)):
+        ens_steps = es_steps if es_steps is not None else steps
+        for s in [x for x in ens_steps if lo <= x <= hi]:
+            for typ, val, kind in (("es", 5.0 + s / 2, "es"), ("em", 5500.0 + s, "em")):
+                if (kind, s) in skip:
+                    continue
                 k = key(type=typ, step=s, levtype="pl", param="gh", stream="enfo")
                 k["levelist"] = "500"
                 ent.append((k, grib_bytes("gh", 500, np.full(shape, val, np.float64), lat, lon)))
+        for e in [x for x in ens_steps if x >= 24 and x % 12 == 0 and (x <= 240) == (end == 240) and ("pr", x) not in skip]:
+            for param, val in (("tpg1", 20.0 + e / 12), ("tpg5", 99.0), ("tpg10", e / 12)):
+                k = key(type="ep", step=f"{e - 24}-{e}", levtype="sfc", param=param, stream="enfo")
+                ent.append((k, grib_bytes(param, 0, np.full(shape, val, np.float64), lat, lon, "surface")))
         if ent:
             blob, idx = _index_and_blob(ent)
             base = f"/{ymd}/{hh}z/ifs/0p25/enfo/{stamp}-{end}h-enfo-ep"

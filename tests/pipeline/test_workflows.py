@@ -261,3 +261,107 @@ def test_validate_step_is_quiet_when_nothing_is_missing(scratch, work):
     r = _validate_step(scratch, work, '{"fields": ["z500", "z500a", "z500sd"], "files": 4, "bytes": 9, "probes": 2, "missing": []}\n')
     assert r.returncode == 0, r.stderr
     assert "::warning::" not in r.stdout and "Published without" not in (work / "gho.sum").read_text()
+
+
+# ---- W4-08 (Josh points 8, 15, 16; MET-10, MET-12, TEST-9): IVT on the scheduled 00Z run only, the raw-GRIB check, nightly ----
+
+GUARD = "github.repository == 'quantum-wave/weather-story-explorer-public'"
+
+
+def _fields_passed(scratch, work, name, event, run, model="ifs"):
+    """Run the Build or Validate step for real against a stub python and return its --fields argument."""
+    co, bare, bindir = scratch
+    (co / "out").mkdir(exist_ok=True)
+    (work / "out.txt").write_text('{"fields": []}\n')
+    env = {"FIELDS": "z500,z500a,t2m", "RUN": run, "MODEL": model, "MAX_STEP": "360", "SOURCE": "ecmwf", "EVENT_NAME": event,
+           "SHIM_LOG": str(work / "log"), "SHIM_OUT": str(work / "out.txt")}
+    r = run_step(co, bindir, step(load("data.yml"), name)["run"], env, work / "gho")
+    assert r.returncode == 0, r.stderr
+    log = (work / "log").read_text()
+    return re.search(r"--fields (\S+)", log).group(1)
+
+
+@pytest.mark.parametrize("name", ["Build", "Validate"])
+@pytest.mark.parametrize("event,run,model,ivt", [
+    ("schedule", "2026111900", "ifs", True),            # the scheduled 00Z run
+    ("schedule", "2026111912", "ifs", False),           # 12Z: never
+    ("workflow_dispatch", "2026111900", "ifs", False),  # a manual run says what it wants in `fields`
+    ("schedule", "2026111900", "aifs", False),
+    ("schedule", "2026111800", "ifs", True),
+])
+def test_ivt_is_added_on_the_scheduled_00z_run_only(scratch, work, name, event, run, model, ivt):
+    got = _fields_passed(scratch, work, name, event, run, model)
+    assert got == ("z500,z500a,t2m,ivt" if ivt else "z500,z500a,t2m")
+
+
+def test_the_data_default_fields_carry_t2m_but_not_ivt():
+    d = load("data.yml")
+    env = d["jobs"]["data"]["env"]["FIELDS"]
+    assert ",t2m'" in env and "ivt" not in env
+    assert "t2m" in d["on"]["workflow_dispatch"]["inputs"]["fields"]["default"].split(",")
+
+
+def test_data_cross_checks_one_raw_step_after_validate_and_never_blocks_the_publish():
+    d = load("data.yml")
+    names = [s.get("name", "") for s in steps(d)]
+    i = names.index("Cross-check against the raw GRIB")
+    assert names.index("Validate") < i < names.index("Publish to the data branch")
+    s = steps(d)[i]
+    assert s["continue-on-error"] is True and s["if"] == "steps.decide.outputs.build == 'true'"
+    src = (ROOT / "tools" / "compare_grib.py").read_text()
+    assert "--step 24" in s["run"]  # one step
+    for flag in re.findall(r"(--[a-z0-9-]+)", s["run"]):
+        assert f'"{flag}"' in src, flag
+    assert "exit 1" not in s["run"]
+
+
+def test_nightly_every_job_carries_the_repository_guard_and_nothing_publishes():
+    n = load("nightly.yml")
+    assert n["jobs"] and all(GUARD in j.get("if", "") for j in n["jobs"].values())
+    assert n["permissions"] == {"contents": "read"} and "schedule" in n["on"] and "workflow_dispatch" in n["on"]
+    text = (WF / "nightly.yml").read_text()
+    assert not re.search(r"pipeline/run\.py publish|git push|gh workflow|gh run", text)
+
+
+def test_nightly_builds_two_real_steps_with_every_field_including_the_ensemble_files():
+    import sys
+    sys.path.insert(0, str(ROOT))
+    from pipeline import build, fetch
+    n = load("nightly.yml")
+    job = next(iter(n["jobs"].values()))
+    fields = job["env"]["FIELDS"].split(",")
+    assert fields == build.ALL_FIELDS  # every field: the ensemble ones, t2m and ivt included
+    ens = {"z500sd", "z500em", "pr1", "pr10"}
+    assert ens <= set(fields) and {"ivt", "t2m"} <= set(fields)
+    b = step(n, "Build")["run"]
+    assert "--run latest" in b and "--strict" in b and '--fields "$FIELDS"' in b
+    two = [int(x) for x in re.search(r"--steps (\S+)", b).group(1).split(",")]
+    assert len(two) == 2 and max(two) >= fetch.EM_FIRST_STEP and max(two) <= fetch.LOW_LEVEL_LAST_STEP  # em and rain windows, ivt, t2m
+    assert fetch.need_applies("em", max(two)) and fetch.need_applies("tpg", max(two)) and fetch.need_applies("ivt_pl", max(two))
+    assert 6 in two  # tp6 needs the 6 h step
+    for need in ("es", "em", "tpg"):  # the ensemble product files are what these requests read
+        assert fetch.request_for(need, "ifs", fetch.parse_run("2026111900"), max(two))["stream"] == "enfo"
+    src = (ROOT / "pipeline" / "build.py").read_text() + (ROOT / "tools" / "compare_grib.py").read_text()
+    for flag in re.findall(r"(--[a-z0-9-]+)", b + step(n, "Cross-check")["run"]):
+        assert f'"{flag}"' in src, flag
+
+
+def test_nightly_states_the_build_time_budget_and_caps_the_step():
+    text = (WF / "nightly.yml").read_text()
+    assert "Time budget" in text and "estimate" in text
+    assert step(load("nightly.yml"), "Build")["timeout-minutes"] <= 15
+
+
+def test_nightly_workflow_inputs_are_not_interpolated_into_scripts():
+    for r in all_runs(load("nightly.yml")):
+        assert "${{" not in r, r[:80]
+
+
+def test_nightly_fails_the_job_when_a_field_is_missing_strict_build_and_the_guard_script():
+    """The failure that the first live run had (a requested field absent from the build) must fail nightly."""
+    import sys
+    sys.path.insert(0, str(ROOT))
+    from pipeline import build
+    src = (ROOT / "pipeline" / "build.py").read_text()
+    assert "strict: requested field(s) missing" in src and "ap.add_argument(\"--strict\"" in src
+    assert 'assert not gone' in step(load("nightly.yml"), "Validate")["run"]

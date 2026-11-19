@@ -1,0 +1,84 @@
+# Nightly real-download test (design TEST-9b and 9c, W4-08): the one check that talks to ECMWF through the real pipeline.
+# The first live run (data.yml 44482208617) built every field and then failed validation on `z500sd`; nothing in the offline
+# suite could have seen that. This workflow builds TWO real steps with EVERY field, validates the result strictly, and
+# compares the decoded 500 hPa height with ECMWF's raw GRIB. It publishes nothing and pushes nothing.
+#
+# Runs ONLY in the public mirror: every job carries the repository guard, because the private repo has Actions enabled and
+# would bill its minutes (tests/lint/hygiene.mjs fails a job without it).
+#
+# Steps 6 and 144: step 6 holds the accumulated rain (tp6 needs step 6 on its own), step 144 is the first step of the ensemble
+# mean (z500em) and a rain-probability window end (pr1, pr10), and both are inside the 168 h of ivt and t2m. Together they ask
+# for every file kind: HRES single and pressure levels, the two enfo-ep products (es, em, ep) and surface pressure.
+# 15:30 UTC: the 00Z run was posted by about 09:00 UTC and the 12Z run is not posted before about 19:30, so "latest" is a
+# finished 00Z run with its ensemble products.
+name: nightly
+on:
+  schedule:
+    - cron: "30 15 * * *"
+  workflow_dispatch:
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  real-download:
+    if: github.repository == 'quantum-wave/weather-story-explorer-public'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONUNBUFFERED: "1"
+      # every field the build knows, ivt and the ensemble products (z500sd, z500em, pr1, pr10) included
+      FIELDS: "z500,z500a,tp6,z500sd,z500em,pr1,pr10,t850a,ws250,msl,t2m,ivt"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: pip install --quiet -r requirements.txt
+
+      - name: Fetch the climatology
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p clim
+          if ! git fetch --quiet --depth 1 origin clim || ! git show FETCH_HEAD:harmonics.npz > clim/harmonics.npz; then
+            echo "::error::The 'clim' branch (harmonics.npz) does not exist. Run the 'clim' workflow once, then re-run this one."
+            exit 1
+          fi
+
+      # Time budget (an estimate, not yet a measurement: this is the first run): the two steps download about 30 single-level
+      # and 24 pressure-level slices of 0.25 degree fields (about 1 MB each) plus the ensemble slices, roughly 100-150 MB,
+      # about 3 minutes at the runner's usual speed. The step is capped at 12 minutes; the job at 25.
+      - name: Build
+        timeout-minutes: 12
+        shell: bash
+        run: |
+          mkdir -p out
+          python -I pipeline/run.py build --run latest --steps 6,144 --strict --fields "$FIELDS" \
+            --clim clim/harmonics.npz --out out/data | tee out/build.txt
+
+      - name: Validate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -I pipeline/run.py validate out/data | tee out/validate.json
+          python3 - <<'PY'
+          import json, os
+          m = json.load(open("out/data/manifest.json"))
+          want = os.environ["FIELDS"].split(",")
+          print("fields:", sorted(m["fields"]))
+          gone = [f for f in want if f not in m["fields"]]
+          assert not gone, f"missing from the nightly build: {gone}"
+          assert not m.get("missing"), m["missing"]
+          PY
+
+      - name: Cross-check against the raw GRIB
+        shell: bash
+        run: |
+          set -euo pipefail
+          run=$(python3 -c "import json,re; print(re.sub(r'\D', '', json.load(open('out/data/manifest.json'))['run'])[:10])")
+          python -I tools/compare_grib.py --download "$run" --step 144 out/data | tee out/compare.txt
+          { echo "### nightly: real two-step build of run $run"; echo '```'; cat out/compare.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

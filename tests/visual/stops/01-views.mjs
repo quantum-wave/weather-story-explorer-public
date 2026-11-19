@@ -1,5 +1,6 @@
 // Tour stop 01: the three map views (Regional, Hemisphere, Global), chosen with the view switch (Josh points 11, 12).
-// MVP shell: gate:false; the owner package rewrites this stop and sets gate:true. mvpFails: assertion numbers of spec 14.3
+// Owner W3-03 (MAP-INTERACT): #map is a focusable canvas (tabindex 0, arrow keys pan and rotate), so it is an interactive box under
+// the controls laid over it; those overlaps are intended and declared below. mvpFails: assertion numbers of spec 14.3
 // (1 overlap, 2 hscroll, 3 textsize, 4 clipped, 5 target).
 import { mustBeVisible } from '../lib/steps.mjs';
 
@@ -8,9 +9,10 @@ export default {
   owner: 'W3-03',
   gate: false,
   mvpFails: [1, 5],
-  mvpReason: "measured on the MVP shell: the strip's day cells overlap their initials (desktop); the view-switch buttons are 40 px tall (phone)",
+  mvpReason: "other packages' boxes, measured on this stop: the strip's day cells overlap their initials; the view-switch buttons are 40 px tall (phone)",
   viewports: ['phone', 'desktop'],
   data: 'synthetic',
+  allowOverlap: [['#map', '*']], // the full-bleed focusable map canvas lies under every map control by design
   async run(page, inp, { snap }) {
     for (const [view, name] of [['nh', 'hemisphere'], ['gl', 'global']]) {
       await inp.activate(`#view-switch [data-view="${view}"]`);

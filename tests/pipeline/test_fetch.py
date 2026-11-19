@@ -43,6 +43,20 @@ def test_needs_follow_the_requested_fields():
     assert fetch.needs_for(["ivt"]) == ["ivt_pl", "ivt_sp"]
 
 
+def test_needs_for_the_w3_10_fields():
+    assert fetch.needs_for(["z500em", "pr1", "pr10", "msl"]) == ["em", "tpg", "msl"]  # pr1 and pr10 share one request
+    assert fetch.needs_for(["t850a"]) == ["t850"]  # surface pressure is read once per run, not per step
+
+
+def test_the_new_request_dicts():
+    assert fetch.request_for("em", "ifs", RUN, 150) == dict(date="20261118", time=0, step=150, model="ifs", stream="enfo",
+                                                           type="em", levtype="pl", param="gh", levelist=500)
+    assert fetch.request_for("tpg", "aifs", RUN, 252) == dict(date="20261118", time=0, step="228-252", model="ifs",
+                                                              stream="enfo", type="ep", levtype="sfc", param=["tpg1", "tpg10"])
+    assert fetch.request_for("sp", "ifs", RUN, 0) == dict(date="20261118", time=0, step=0, model="ifs", stream="oper",
+                                                         type="fc", levtype="sfc", param="sp")
+
+
 def test_request_dicts():
     r = fetch.request_for("wind250", "ifs", RUN, 6)
     assert r == dict(date="20261118", time=0, step=6, model="ifs", stream="oper", type="fc", levtype="pl", param=["u", "v"], levelist=250)
@@ -61,6 +75,7 @@ def test_request_dicts():
     ("msl", [("msl", 0)]),
     ("es", [("gh", 500)]),
     ("em", [("gh", 500)]),
+    ("sp", [("sp", 0)]),
 ])
 def test_each_need_downloads_exactly_its_messages_and_no_decoys(work, store, need, expect):
     publish_run(store, RUN, [12], lat=LAT, lon=LON)
@@ -81,6 +96,13 @@ def test_steps_beyond_240_come_from_the_360h_ensemble_file(work, store):
     publish_run(store, RUN, [246], lat=LAT, lon=LON)
     p = retriever(work, store).get(RUN, 246, "es")
     assert pick(read_messages(p), "gh", 500).data[0, 0] == pytest.approx(5.0 + 123, abs=1e-3)
+    assert any("360h-enfo-ep" in path for _, path, _ in store.requests)
+
+
+def test_a_rain_window_download_holds_only_tpg1_and_tpg10_not_the_tpg5_decoy(work, store):
+    publish_run(store, RUN, [252], lat=LAT, lon=LON)
+    p = retriever(work, store).get(RUN, 252, "tpg")
+    assert shorts(p) == [("tpg1", 0), ("tpg10", 0)] or sorted(s for s, _ in shorts(p)) == ["tpg1", "tpg10"]
     assert any("360h-enfo-ep" in path for _, path, _ in store.requests)
 
 

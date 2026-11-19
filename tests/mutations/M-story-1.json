@@ -1,0 +1,12 @@
+{
+ "id": "story-1",
+ "file": "site/js/story/index.js",
+ "find": "const signal = z.length ? signalAt({ anomDam, spreadDam, hasSpread: sd.length > 0 }) : 'clear';",
+ "replace": "const signal = 'clear';",
+ "checks": [
+  "S-STORY",
+  "unit:wp4.story.test.mjs"
+ ],
+ "expect": "killed",
+ "note": "MET-14 / P-B2: a day where forecasts disagree is treated as a clear near-normal day instead of 'No clear signal yet'. Killed by the no-signal probe at 300 h on synthetic-15d."
+}

@@ -7,7 +7,9 @@
 #
 #   <dist>           output folder; created, or cleared if it is an earlier output of this script
 #   <datadir>        folder holding manifest.json and the chunk files; becomes <dist>/data/.
-#                    Without it, site/data/ (if present) is copied along with the rest of site/.
+#                    Without it the recorded forecast ships: tests/site/fixtures/recorded/ (one real ECMWF run,
+#                    made by tools/make_sample.py) becomes <dist>/data/. If that folder does not exist, site/data/
+#                    (if present) is copied along with the rest of site/. A manifest that says synthetic never ships.
 #   --canonical-url  the public address of the site (written to config.json; null if omitted)
 #   --artifact       build for the claude.ai artifact host instead of Pages: data chunks *.bin are renamed *.wasm
 #                    (the host refuses .bin and serves .wasm) with the manifest paths rewritten, and the vendored
@@ -66,6 +68,11 @@ done
 ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
 SITE="$ROOT/site"
 [ -f "$SITE/index.html" ] || die "site/index.html not found under $ROOT"
+RECORDED="$ROOT/tests/site/fixtures/recorded"
+if [ -z "$DATADIR" ] && [ -f "$RECORDED/manifest.json" ]; then
+  DATADIR="$RECORDED"
+  echo "assemble: no data folder given, shipping the recorded forecast (tests/site/fixtures/recorded)"
+fi
 
 if [ -n "$CANON" ]; then
   case "$CANON" in

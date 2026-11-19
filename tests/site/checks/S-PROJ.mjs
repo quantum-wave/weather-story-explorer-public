@@ -11,7 +11,7 @@ export async function run({ page, baseUrl, assert }) {
   await page.goto(baseUrl);
   await page.waitFor('window.__wse && window.__wse.ready === true', { timeout: 45000 });
   const t = await page.eval('window.__wse.data.getManifest().fields.z500a.steps[1]');
-  for (const [view, w, h, dpr] of [['np', 1000, 600, 1], ['nh', 800, 800, 1], ['gl', 1100, 620, 1], ['np', 390, 844, 2]]) {
+  for (const [view, w, h, dpr] of [['np', 1000, 600, 1], ['nh', 800, 800, 1], ['gl', 1100, 620, 1], ['np', 390, 844, 2], ['np', 1000, 1300, 1]]) {
     await mount(page, { width: w, height: h, dpr });
     const img = await shoot(page, { view, layers: LAYERS, case: 'A', theme: 'dark', t }, `proj-${view}-${w}x${h}`);
     assert.equal(img.w, w * dpr, `${view} ${w}x${h}@${dpr} screenshot width`);
@@ -24,15 +24,26 @@ export async function run({ page, baseUrl, assert }) {
     assert.ok(edgeRingDiff(img) < 8, `${label}: the canvas edge is framed (${edgeRingDiff(img).toFixed(1)})`);
     // projection round trip and view-specific geometry, in CSS px
     const probe = await page.eval(`(() => { const r = window.__wp2.renderer, out = {};
-      for (const [k, ll] of Object.entries({ sf: [-122.42, 37.77], ny: [-74, 40.7], hon: [-157.86, 21.3] })) { const p = r.project(ll); out[k] = p && { p, back: r.invert(p) }; }
+      for (const [k, ll] of Object.entries({ sf: [-122.42, 37.77], ny: [-74, 40.7], hon: [-157.86, 21.3], anc: [-149.9, 61.2] })) { const p = r.project(ll); out[k] = p && { p, back: r.invert(p) }; }
       return out; })()`);
     for (const [k, v] of Object.entries(probe)) {
       if (!v) { assert.ok(k !== 'sf', `${label}: San Francisco is not projectable`); continue; }
-      assert.ok(v.back && Math.abs(v.back[0] - { sf: -122.42, ny: -74, hon: -157.86 }[k]) < 0.05, `${label}: invert(project(${k})) = ${v.back}`);
+      assert.ok(v.back && Math.abs(v.back[0] - { sf: -122.42, ny: -74, hon: -157.86, anc: -149.9 }[k]) < 0.05, `${label}: invert(project(${k})) = ${v.back}`);
     }
     const sf = probe.sf.p;
     assert.ok(sf[0] > 0 && sf[0] < w && sf[1] > 0 && sf[1] < h, `${label}: San Francisco on screen at ${sf}`);
-    if (view === 'np' && w < h) assert.ok(Math.abs(sf[0] / w - 0.7) < 0.03, `portrait np: SF ${(sf[0] / w).toFixed(2)} across, want 0.70`);
+    if (view === 'np' && w < h) {
+      // Regional framing (spec 4.6): SF between 0.5 W and 0.75 W; Anchorage off-canvas or in the top 15 %; Honolulu off-canvas or in the bottom 15 %
+      assert.ok(sf[0] >= 0.5 * w && sf[0] <= 0.75 * w, `${label}: SF ${(sf[0] / w).toFixed(2)} across, want 0.50-0.75`);
+      const an = probe.anc.p, ho = probe.hon.p;
+      assert.ok(an[1] < 0.15 * h || an[0] < 0 || an[0] > w, `${label}: Anchorage at y ${(an[1] / h).toFixed(2)} H, x ${(an[0] / w).toFixed(2)} W`);
+      assert.ok(ho[1] > 0.85 * h || ho[0] < 0 || ho[0] > w, `${label}: Honolulu at y ${(ho[1] / h).toFixed(2)} H, x ${(ho[0] / w).toFixed(2)} W`);
+    }
+    if (view === 'gl') { // the globe: the far side of the Earth has no pixel and no longitude
+      const far = await page.eval(`(() => { const r = window.__wp2.renderer, c = r.invert([${w / 2}, ${h / 2}]); return { c, anti: r.project([c[0] + 180, -c[1]]), corner: r.invert([1, 1]) }; })()`);
+      assert.equal(far.anti, null, `${label}: the antipode of the view centre ${far.c} has no pixel`);
+      assert.equal(far.corner, null, `${label}: a corner is off the disc`);
+    }
     if (view === 'nh') assert.ok(sf[1] > h / 2 && Math.abs(sf[0] - w / 2) < 2, `nh: SF's meridian points down, SF at ${sf}`);
   }
   // pan and zoom: wheel zooms about the pointer, reset returns, nh drag spins

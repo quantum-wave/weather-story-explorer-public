@@ -1,0 +1,16 @@
+{
+  "about": "TEST-8: public places Josh goes to (no people, no addresses). Each must resolve from its name to a gazetteer result within 15 km of lat/lon. lat/lon cite a source: a GeoNames id of a cities.json row, a midpoint of named rows, or a public map position.",
+  "radiusKm": 15,
+  "places": [
+    { "name": "North Lake Tahoe", "lat": 39.2, "lon": -120.1, "state": "CA", "source": "midpoint of GeoNames 7262635 (Sunnyside-Tahoe City) and 5363364 (Kings Beach)" },
+    { "name": "Tahoe City", "lat": 39.15, "lon": -120.16, "state": "CA", "source": "GeoNames 7262635" },
+    { "name": "Kings Beach", "lat": 39.24, "lon": -120.03, "state": "CA", "source": "GeoNames 5363364" },
+    { "name": "Truckee", "lat": 39.33, "lon": -120.18, "state": "CA", "source": "GeoNames 5403676" },
+    { "name": "Olympic Valley", "lat": 39.2, "lon": -120.24, "state": "CA", "source": "public map position of the Olympic Valley / Palisades Tahoe base area" },
+    { "name": "Incline Village", "lat": 39.25, "lon": -119.97, "state": "NV", "source": "GeoNames 5505963" },
+    { "name": "Bodega Bay", "lat": 38.33, "lon": -123.05, "state": "CA", "source": "GeoNames 5329735" },
+    { "name": "Big Sur", "lat": 36.27, "lon": -121.81, "state": "CA", "source": "public map position of the Big Sur village area" },
+    { "name": "South Lake Tahoe", "lat": 38.93, "lon": -119.98, "state": "CA", "source": "GeoNames 5397664" },
+    { "name": "Lake Tahoe", "lat": 39.09, "lon": -120.04, "state": "CA", "source": "public map position of the middle of the lake" }
+  ]
+}

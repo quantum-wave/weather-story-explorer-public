@@ -1,11 +1,11 @@
 {
   "id": "audit-3",
   "file": "site/js/render/index.js",
-  "find": "if (s.view === 'nh' && g.xf.k === 1) {",
-  "replace": "if (false && s.view === 'nh' && g.xf.k === 1) {",
+  "find": "const x = { ...b, rot: [b.rot[0] - da, b.rot[1], b.rot[2]] };",
+  "replace": "const x = { ...b, rot: [b.rot[0], b.rot[1], b.rot[2]] };",
   "checks": [
-    "S-PROJ"
+    "S-GESTURE"
   ],
   "expect": "killed",
-  "note": "AUDIT-TESTS section 1: hemisphere spin disabled, the positive control; S-PROJ fails on 'the point under the finger follows it'"
+  "note": "AUDIT-TESTS section 1: hemisphere spin disabled, the positive control; re-targeted from S-PROJ to S-GESTURE, which spins at zoom 1 and zoom 2.6 with real input (the old find line no longer exists after W3-03)"
 }

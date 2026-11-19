@@ -1,0 +1,12 @@
+{
+ "id": "story-2",
+ "file": "site/js/story/strip.js",
+ "find": "d += `C${r2(xs[k] + h)} ${r2(ys[k] + m[k] * h)} ${r2(xs[k + 1] - h)} ${r2(ys[k + 1] - m[k + 1] * h)} ${r2(xs[k + 1])} ${r2(ys[k + 1])}`;",
+ "replace": "d += `L${r2(xs[k + 1])} ${r2(ys[k + 1])}`;",
+ "checks": [
+  "S-STORY",
+  "unit:wp11.strip.test.mjs"
+ ],
+ "expect": "killed",
+ "note": "Point 14: the strip's wave drawn as straight segments instead of the monotone cubic (the MVP's jagged wire). Killed by the strip-curve measurement (turning angle over 30 degrees at step points)."
+}

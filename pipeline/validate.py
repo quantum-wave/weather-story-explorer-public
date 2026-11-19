@@ -48,12 +48,23 @@ MIN_COVERAGE = 0.9      # share of the 6-hourly grid a live field must have
 SPREAD_COVERAGE = 0.45  # z500sd comes from the ensemble and may be 12-hourly
 
 
+def _expected_steps(fid, top):
+    """How many steps a complete field has in a run that goes to `top` h: ivt and t2m stop at 168 h, z500em starts at 144 h, the rain
+    probabilities are 24 h windows keyed by end hour every 12 h from 24 h, everything else is 6-hourly from 0."""
+    if fid in ("ivt", "t2m"):  # built to 168 h only (W4-08)
+        return len(range(0, min(top, 168) + 1, 6))
+    if fid == "z500em":
+        return len(range(144, top + 1, 6))
+    if fid in ("pr1", "pr10"):
+        return len(range(24, top + 1, 12))
+    return len(range(0, top + 1, 6))
+
+
 def _live_gate(m, require_fields, require_z500a_hours, max_step):
     """A live run is complete enough to replace the published one: every REQUIRED field asked for present, no gap
     over MAX_GAP_H, z500a gapless up to the minimum lead time (one missing step allowed), enough steps per field.
     A failure in an optional field carries its name, so the caller can drop that field instead of failing."""
     top = max_step if max_step is not None else (require_z500a_hours or 0)
-    expected = len(range(0, top + 1, 6))
     asked = list(require_fields or [])
     needed = list(dict.fromkeys(asked + (["z500a"] if require_z500a_hours is not None else [])))
     for fid in needed:
@@ -64,6 +75,7 @@ def _live_gate(m, require_fields, require_z500a_hours, max_step):
         for a, b in zip(st, st[1:]):
             if b - a > MAX_GAP_H:
                 _fail(f"{fid}: gap of {b - a} h between steps {a} and {b} (limit {MAX_GAP_H} h)", fid)
+        expected = _expected_steps(fid, top)
         if fid in needed and expected:
             share = SPREAD_COVERAGE if fid == "z500sd" else MIN_COVERAGE
             if len(st) < share * expected:

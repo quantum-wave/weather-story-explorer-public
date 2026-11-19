@@ -60,3 +60,45 @@ def test_narr_native_grid_reference(fixtures_dir):
     assert out.shape == (118, 292)  # native grid: nothing was regridded
     assert out.max() == pytest.approx(533, abs=2)
     assert np.percentile(out, 95) == pytest.approx(303, abs=3)
+
+
+# ---- W4-08 (Josh points 8, 15; MET-10): IVT is built to 168 h, from the scheduled 00Z run's field list --------------
+
+def test_ivt_requests_stop_at_168_h():
+    from pipeline import fetch
+    for need in ("ivt_pl", "ivt_sp"):
+        assert fetch.need_applies(need, 0) and fetch.need_applies(need, 168) and not fetch.need_applies(need, 174)
+
+
+def test_a_live_build_makes_ivt_to_168_h_and_decodes_the_hand_value(work, store):
+    import datetime as dt
+    import numpy as np
+    from grib_helpers import publish_run
+    from pipeline import build, fetch
+    from pipeline.validate import validate
+    from test_fetch import LAT, LON, client_factory
+    from test_steps import RUN, at, decoded
+    steps = list(range(0, 181, 6))
+    publish_run(store, RUN, steps, lat=LAT, lon=LON, ivt=True)
+    asked = []
+    real = fetch.Retriever.get
+
+    def spy(self, run, step, need):
+        asked.append((step, need))
+        return real(self, run, step, need)
+
+    fetch.Retriever.get = spy
+    try:
+        r = fetch.Retriever(work / "raw", "ifs", [store.url], client_factory())
+        m = build.build_live(RUN, "ifs", ["z500", "ivt"], str(work / "out"), None, r, workers=3, max_step=180,
+                             generated="2026-11-18T09:50Z")
+    finally:
+        fetch.Retriever.get = real
+    f = m["fields"]["ivt"]
+    assert f["steps"] == list(range(0, 169, 6)) and f["domains"] == ["g1", "np05"] and f["units"] == "kg/m/s"
+    assert not [1 for s, n in asked if n in ("ivt_pl", "ivt_sp") and s > 168]
+    want = 0.01 * 10 * 70000 / G  # q 0.01, u 10 m/s, v 0, 1000-300 hPa, surface pressure 1000 hPa
+    for dom in ("g1", "np05"):
+        assert at(decoded(work, m, "ivt", dom, 48), dom, 37.77, -122.42) == pytest.approx(want, abs=1.0)
+    validate(str(work / "out"), require_fields=["z500", "ivt"], max_step=180)
+    validate(str(work / "out"), require_fields=["ivt"], max_step=360)  # only 0-168 h is expected of it

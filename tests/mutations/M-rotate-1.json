@@ -1,0 +1,9 @@
+{
+  "id": "M-rotate-1",
+  "file": "site/js/render/index.js",
+  "find": "const r1 = dragRotate(mv.base.proj, from, to, mv.rotation()), r0 = mv.base.rotate;",
+  "replace": "const r1 = mv.rotation(), r0 = mv.base.rotate;",
+  "checks": ["S-GESTURE"],
+  "expect": "killed",
+  "note": "ignore drag on gl: the globe never rotates under the finger (rot stays [0,0,0], the audit's e3_gl finding)"
+}

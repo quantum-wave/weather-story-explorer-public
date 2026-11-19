@@ -62,20 +62,24 @@ def test_first_live_field_set_end_to_end(work, store):
     assert m["attribution"] == "ECMWF open data CC-BY-4.0"
     assert m["climatology"] == {"label": "test baseline", "source": "unit", "method": "annual mean + 3 harmonics"}
     f = m["fields"]
-    assert list(f) == ["z500", "z500a", "tp6", "z500sd", "t850a", "ws250"]  # the SPEC's priority order
+    # the SPEC's priority order; z500em starts at 144 h so a 24 h run has none (listed as missing, not fatal)
+    assert list(f) == ["z500", "z500a", "tp6", "z500sd", "pr1", "pr10", "t850a", "ws250", "msl", "t2m"]
+    assert [x["field"] for x in m["missing"]] == ["z500em"]
     assert {k: v["steps"] for k, v in f.items()} == {
-        "z500": STEPS, "z500a": STEPS, "z500sd": STEPS, "ws250": STEPS, "t850a": STEPS, "tp6": [6, 12, 18, 24]}
+        "z500": STEPS, "z500a": STEPS, "z500sd": STEPS, "ws250": STEPS, "t850a": STEPS, "msl": STEPS,
+        "tp6": [6, 12, 18, 24], "pr1": [24], "pr10": [24], "t2m": STEPS}
     assert {k: v["domains"] for k, v in f.items()} == {
         "z500": ["g1", "np05"], "z500a": ["g1", "np05"], "z500sd": ["g1", "np05"], "ws250": ["g1", "np05"],
-        "tp6": ["g1"], "t850a": ["g1"]}
+        "msl": ["g1", "np05"], "tp6": ["g1"], "t850a": ["g1"], "pr1": ["g1"], "pr10": ["g1"], "t2m": ["g1"]}
+    assert set(m["checks"]["mean_anomaly_gpm"]) == {"global", "nh", "tropics"}
     assert all("case" not in v for v in f.values())
     validate(str(work / "out"))
 
 
-def test_file_count_matches_four_both_domain_fields_and_two_g1_fields(work, store):
+def test_file_count_matches_five_both_domain_fields_and_four_g1_fields(work, store):
     live(work, store)
     bins = [x for x in os.listdir(work / "out") if x.endswith(".bin")]
-    assert len(bins) == 4 * 2 + 2  # one chunk each: steps 0-24 are all in chunk a
+    assert len(bins) == 5 * 2 + 5  # one chunk each: steps 0-24 are all in chunk a; z500em has no step before 144 h
 
 
 def test_values_are_the_constants_the_fake_server_publishes(work, store):
@@ -91,6 +95,21 @@ def test_values_are_the_constants_the_fake_server_publishes(work, store):
         assert at(decoded(work, m, "ws250", "np05", s), "np05", *sf) == pytest.approx(np.hypot(30 + ramp, 40 + ramp), abs=0.06)
     for s in (6, 12, 18, 24):  # 0.0005 m per step -> 3.0 mm per 6 h
         assert at(decoded(work, m, "tp6", "g1", s), "g1", *sf) == pytest.approx(3.0, abs=0.06)
+
+
+def test_msl_is_on_by_default_and_decodes_in_pascals(work, store):
+    assert "msl" in build.DEFAULT_FIELDS and "ivt" not in build.DEFAULT_FIELDS
+    m = live(work, store)
+    ramp = ((-122.42) % 360) / 360
+    for dom in ("g1", "np05"):
+        assert at(decoded(work, m, "msl", dom, 12), dom, 37.77, -122.42) == pytest.approx(101325 + ramp, abs=5.1)
+    assert any(p["field"] == "msl" for p in m["probes"])
+
+
+def test_only_z500_and_z500a_are_required_everything_else_in_the_default_set_is_optional():
+    from pipeline.validate import REQUIRED
+    assert set(REQUIRED) == {"z500", "z500a"}
+    assert set(build.DEFAULT_FIELDS) - set(REQUIRED) == {"tp6", "z500sd", "z500em", "pr1", "pr10", "t850a", "ws250", "msl", "t2m"}
 
 
 def test_the_grid_is_not_shifted_or_flipped(work, store):

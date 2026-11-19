@@ -33,6 +33,12 @@ export async function run({ page, baseUrl, assert, newPage }) {
   await page.waitFor('window.__wse && window.__wse.storyReady === true', { timeout: 20000 });
   assert.equal(await page.eval(`!!document.getElementById('demo-card')`), false, 'dismissal persists');
 
+  // the story card shows only days that have data: no hatched day, no "No data past", no "settled"
+  const wk = await page.eval(`(() => { const c = document.querySelector('#sec-week .card'); return { hatch: c.querySelectorAll('.hatch-nodata').length, cols: c.querySelectorAll('.strip-day').length, text: c.textContent }; })()`);
+  assert.equal(wk.hatch, 0, 'no hatched day in the sample card');
+  assert.ok(wk.cols >= 1 && wk.cols <= 7, 'columns: ' + wk.cols);
+  assert.ok(!/No data past|settled/i.test(wk.text), 'card text: ' + wk.text);
+
   // one case at a time
   const shown = (l) => Object.entries(l).filter(([, v]) => v).map(([k]) => k);
   await page.eval(`document.getElementById('btn-layers').click()`);

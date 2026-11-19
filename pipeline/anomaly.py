@@ -92,3 +92,20 @@ class Climatology:
         """The manifest's `climatology` block."""
         m = self.meta
         return {"label": m["label"], "source": m["source"], "method": m["method"]}
+
+
+def area_weighted_means(a, dom):
+    """Area-weighted (cos latitude) mean of a (ny, nx) field on a domain dict, NaN skipped, in the field's units:
+    {"global": all rows, "nh": 20-90 N, "tropics": 20 S-20 N}, each rounded to 0.1. A repeated wrap column is left
+    out. A region with no valid node is None."""
+    a = np.asarray(a, np.float64)
+    lat = dom["lat0"] + dom["dlat"] * np.arange(dom["ny"])
+    if abs((dom["nx"] - 1) * dom["dlon"] - 360.0) < 1e-6:
+        a = a[:, :-1]
+    w = np.cos(np.radians(lat))[:, None] * np.ones((1, a.shape[1]))
+    ok = np.isfinite(a)
+    out = {}
+    for name, sel in (("global", np.ones_like(lat, bool)), ("nh", lat >= 20.0), ("tropics", np.abs(lat) <= 20.0)):
+        m = ok & sel[:, None]
+        out[name] = round(float((a[m] * w[m]).sum() / w[m].sum()), 1) if m.any() else None
+    return out

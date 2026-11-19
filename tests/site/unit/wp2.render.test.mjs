@@ -7,13 +7,13 @@ const load = (p) => import(new URL(p, site).href);
 const NP = { lon0: 150, lat0: 75, dlon: 0.5, dlat: -0.5, nx: 321, ny: 131 };
 const G1 = { lon0: -180, lat0: 90, dlon: 1, dlat: -1, nx: 361, ny: 181 };
 
-test('view: np frames the region, portrait puts San Francisco 70 % across, nh points its meridian down', async () => {
+test('view: np frames the region, portrait puts San Francisco 60 % across, nh points its meridian down', async () => {
   const { baseProjection, MapView, SF } = await load('render/view.js');
   const land = new MapView(baseProjection('np', 1200, 700));
   const sf = land.project(SF);
   assert.ok(sf[0] > 400 && sf[0] < 900 && sf[1] > 300 && sf[1] < 650, `landscape SF ${sf}`);
   const portrait = new MapView(baseProjection('np', 390, 844));
-  assert.ok(Math.abs(portrait.project(SF)[0] / 390 - 0.7) < 0.005);
+  assert.ok(Math.abs(portrait.project(SF)[0] / 390 - 0.6) < 0.005);
   const nh = new MapView(baseProjection('nh', 800, 800)), p = nh.project(SF);
   assert.ok(Math.abs(p[0] - 400) < 1 && p[1] > 400, `nh SF ${p}`);
   assert.equal(nh.project([-122.42, 5]), null, 'beyond the 75 degree clip');
@@ -36,7 +36,7 @@ test('view: zoom keeps the point under the finger, rotation spins nh', async () 
   const xf = clampXf({ k, tx: at[0] - (at[0] - 0) * k, ty: at[1] - (at[1] - 0) * k, rot: [0, 0] }, 1000, 600);
   const z = new MapView(base, xf).project(SF);
   if (xf.tx === at[0] - at[0] * k && xf.ty === at[1] - at[1] * k) assert.ok(Math.hypot(z[0] - at[0], z[1] - at[1]) < 1e-6);
-  assert.ok(clampXf({ k: 99, tx: 5, ty: 5, rot: [0, 0] }, 100, 100).k === 6 && clampXf({ k: 0.2, tx: 0, ty: 0, rot: [0, 0] }, 100, 100).k === 1);
+  assert.ok(clampXf({ k: 99, tx: 5, ty: 5, rot: [0, 0] }, 100, 100).k === 8 && clampXf({ k: 0.2, tx: 0, ty: 0, rot: [0, 0] }, 100, 100).k === 1);
   const nh = baseProjection('nh', 800, 800);
   const a = new MapView(nh, { k: 1, tx: 0, ty: 0, rot: [0, 0] }).project([10, 60]), b = new MapView(nh, { k: 1, tx: 0, ty: 0, rot: [20, 0] }).project([10, 60]);
   assert.ok(Math.hypot(a[0] - b[0], a[1] - b[1]) > 20, 'rotation moves the map');

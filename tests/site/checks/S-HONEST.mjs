@@ -43,6 +43,16 @@ export async function run({ page, baseUrl, assert }) {
     assert.ok(!/Pattern: (confident|fairly|timing)/.test(stories), 'no confidence claim in sample stories: ' + stories);
     assert.ok(!/(dry|rain|warmer|cooler|colder|mild|settled)/i.test(stories.replace(/(Rain and temperature aren’t|Rain isn’t|Temperature isn’t) in this sample/g, '')), 'no rain or air-mass claim the sample lacks: ' + stories);
 
+    // the card shows the days the sample has and nothing else: three columns (Sat 31 Dec to Mon 2 Jan in San Francisco),
+    // no hatched phantom day, no "No data past", no "settled" or "unsettled", and the dates are real
+    const card = await page.eval(`(() => { const c = document.querySelector('#sec-week .card'); return { cols: c.querySelectorAll('.strip-day').length, hatch: c.querySelectorAll('.hatch-nodata').length, text: c.textContent, labels: [...c.querySelectorAll('.strip-label')].map((x) => x.textContent) }; })()`);
+    assert.equal(card.cols, 3, 'one column per day the sample has: ' + card.cols);
+    assert.equal(card.hatch, 0, 'no hatched day');
+    assert.ok(!/No data past/i.test(card.text) && !/settled/i.test(card.text), 'card text: ' + card.text);
+    assert.deepEqual(card.labels, ['Sat 31', 'Sun 1', 'Mon 2'], 'columns are labelled with the real dates, never an initial: ' + card.labels);
+    // (the map legend and the layers panel still carry the old words until the packages that own them land: the home panel is this package's)
+    assert.ok(!/settled/i.test(await page.eval(`document.getElementById('home').innerText`)), 'the words settled and unsettled appear nowhere in the home panel');
+
     // deep link: the real date
     await page.eval(`__wse.store.set({ view: 'np', layers: { z: true, j: false, c: false, t: false }, t: 12 })`);
     const hash = await page.eval(`import('./js/links.js').then((L) => L.formatHash(__wse.store.get()))`);

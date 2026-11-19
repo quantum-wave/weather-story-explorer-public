@@ -346,5 +346,4 @@ export function fmtRange(a, b) {
 
 /** The app's store. */
 export const pins = createPins();
-// Warm the gazetteer once the page is idle so the first search is instant.
-if (typeof document !== 'undefined') try { (globalThis.requestIdleCallback || ((f) => setTimeout(f, 1500)))(() => { gaz.load(); }); } catch { /* not a browser */ }
+// The gazetteer (cities.json, ~1.8 MB) loads on first use (a search, a pin lookup), never at boot: DESIGN-SPEC 8.4, W2-02.

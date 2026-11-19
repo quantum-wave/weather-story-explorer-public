@@ -59,6 +59,25 @@ def tp6_from_cumulative(cum):
     return steps, out
 
 
+SP_MIN_PA = 87000.0  # below 870 hPa surface pressure the 850 hPa level is under the ground (SPEC MET-8)
+
+
+def below_ground_mask(sp_pa):
+    """True where the surface pressure is under 870 hPa: 850 hPa lies below ground there, so a temperature at that
+    level is an extrapolation (Denver, Lake Tahoe)."""
+    return np.asarray(sp_pa, np.float64) < SP_MIN_PA
+
+
+def apply_mask(a, mask):
+    """A copy of `a` (float32) with NaN, the no-data value, where `mask` is True."""
+    return np.where(mask, np.nan, np.asarray(a, np.float32)).astype(np.float32)
+
+
+def terrain_masks(sp_pa, grid, domains=("g1", "np05")):
+    """{domain: below-ground mask} from one surface-pressure field on its native grid."""
+    return {d: below_ground_mask(r) for d, r in to_domains(sp_pa, grid, domains).items()}
+
+
 def to_domains(a, grid, domains=("g1", "np05")):
     return {d: resample(a, grid, DOMAINS[d]) for d in domains}
 
@@ -66,11 +85,13 @@ def to_domains(a, grid, domains=("g1", "np05")):
 class StepReducer:
     """Callable for fetch.fetch_steps: reduce(step, {need: path}) -> {field: {domain: array}}.
 
-    Output keys: z500, z500a, z500sd, ws250, t850a, msl, ivt, and `tp_cum` (tp in mm accumulated since step 0,
+    Output keys: z500, z500a, z500sd, z500em, pr1, pr10, ws250, t850a, t2m, msl, ivt, and `tp_cum` (tp in mm accumulated since step 0,
     turned into tp6 across steps by tp6_from_cumulative). Fields whose needs did not arrive are simply absent.
     """
 
-    def __init__(self, run, model, fields, clim=None, domains=("g1", "np05")):
+    def __init__(self, run, model, fields, clim=None, domains=("g1", "np05"), terrain=None):
+        """terrain: {domain: below-ground mask} (terrain_masks); t850a is only produced when it is given."""
+        self.terrain = terrain
         self.run = run
         self.model = model
         self.fields = set(fields)
@@ -97,13 +118,25 @@ class StepReducer:
             msgs = read_messages(paths["wind250"])
             u, v = pick(msgs, "u", 250), pick(msgs, "v", 250)
             out["ws250"] = to_domains(wind_speed(u.data, v.data), u.grid, doms)
-        if "t850" in paths and "t850a" in f:
+        if "t850" in paths and "t850a" in f and self.terrain is not None:
             m = pick(read_messages(paths["t850"]), "t", 850)
             t = to_domains(m.data, m.grid, doms)
-            out["t850a"] = {d: self.clim.anomaly("t850", d, valid, t[d]) for d in doms}
+            out["t850a"] = {d: apply_mask(self.clim.anomaly("t850", d, valid, t[d]), self.terrain[d]) for d in doms}
         if "tp" in paths and "tp6" in f:
             m = pick(read_messages(paths["tp"]), "tp")
             out["tp_cum"] = to_domains(m.data * 1000.0, m.grid, doms)
+        if "em" in paths and "z500em" in f:
+            m = pick(read_messages(paths["em"]), "gh", 500)
+            out["z500em"] = to_domains(m.data, m.grid, doms)
+        if "tpg" in paths and ({"pr1", "pr10"} & f):  # percent, already a probability; g1 only
+            msgs = read_messages(paths["tpg"])
+            for fid, short in (("pr1", "tpg1"), ("pr10", "tpg10")):
+                if fid in f:
+                    m = pick(msgs, short)
+                    out[fid] = to_domains(m.data, m.grid, ("g1",))
+        if "t2m" in paths and "t2m" in f:  # kelvin, linear, g1 only (card highs and lows)
+            m = pick(read_messages(paths["t2m"]), "2t")
+            out["t2m"] = to_domains(m.data, m.grid, ("g1",))
         if "msl" in paths and "msl" in f:
             m = pick(read_messages(paths["msl"]), "msl")
             out["msl"] = to_domains(m.data, m.grid, doms)

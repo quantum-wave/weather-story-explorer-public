@@ -110,3 +110,21 @@ def test_schema_rejects_breakage():
     del m["cases"]
     with pytest.raises(jsonschema.ValidationError):
         jsonschema.validate(m, SCHEMA)
+
+
+def test_every_default_field_has_a_contract_row_a_range_a_domain_and_a_fetch_need():
+    from pipeline import build, fetch
+    from pipeline.encode import FIELD_META
+    from pipeline.validate import RANGES
+    for fid in build.ALL_FIELDS:
+        assert fid in FIELD_META and fid in RANGES and fid in build.FIELD_DOMAINS and fid in fetch.FIELD_NEEDS and fid in build.DATASET, fid
+        assert fid in SCHEMA["properties"]["fields"]["properties"], fid
+
+
+def test_data_workflow_default_fields_are_the_builds_default_fields():
+    import re
+    from pipeline import build
+    text = (ROOT / ".github/workflows/data.yml").read_text()
+    wanted = ",".join(build.DEFAULT_FIELDS)
+    assert f'default: "{wanted}"' in text and f"inputs.fields || '{wanted}'" in text
+    assert "ivt" not in wanted

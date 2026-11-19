@@ -67,7 +67,12 @@ export async function run({ page, baseUrl, assert }) {
       centre: { lat: 37.77, lon: -122.42, zoom: 2 }, overlays: [(ctx, project, st) => { overlayCalls++; const q = project([-122.42, 37.77]); ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.arc(q[0], q[1], 12, 0, 7); ctx.stroke(); }] });
     const d = c.getImageData(0, 0, 540, 675).data; let tinted = 0, drawn = 0;
     for (let i = 0; i < d.length; i += 4) { if (d[i + 3] > 0) drawn++; const r1 = d[i], b1 = d[i + 2]; if (Math.abs(r1 - b1) > 22) tinted++; }
-    return { texts, overlayCalls, sf: r.project([-122.42, 37.77]), back: r.invert([270, 337]), tinted: tinted / (540 * 675), drawn: drawn / (540 * 675) };
+    // The synthetic grid is coarse (about 4.6 degrees), so the tight portrait framing (22-60N, W3-03) leaves too few segments per
+    // cell to place a label: the label check renders the landscape Regional frame instead.
+    const cv2 = document.createElement('canvas'); cv2.width = 1000; cv2.height = 600;
+    const c2 = cv2.getContext('2d'), texts2 = []; const ft2 = c2.fillText.bind(c2); c2.fillText = (t, ...r) => { texts2.push(String(t)); return ft2(t, ...r); };
+    w.renderer.renderTo(c2, { width: 1000, height: 600, t: ${stepOf('z500a')}, view: 'np', layers: { z: true, j: false }, case: 'A', theme: 'dark' });
+    return { texts: texts.concat(texts2), overlayCalls, sf: r.project([-122.42, 37.77]), back: r.invert([270, 337]), tinted: tinted / (540 * 675), drawn: drawn / (540 * 675) };
   })()`);
   assert.equal(out.overlayCalls, 1);
   assert.ok(out.drawn > 0.99, 'renderTo paints every pixel');
