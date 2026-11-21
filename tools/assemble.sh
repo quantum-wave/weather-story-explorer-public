@@ -136,9 +136,12 @@ if [ "$ARTIFACT" -eq 1 ]; then
   fi
   # Libraries: the exact npm files from jsdelivr instead of the vendored copies.
   rm -rf "$DIST_ABS/vendor"
-  sed -e "s#src=\"vendor/d3@7.9.2/d3.min.js\"#src=\"$CDN/d3@7.9.2/dist/d3.min.js\"#" \
-      -e "s#src=\"vendor/topojson-client@3.1.0/topojson-client.min.js\"#src=\"$CDN/topojson-client@3.1.0/dist/topojson-client.min.js\"#" \
-      "$DIST_ABS/index.html" > "$DIST_ABS/index.html.new" && mv "$DIST_ABS/index.html.new" "$DIST_ABS/index.html"
+  # every page that loads them (index.html, how.html, any later *.html), not only the first
+  while IFS= read -r page; do
+    sed -e "s#src=\"vendor/d3@7.9.2/d3.min.js\"#src=\"$CDN/d3@7.9.2/dist/d3.min.js\"#" \
+        -e "s#src=\"vendor/topojson-client@3.1.0/topojson-client.min.js\"#src=\"$CDN/topojson-client@3.1.0/dist/topojson-client.min.js\"#" \
+        "$page" > "$page.new" && mv "$page.new" "$page"
+  done < <(find "$DIST_ABS" -type f -name '*.html')
   if [ -f "$DIST_ABS/js/vendor.js" ]; then
     # the Node-only branch (unit tests load the vendored files) goes with vendor/
     sed -e '/^if (typeof globalThis.d3 === .undefined. && globalThis.process/,/^}$/d' \

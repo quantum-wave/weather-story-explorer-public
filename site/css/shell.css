@@ -1,36 +1,26 @@
 /* shell.css: layout, themes, type, home, cards, sheet, header, legend (SPEC section 8). */
 
+/* Colours, type and shape come from tokens.css (spec 10). What follows keeps the MVP names alive as aliases of the tokens, so
+   the other stylesheets that still use them (--ink, --sheet, --card ...) follow the theme. New code uses the token names. */
 :root {
-  --font-serif: ui-serif, "New York", "Iowan Old Style", Georgia, serif;
-  --font-ui: -apple-system, "SF Pro Text", system-ui, "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px;
-  --r-sheet: 14px; --r-card: 10px; --touch: 44px; --topbar-h: 48px;
+  --r-sheet: 14px; --r-card: 10px; --topbar-h: 44px; --panel-w: 380px;
   --ease: cubic-bezier(.2, .8, .2, 1);
   --spring: cubic-bezier(.22, 1.15, .36, 1);
   --sheet-h: 170px;
   --timeline-h: 0px;
+  --ink: var(--text); --ink-2: var(--text-2); --sheet: var(--surface); --ring: var(--accent);
+  --card: var(--surface); --card-active: color-mix(in srgb, var(--text) 6%, var(--surface));
+  /* not chrome: story and map marks of the MVP, until their owners move them (W3-06) */
+  --land: #EEEBE5; --coast: #8A847A; --sample: #B7791F; --rain: #5A7FA8; --good: #2F7A57;
 }
-:root, [data-theme="dark"] {
-  color-scheme: dark;
-  --bg: #0C1014; --land: #14191E; --sheet: #12171C; --hairline: #232B33; --coast: #6B7684;
-  --ink: #E6E9ED; --ink-2: #9AA4AF; --ring: #F4F1EA; --sample: #F0B429;
-  --card: #161C22; --card-active: #1B232B; --rain: #6E93BA; --scrim: rgba(12, 16, 20, .82);
-  --good: #7FB89A; --danger: #E08C7E;
-}
-[data-theme="light"] {
-  color-scheme: light;
-  --bg: #F9F6F2; --land: #EEEBE5; --sheet: #FFFFFF; --hairline: #E2DED6; --coast: #8A847A;
-  --ink: #1C2024; --ink-2: #5F6670; --ring: #1C2024; --sample: #B7791F;
-  --card: #FBF9F6; --card-active: #F3EFE9; --rain: #5A7FA8; --scrim: rgba(249, 246, 242, .86);
-  --good: #2F7A57; --danger: #A8473A;
-}
+:root[data-theme="dark"] { --land: #14191E; --coast: #6B7684; --sample: #F0B429; --rain: #6E93BA; --good: #7FB89A; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --land: #14191E; --coast: #6B7684; --sample: #F0B429; --rain: #6E93BA; --good: #7FB89A; } }
 
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
 body {
   background: var(--bg); color: var(--ink);
-  font: 400 13px/15px var(--font-ui);
+  font: 400 15px/20px var(--font-ui);
   -webkit-text-size-adjust: 100%; -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
 }
@@ -39,51 +29,78 @@ button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 [hidden] { display: none !important; }
-.mono, .tabular { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.tabular { font-variant-numeric: tabular-nums; }
+#debug, #debug * { font-family: var(--font-mono); }
 
 /* ---------- layout ---------- */
 #app {
   height: 100vh; height: 100dvh; display: grid;
-  grid-template-columns: 380px minmax(0, 1fr);
+  grid-template-columns: var(--panel-w) auto minmax(0, 1fr);
   grid-template-rows: var(--topbar-h) minmax(0, 1fr) auto;
-  grid-template-areas: "top top" "home stage" "home timeline";
+  grid-template-areas: "top top top" "home divider stage" "home divider timeline";
 }
+#divider { grid-area: divider; }
+
+/* header: one 44 px row at every width (spec 3.1). Brand, data chip, then Share and Display (desktop) or More (phone). */
 #topbar {
-  grid-area: top; display: flex; align-items: center; gap: var(--s3);
-  padding: 0 var(--s3) 0 var(--s4); background: var(--sheet); border-bottom: 1px solid var(--hairline);
+  grid-area: top; display: flex; align-items: center; gap: var(--s3); height: var(--topbar-h); overflow: visible;
+  padding: 0 var(--s3) 0 var(--s4); background: var(--surface); border-bottom: 1px solid var(--hairline);
   min-width: 0; z-index: 30;
 }
-.brand { display: flex; align-items: center; gap: var(--s2); white-space: nowrap; }
-.brand-mark { width: 14px; height: 14px; border-radius: 50%; background: conic-gradient(from 200deg, #4C82C6, #14191E 45%, #D38029 70%, #4C82C6); box-shadow: inset 0 0 0 1px var(--hairline); }
-.brand-name { font: 600 15px/18px var(--font-serif); letter-spacing: .01em; }
-.run-label { background: none; border: 0; padding: 0 var(--s2); min-height: var(--touch); color: var(--ink-2); font: 400 12px/15px var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; text-align: left; }
-.run-label.stale { color: var(--sample); }
+.brand { display: flex; align-items: center; gap: var(--s2); white-space: nowrap; flex: none; }
+.brand-mark { width: 14px; height: 14px; border-radius: 50%; background: conic-gradient(from 200deg, var(--text-3), var(--surface) 45%, var(--text) 70%, var(--text-3)); box-shadow: inset 0 0 0 1px var(--hairline); }
+.brand-name { font: 600 15px/20px var(--font-serif); letter-spacing: .01em; }
+.data-chip { display: flex; align-items: center; flex: 0 1 auto; min-width: 0; height: var(--touch); padding: 0 var(--s2); background: none; border: 0; border-radius: var(--r-input); color: var(--text-2); text-align: left; }
+.data-chip:hover { color: var(--text); }
+.data-chip .chip-text { display: block; min-width: 0; max-width: 100%; overflow: hidden; white-space: nowrap; font: 400 12px/16px var(--font-ui); font-variant-numeric: tabular-nums; }
+.data-chip.stale { color: var(--text); }
+.data-chip.stale .chip-text { font-weight: 600; }
 .spacer { flex: 1 1 auto; }
-.badge {
-  display: inline-flex; align-items: center; min-height: 28px; padding: 0 var(--s3); border-radius: 14px;
-  background: color-mix(in srgb, var(--sample) 16%, transparent); color: var(--sample);
-  border: 1px solid color-mix(in srgb, var(--sample) 45%, transparent);
-  font: 600 12px/15px var(--font-ui); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+/* under 360 px the chip needs the room more than the wordmark does: the mark stays, the name is visually hidden (still read aloud) */
+@media (max-width: 359px) {
+  .brand-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  #topbar .brand-mark { display: block; flex: none; }
 }
-.icon-btn { width: var(--touch); height: var(--touch); display: inline-grid; place-items: center; background: none; border: 0; border-radius: 22px; color: var(--ink-2); flex: none; }
-.icon-btn:hover { color: var(--ink); background: var(--card-active); }
-.icon-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.hbtn { display: inline-flex; align-items: center; gap: var(--s1); height: var(--touch); min-width: var(--touch); padding: 0 var(--s3); background: none; border: 0; border-radius: var(--r-input); color: var(--text); font: 600 13px/18px var(--font-ui); flex: none; }
+.hbtn:hover, .hbtn[aria-expanded="true"] { background: var(--card-active); }
+.hbtn .caret { font-size: 12px; color: var(--text-2); }
+#btn-more { display: none; }
+.icon-btn { width: var(--touch); height: var(--touch); display: inline-grid; place-items: center; background: none; border: 0; border-radius: 22px; color: var(--text-2); flex: none; }
+.icon-btn:hover { color: var(--text); background: var(--card-active); }
 
-#stage { grid-area: stage; position: relative; min-width: 0; min-height: 0; overflow: hidden; background: var(--bg); }
+/* Display / More menu and the data popover: raised, shadowed, never clipped by the timeline */
+.menu { position: fixed; z-index: 40; top: calc(var(--topbar-h) + 4px); right: var(--s3); width: min(320px, calc(100vw - 24px)); max-height: calc(100dvh - var(--topbar-h) - 16px); overflow: auto; background: var(--raised); color: var(--text); border: 1px solid var(--hairline); border-radius: var(--r-sheet); box-shadow: var(--shadow); padding: var(--s2) var(--s4) var(--s4); }
+.menu-group { padding-top: var(--s3); }
+.menu-label { margin: 0 0 var(--s2); font: 600 12px/16px var(--font-ui); letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); }
+.menu-opts { display: flex; gap: var(--s1); padding: 2px; border: 1px solid var(--hairline); border-radius: var(--r-input); }
+.menu-opt { flex: 1 1 0; min-width: 0; min-height: var(--touch); padding: 0 var(--s2); background: none; border: 0; border-radius: 6px; color: var(--text-2); font: 400 13px/18px var(--font-ui); white-space: nowrap; }
+.menu-opt[aria-checked="true"] { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+.menu-item { display: flex; align-items: center; width: 100%; min-height: var(--touch); padding: 0; background: none; border: 0; color: var(--text); font: 600 15px/20px var(--font-ui); text-align: left; }
+.menu-note { margin: var(--s2) 0 0; color: var(--text-2); font: 400 12px/16px var(--font-ui); }
+.menu-sep { border: 0; border-top: 1px solid var(--hairline); margin: var(--s3) 0 0; }
+.popover { position: fixed; z-index: 40; top: calc(var(--topbar-h) + 4px); left: var(--s3); width: min(360px, calc(100vw - 24px)); background: var(--raised); color: var(--text); border: 1px solid var(--hairline); border-radius: var(--r-sheet); box-shadow: var(--shadow); padding: var(--s4); }
+.popover h2 { margin: 0 0 var(--s2); font: 600 15px/20px var(--font-ui); }
+.popover p { margin: 0 0 var(--s2); font: 400 13px/18px var(--font-ui); color: var(--text-2); }
+.popover p.full { color: var(--text); font-weight: 600; font-size: 15px; line-height: 20px; }
+
+#stage { grid-area: stage; position: relative; min-width: 0; min-height: 0; overflow: hidden; background: var(--bg); margin: var(--s2); border: 1px solid var(--hairline); border-radius: var(--r-sheet); box-shadow: var(--shadow); }
 #map { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; opacity: 0; transition: opacity 300ms var(--ease); }
 #app.map-ready #map { opacity: 1; }
 #map-status { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: var(--ink-2); font: 400 13px/15px var(--font-ui); pointer-events: none; transition: opacity 300ms; }
 #map-status:empty { opacity: 0; }
-#timeline { grid-area: timeline; min-width: 0; background: var(--sheet); border-top: 1px solid var(--hairline); }
+#timeline { grid-area: timeline; min-width: 0; background: var(--surface); border-top: 1px solid var(--hairline); }
 
-/* map tools */
+/* map tools: glass over the chart (spec 10.3) */
 #map-tools { position: absolute; top: var(--s3); left: var(--s3); right: var(--s3); display: flex; gap: var(--s2); align-items: center; pointer-events: none; z-index: 5; }
-#map-tools > * { pointer-events: auto; }
-.seg { display: inline-flex; background: var(--scrim); border: 1px solid var(--hairline); border-radius: 22px; padding: 2px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
-.seg button { min-height: 40px; padding: 0 var(--s3); background: none; border: 0; border-radius: 20px; color: var(--ink-2); white-space: nowrap; }
-.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); font-weight: 600; }
-.tool-btn { min-height: var(--touch); padding: 0 var(--s4); background: var(--scrim); border: 1px solid var(--hairline); border-radius: 22px; color: var(--ink); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
-.tool-btn[aria-expanded="true"] { background: var(--ink); color: var(--bg); }
+#map-tools > *, #map-tools .tools-end > * { pointer-events: auto; }
+.tools-end { margin-left: auto; display: flex; gap: var(--s2); align-items: center; pointer-events: none; }
+.glass { background: var(--glass); -webkit-backdrop-filter: blur(12px) saturate(1.2); backdrop-filter: blur(12px) saturate(1.2); border: 0; box-shadow: 0 0 0 1px var(--hairline), var(--shadow); }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .glass { background: var(--glass-solid); } }
+.seg { display: inline-flex; padding: 0; border-radius: var(--r-chip); }
+.seg button { min-height: 40px; padding: 0 var(--s3); background: none; border: 0; border-radius: var(--r-chip); color: var(--text-2); white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+.tool-btn { white-space: nowrap; min-height: var(--touch); padding: 0 var(--s4); border-radius: var(--r-chip); color: var(--text); font-weight: 600; }
+.tool-btn[aria-expanded="true"] { background: var(--accent); color: var(--on-accent); }
 
 .panel { position: absolute; top: 64px; right: var(--s3); width: min(320px, calc(100% - 24px)); max-height: calc(100% - 140px); overflow: auto; background: var(--sheet); border: 1px solid var(--hairline); border-radius: var(--r-sheet); padding: var(--s4); box-shadow: 0 12px 40px rgba(0, 0, 0, .35); z-index: 8; animation: rise 200ms var(--ease); }
 .panel h3, .group-title { margin: 0 0 var(--s2); font: 600 12px/15px var(--font-ui); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); }
@@ -117,7 +134,7 @@ button { cursor: pointer; }
 .card.active { background: var(--card-active); border-color: color-mix(in srgb, var(--ink) 35%, var(--hairline)); }
 .card-head { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 0; min-height: var(--touch); }
 .kicker { display: flex; justify-content: space-between; gap: var(--s2); color: var(--ink-2); font: 400 13px/15px var(--font-ui); margin-bottom: var(--s1); }
-.kicker .when { font-family: var(--font-mono); font-size: 12px; white-space: nowrap; }
+.kicker .when { font-variant-numeric: tabular-nums; font-size: 12px; white-space: nowrap; }
 .summary { font: 400 20px/26px var(--font-serif); color: var(--ink); margin: 0; text-wrap: pretty; }
 .summary.muted { color: var(--ink-2); }
 .dayline { margin: 0; font: 400 13px/15px var(--font-ui); color: var(--ink-2); }
@@ -156,7 +173,7 @@ button.empty:hover { color: var(--ink); border-color: var(--ink-2); }
 .person-main .dot { grid-row: 1 / span 2; }
 .person-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .person-sub { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 15px; }
-.person-why { color: var(--ink); font: 400 12px/15px var(--font-mono); white-space: nowrap; }
+.person-why { color: var(--ink); font: 400 12px/16px var(--font-ui); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .person .card { margin: 0 0 var(--s3); }
 .more-btn { color: var(--ink-2); }
 .show-all { margin-top: var(--s2); }
@@ -197,37 +214,45 @@ details.help p { margin: 0 0 var(--s2); }
 
 .modal-scrim { position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, .5); display: grid; place-items: end center; animation: fade 200ms var(--ease); }
 .modal { width: min(480px, 100%); max-height: 92dvh; overflow: auto; background: var(--sheet); border: 1px solid var(--hairline); border-radius: var(--r-sheet) var(--r-sheet) 0 0; padding: var(--s4) var(--s4) calc(var(--s4) + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: var(--s3); animation: rise 260ms var(--spring); }
-@media (min-width: 900px) { .modal-scrim { place-items: center; } .modal { border-radius: var(--r-sheet); } }
+@media (min-width: 900px) and (not ((orientation: landscape) and (max-height: 500px) and (pointer: coarse))) { .modal-scrim { place-items: center; } .modal { border-radius: var(--r-sheet); } }
 .modal h2 { margin: 0; font: 600 17px/22px var(--font-serif); }
 .field { display: flex; flex-direction: column; gap: 4px; }
 .field > span { color: var(--ink-2); font-size: 12px; }
 .modal .actions { display: flex; gap: var(--s2); justify-content: space-between; flex-wrap: wrap; }
 
-/* ---------- phone: map fills the screen, home is a bottom sheet ---------- */
-@media (max-width: 899px) {
+/* ---------- phone: map fills the screen, home is a bottom sheet (spec 11.1) ---------- */
+@media (max-width: 899px), (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
   #app { display: block; position: relative; }
-  #topbar { position: fixed; top: 0; left: 0; right: 0; padding-left: max(var(--s4), env(safe-area-inset-left)); padding-right: max(var(--s2), env(safe-area-inset-right)); }
-  .brand-name { display: none; }
-  #stage { position: fixed; top: var(--topbar-h); left: 0; right: 0; bottom: 0; }
-  #home { position: fixed; left: 0; right: 0; bottom: 0; height: var(--sheet-h); z-index: 20; border-right: 0; border-top: 1px solid var(--hairline); border-radius: var(--r-sheet) var(--r-sheet) 0 0; box-shadow: 0 -8px 30px rgba(0, 0, 0, .3); transition: height 380ms var(--spring); padding-bottom: env(safe-area-inset-bottom); }
+  #topbar { position: fixed; top: 0; left: 0; right: 0; height: calc(var(--topbar-h) + env(safe-area-inset-top, 0px)); padding: env(safe-area-inset-top, 0px) max(var(--s2), env(safe-area-inset-right, 0px)) 0 max(var(--s4), env(safe-area-inset-left, 0px)); gap: var(--s2); }
+  #btn-share, #btn-display { display: none; }
+  #btn-more { display: inline-flex; }
+  .menu { right: var(--s2); }
+  .brand-mark { display: none; }
+  .hbtn { padding: 0 var(--s2); }
+  #stage { position: fixed; top: calc(var(--topbar-h) + env(safe-area-inset-top, 0px)); left: 0; right: 0; bottom: 0; margin: 0; border: 0; border-radius: 0; box-shadow: none; }
+  #home { position: fixed; left: 0; right: 0; bottom: 0; height: var(--sheet-h); z-index: 20; border-right: 0; border-top: 1px solid var(--hairline); border-radius: var(--r-sheet) var(--r-sheet) 0 0; box-shadow: var(--shadow); transition: height 380ms var(--spring); padding-bottom: env(safe-area-inset-bottom, 0px); }
   #timeline { position: fixed; left: 0; right: 0; bottom: var(--sheet-h); z-index: 21; border-top: 0; transition: bottom 380ms var(--spring); }
   #app.dragging #home, #app.dragging #timeline { transition: none; }
   .sheet-handle { display: grid; place-items: center; width: 100%; height: 44px; flex: none; background: none; border: 0; padding: 0; touch-action: none; cursor: grab; }
   .sheet-handle span { width: 36px; height: 4px; border-radius: 2px; background: var(--hairline); display: block; }
   #app[data-snap="peek"] .home-body { display: none; }
   .focus-card { display: block; padding: 0 var(--s4) var(--s3); flex: none; overflow: hidden; touch-action: none; }
-  #app[data-snap="peek"] .focus-card { padding-bottom: 0; }
+  #app[data-snap="peek"] .focus-card { padding-bottom: var(--s2); }
   .focus-card .summary { font-size: 20px; line-height: 26px; }
   .focus-card .dayline { margin-top: var(--s1); }
   .home-body { padding-top: var(--s2); }
-  .panel { top: 64px; }
-  #btn-layers .tool-label { display: none; }
-  #btn-layers { width: var(--touch); padding: 0; display: grid; place-items: center; }
-  #btn-layers::before { content: ""; width: 18px; height: 18px; background: currentColor; -webkit-mask: var(--layers-icon) center / contain no-repeat; mask: var(--layers-icon) center / contain no-repeat; }
-  .seg button { padding: 0 10px; }
+  .panel { top: calc(var(--s3) + 44px + var(--s2)); }
+  /* one row of map tools; every button 44 px tall (spec 10.3), the row is glass over the chart and nothing else stacks above it */
+  #map-tools { gap: var(--s2); flex-wrap: nowrap; } /* one row always; Reset joins it where it fits (see the map tools rules at the end) */
+  .seg button { min-height: var(--touch); min-width: var(--touch); padding: 0 var(--s2); font-size: 13px; }
+  .tool-btn { padding: 0 10px; font-size: 13px; }
+  /* the docked phone timeline (56 px at peek and full, 72 px at half) is laid out by timeline.css (W3-08); the shell only places it */
+  /* at full the sheet covers the chart and the scrubber bar sits under the header: the map tools would sit under it, so they step aside */
+  #app[data-snap="full"] #map-tools, #app[data-snap="full"] #layers-panel { visibility: hidden; }
+  /* touch targets: every control in the panel is at least 44 px tall (spec 10.3) */
+  .btn, .link-btn, .chip, .results button { min-height: var(--touch); }
+  .link-btn { min-width: var(--touch); display: inline-flex; align-items: center; }
 }
-:root { --layers-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3 3 8l9 5 9-5-9-5Z'/%3E%3Cpath d='m3 13 9 5 9-5'/%3E%3C/svg%3E"); }
-@media (max-width: 380px) { .seg button { padding: 0 8px; font-size: 12px; } .badge { padding: 0 8px; } }
 
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
@@ -239,21 +264,56 @@ details.help p { margin: 0 0 var(--s2); }
 /* a linked place (a friend's view) shows its focus card on the Mac rail too */
 #home[data-focus="link"] .focus-card { display: block; padding: var(--s4) var(--s4) 0; }
 .focus-card .kicker { margin-bottom: var(--s1); }
-@media (max-width: 899px) {
-  .badge { white-space: normal; line-height: 14px; padding: 3px 10px; border-radius: 12px; max-height: 36px; }
-  #topbar.has-badge .run-label { display: none; }
-}
 
 /* WP5's add field in the rail */
 #quickadd-host .pn-qa textarea { font-size: 15px; }
 #sec-add .sec-title { text-transform: none; letter-spacing: 0; }
 .note-card.compact p:not(.title) { font-size: 13px; line-height: 17px; }
 
-/* peek (170 px): the summary and the day line must both show */
-@media (max-width: 899px) {
-  #app[data-snap="peek"] .focus-card .summary { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  #app[data-snap="peek"] .focus-card .dayline { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-}
+/* peek (spec 11.1: handle, place name, a sentence of at most three lines, the strip; at most 180 px): the focus card's peek is
+   styled by home.css (W3-06, "the peek" in its phone block), which is injected after this sheet and wins at equal specificity:
+   the summary sentence is unclamped at 17/22 (a 110-character story sentence wraps to three lines at 390 px) and the selected
+   day's line waits for half. The shell sets no peek typography of its own; S-SHELL measures what is drawn and M-shell-4 mutates
+   home.css's rule. */
 
 /* sample mode: every story names the real case it reads */
 .sample-tag { margin: var(--s1, 4px) 0 0; font: 400 12px/15px var(--font-ui); color: var(--ink-2); }
+
+/* the phone menu carries Share; on the desktop the header has its own Share button */
+@media (min-width: 900px) and (not ((orientation: landscape) and (max-height: 500px) and (pointer: coarse))) { .menu-share { display: none; } }
+
+/* The timeline readout, speed and step labels are words and numbers, not code: the UI face with tabular figures (acceptance 1).
+   The component's own stylesheet (timeline.css, W3-08) still asks for a fixed-pitch face; this wins on specificity. */
+#timeline .tl-speed, #timeline .tl-time-main, #timeline .tl-time-sub { font-family: var(--font-ui); font-variant-numeric: tabular-nums; }
+/* The map tools row: four views (Regional, Hemisphere, Globe, World), Layers, Expand, and Reset after a pan or zoom. Which names fit is a
+   question of the stage's width, which is the viewport on a phone (a landscape phone included) and the viewport less the 380 px
+   default panel, its divider and margins (396 px) from 900 px up; the divider's maximum (layout.js) is measured from this row, so a
+   wider panel never squeezes it. Every button keeps its full name as its accessible name; only the visible label shortens.
+   - 680 px of stage and up: the full words (the row needs about 645 px with "Reset view" shown), "Reset view".
+   - under that: "Reg | Hemi | Globe | World" in four equal 48 px cells, so the selected pill is the same size whichever view it is on;
+     "Reset".
+   - under 420 px of stage: Reset sits just under the row at the right instead of widening it, so the row never reshuffles when Reset
+     appears, and the row never holds more than it can fit with at least 4 px to spare. */
+#view-switch .vw-long, .tool-long { display: none; }
+@media (min-width: 680px) and (max-width: 899px), (min-width: 1076px) { #view-switch .vw-long, .tool-long { display: inline; } }
+@media (max-width: 679px), (min-width: 900px) and (max-width: 1075px) {
+  #view-switch { display: inline-grid; grid-template-columns: repeat(4, minmax(48px, 1fr)); }
+  #view-switch button { min-width: 48px; padding: 0 4px; font-size: 12px; }
+  #map-tools .tool-btn { padding: 0 8px; font-size: 12px; }
+}
+@media (max-width: 419px) { #btn-reset { position: absolute; top: calc(100% + var(--s2)); right: 0; } } /* 8 px under the row: the slot lenses/jet.js keeps clear for it */
+/* under 360 px: cells of 44 px (the touch minimum), 11 px labels, tighter gutters */
+@media (max-width: 359px) {
+  #map-tools { left: var(--s2); right: var(--s2); gap: var(--s1); }
+  .tools-end { gap: var(--s1); }
+  #view-switch { grid-template-columns: repeat(4, minmax(44px, 1fr)); }
+  #view-switch button { min-width: 44px; padding: 0 3px; font-size: 11px; }
+  #map-tools .tool-btn { padding: 0 6px; font-size: 11px; }
+}
+
+/* The collapsed phone legend (W3-11's one 36 px row) is as wide as its words: title, mini scale and "What is this?". A full-width
+   band covered 366 x 38 px of chart, most of it empty glass; sized to its content it leaves the chart to its right open, which is
+   where the half snap's share is won or lost (spec 11.1). Open, it takes the width it needs as before. */
+@media (max-width: 899px), (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+  #map-legend.mlg[data-collapsed="true"] { right: auto; width: max-content; max-width: calc(100% - 24px); }
+}

@@ -1,0 +1,11 @@
+{
+ "id": "shell-2",
+ "file": "site/js/ui/header.js",
+ "find": "for (const v of vs) {",
+ "replace": "for (const v of [vs[0]]) {",
+ "checks": [
+  "S-SHELL"
+ ],
+ "expect": "killed",
+ "note": "Hide the chip's truncation: fitText only ever tries the full text, so it stays in the chip and overflows its box on a 390 px phone. S-SHELL's scrollWidth <= clientWidth assertion must fail in the multi-case and live states (design spec 3.1 and 14.3, Josh point 5)."
+}

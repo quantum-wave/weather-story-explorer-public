@@ -1,0 +1,9 @@
+{
+  "id": "M-world-1",
+  "file": "site/js/render/view.js",
+  "find": "} else if (viewId === 'wm') {",
+  "replace": "} else if (viewId === 'wm' && false) {",
+  "checks": ["S-PROJ"],
+  "expect": "killed",
+  "note": "wm falls back to the globe projection: the far side of the Earth has no pixel, so S-PROJ's World case (the antipode of the view centre and the lon 180 probes must project on the flat map) fails"
+}

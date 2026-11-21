@@ -262,7 +262,7 @@ test('B1 day labels never meet, never leave their region, and always keep the ac
       const L = ST.layoutDayLabels(forms(n), colW, regionW, active);
       for (let k = 0; k < L.length; k++) {
         assert.ok(L[k].cx - L[k].w / 2 >= -0.01 && L[k].cx + L[k].w / 2 <= regionW + 0.01, `inside the region ${regionW}/${n}/${active}: ${L[k].text}`);
-        if (k) assert.ok(L[k].cx - L[k].w / 2 > L[k - 1].cx + L[k - 1].w / 2, `no touching ${regionW}/${n}/${active}: ${L[k - 1].text} | ${L[k].text}`);
+        if (k) assert.ok(L[k].cx - L[k].w / 2 - (L[k - 1].cx + L[k - 1].w / 2) >= ST.LABEL_GAP - 1e-9, `${ST.LABEL_GAP} px apart ${regionW}/${n}/${active}: ${L[k - 1].text} | ${L[k].text}`);
       }
       if (active >= 0) assert.ok(L.some((x) => x.i === active), `the active day keeps its label ${regionW}/${n}/${active}`);
     }
@@ -272,7 +272,82 @@ test('B1 day labels never meet, never leave their region, and always keep the ac
   const svg = ST.stripSVG(d, s, { width: 324, phone: true, range: 15, activeDay: 3 });
   const xs = svg.all('text.strip-label').map((t) => +t.attrs.x);
   assert.ok(xs.every((x, k) => k === 0 || x > xs[k - 1]));
-  assert.ok(svg.all('text.strip-label').some((t) => t.textContent === 'Thu 19'), 'active day named');
+  // at 324 px the columns are 39 px: the labels fall back to weekdays (the selected day in semibold) rather than drop a day
+  const main = svg.all('text.strip-label').filter((t) => !t.cls.includes('strip-label-end'));
+  assert.equal(main.length, 7, 'every one of days 1-7 keeps a label: ' + main.map((t) => t.textContent));
+  assert.ok(main.some((t) => /^Thu( 19)?$/.test(t.textContent) && /font:600/.test(t.attrs.style)), 'active day named, in semibold');
+});
+
+test('B2 a weekday alone stands in for a date only on the phone, and never when the caller asks for dates (very stale, spec 3.2)', () => {
+  const [d, s] = mk(15, sine);
+  const bare = (svg) => svg.all('text.strip-label').map((t) => t.textContent).filter((t) => /^[A-Z][a-z]{2}$/.test(t));
+  for (const active of [0, 2, 3, 6]) {
+    // desktop: 7 columns at 313 px, the width that dropped the dates (fails before: Mon | Tue | Wed | Thu 19 | ...)
+    assert.deepEqual(bare(ST.stripSVG(d.slice(0, 7), s, { width: 313, activeDay: active })), [], `desktop 313 px, day ${active}: dated or thinned, never a weekday alone`);
+    // phone, but the run is very stale: dates only
+    assert.deepEqual(bare(ST.stripSVG(d, s, { width: 324, phone: true, range: 15, activeDay: active, weekdayLabels: false })), [], `phone, weekdayLabels false, day ${active}`);
+  }
+  // the phone itself still may (B1), so the option is what turns it off
+  assert.ok(bare(ST.stripSVG(d, s, { width: 324, phone: true, range: 15, activeDay: 3 })).length > 0, 'the phone at 324 px uses weekdays');
+});
+
+test('B3 neighbours a little short of the gap are eased apart, never more than NUDGE, each still over its own column', () => {
+  const forms = [['Mon 16'], ['Tue 17'], ['Wed 18'], ['Thu 19'], ['Fri 20'], ['Sat 21'], ['Sun 22']];
+  for (const regionW of [313, 320, 340]) {
+    const colW = regionW / 7;
+    for (let active = 0; active < 7; active++) {
+      const L = ST.layoutDayLabels(forms, colW, regionW, active);
+      for (let k = 0; k < L.length; k++) {
+        const c = colW * (L[k].i + 0.5);
+        assert.ok(Math.abs(L[k].cx - Math.min(Math.max(c, L[k].w / 2), regionW - L[k].w / 2)) <= ST.NUDGE + 1e-6, `${regionW}/${active}: ${L[k].text} moved at most NUDGE`);
+        assert.ok(L[k].cx > colW * L[k].i && L[k].cx < colW * (L[k].i + 1), `${regionW}/${active}: ${L[k].text} over its column`);
+        if (k) assert.ok(L[k].cx - L[k].w / 2 - (L[k - 1].cx + L[k - 1].w / 2) >= ST.MIN_LABEL_GAP - 1e-6, `${regionW}/${active}: at least MIN_LABEL_GAP`);
+      }
+    }
+  }
+});
+
+test('B2 wider fonts (a Linux runner, a fallback font, letter-spacing): the layout uses the measured widths, keeps LABEL_GAP, and thins rather than overlaps', () => {
+  assert.ok(ST.LABEL_GAP >= 4, 'a real gap, not a hairline: ' + ST.LABEL_GAP);
+  const forms = ['Today', 'Tue 17', 'Wed 18', 'Thu 19', 'Fri 20', 'Sat 21', 'Sun 22'].map((t, i) => (i === 1 ? ['Tomorrow', t] : [t]));
+  // a stand-in width model, scaled from 1x to 2x (the Linux runner rendered wider than the macOS estimate assumed)
+  const est = (t, bold) => (t.length * 7.2 + (/W/.test(t) ? 4 : 0)) * (bold ? 1.06 : 1);
+  for (const scale of [1, 1.1, 1.25, 1.5, 2]) {
+    const measure = (t, b) => est(t, b) * scale;
+    for (const [regionW, n] of [[313, 7], [264, 7], [640, 7], [313, 15], [640, 15]]) {
+      const fm = Array.from({ length: n }, (_, i) => forms[i % 7]);
+      for (const active of [-1, 0, 1, 3, n - 1]) {
+        const L = ST.layoutDayLabels(fm, regionW / n, regionW, active, measure);
+        const where = `x${scale} ${regionW}/${n}/${active}: ${L.map((x) => x.text)}`;
+        assert.ok(L.length >= 1, where);
+        for (let k = 0; k < L.length; k++) {
+          assert.ok(Math.abs(L[k].w - measure(L[k].text, L[k].i === active)) < 1e-9, 'the measured width is the one laid out ' + where);
+          assert.ok(L[k].cx - L[k].w / 2 >= -0.01 && L[k].cx + L[k].w / 2 <= regionW + 0.01 || L.length === 1, 'inside ' + where);
+          if (k) assert.ok(L[k].cx - L[k].w / 2 - (L[k - 1].cx + L[k - 1].w / 2) >= ST.LABEL_GAP - 1e-9, 'gap ' + where);
+        }
+        if (active >= 0) assert.ok(L.some((x) => x.i === active), 'active kept ' + where);
+      }
+    }
+  }
+  // 313 px, 7 columns, a quarter wider: the seven labels no longer fit with the gap, so the row is thinned
+  const wide = ST.layoutDayLabels(forms, 313 / 7, 313, 1, (t, b) => est(t, b) * 1.25);
+  assert.ok(wide.length < 7 && wide.length >= 3, 'thinned, not overlapped: ' + wide.map((x) => x.text));
+});
+
+test('B3 a row that misses the gap by a little is spread apart, each label within a fifth of its column, not thinned', () => {
+  // the recorded week at 313 px on macOS: "Sun 22" (39.5 px) and "Mon 23" (42.7 px) in 44.7 px columns sit 3.6 px apart
+  const colW = 313 / 7, ws = [41.86, 38.25, 32.58, 34.81, 39.52, 42.73, 38.75];
+  const texts = ['Wed 18', 'Thu 19', 'Fri 20', 'Sat 21', 'Sun 22', 'Mon 23', 'Tue 24'];
+  const measure = (t) => ws[texts.indexOf(t)];
+  const L = ST.layoutDayLabels(texts.map((t) => [t]), colW, 313, -1, measure);
+  assert.deepEqual(L.map((x) => x.text), texts, 'all seven kept');
+  for (let k = 0; k < L.length; k++) {
+    assert.ok(Math.abs(L[k].cx - colW * (k + 0.5)) <= colW / 5 + 1e-9 || k === 0, `label ${k} stays over its column: ${L[k].cx}`);
+    if (k) assert.ok(L[k].cx - L[k].w / 2 - (L[k - 1].cx + L[k - 1].w / 2) >= ST.LABEL_GAP - 1e-9, `gap ${k}`);
+  }
+  // too far off to spread: null, so the caller thins
+  assert.equal(ST.spreadLabels([{ cx: 20, w: 40 }, { cx: 40, w: 40 }], 20, 300), null);
+  assert.equal(ST.spreadLabels([{ cx: 20, w: 30 }, { cx: 52, w: 30 }], 32, 300, 0), null, 'slack 0: placed as is or not at all');
 });
 
 test('N1 a no-signal day draws a visible neutral band even when its anomaly is near zero (P-B2/MET-14)', () => {
@@ -457,7 +532,7 @@ const shim = (dir) => async (url) => {
   const buf = fsm.readFileSync(f);
   return { ok: true, status: 200, json: async () => JSON.parse(buf.toString()), arrayBuffer: async () => buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) };
 };
-const openFx = async (name) => { data._reset({ fetch: shim(pathm.join(fixtures, name)) }); store.set({ case: 'A' }); return data.loadManifest(); };
+const openFx = async (name) => { data._reset({ fetch: shim(pathm.join(fixtures, name)) }); store.set({ lens: 'z' }); return data.loadManifest(); };
 const stripText = (svg) => [...svg.all('text').map((t) => t.textContent), ...svg.all('rect').map((r) => r.attrs['aria-label'] || '')].join(' | ');
 const hatchedCols = (svg) => { const cols = svg.all('rect.strip-day'); return cols.map((c) => svg.all('rect.hatch-pattern-only').some((h) => +h.attrs.x === +c.attrs.x)); };
 

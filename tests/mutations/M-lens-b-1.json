@@ -1,0 +1,11 @@
+{
+  "id": "lens-b-1",
+  "file": "site/js/render/sample.js",
+  "find": "if (v !== v) { u32[base + px] = 0; iv[px] = 255; runH = 0; runV[px] = 0; continue; }",
+  "replace": "if (v !== v) v = 4; // MUTANT: no-data is painted as a +4 C band\n      if (v !== v) { u32[base + px] = 0; iv[px] = 255; runH = 0; runV[px] = 0; continue; }",
+  "checks": [
+    "S-LENS-B"
+  ],
+  "expect": "killed",
+  "note": "DESIGN-SPEC 6.1, MET-8: the Air mass lens must not fill the terrain mask (t850a no-data over high ground, where the 850 hPa level is under the ground): a masked pixel is hatch or ground, never a temperature band. The mutant makes the raster paint every no-data pixel as a +4 C band (#fe5132 range); S-LENS-B's terrain probe must fail."
+}

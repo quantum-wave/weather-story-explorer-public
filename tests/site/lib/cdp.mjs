@@ -26,6 +26,10 @@ class Page {
     Object.assign(this, { conn, sessionId, targetId, baseUrl, contextId });
     this.console = []; // { type: 'error'|'warning'|'log'|..., text }
     this.externalRequests = [];
+    this.routes = [];      // route(fn): fn(url) -> { status?, headers?, body?, contentType? } answers an off-origin request, or null (W4-09)
+    this.fulfilled = [];   // off-origin URLs a route answered
+    this.downloads = [];   // downloads the page tried to start (denyDownloads)
+    this.failedLoads = []; // { url, reason } for requests that failed after watchNetwork()
     conn.onEvent(sessionId, (m, p) => this._event(m, p));
   }
   _event(method, p) {
@@ -34,11 +38,24 @@ class Page {
     } else if (method === 'Runtime.exceptionThrown') {
       const d = p.exceptionDetails;
       this.console.push({ type: 'error', text: 'exception: ' + (d.exception?.description || d.text) });
+    } else if (method === 'Network.requestWillBeSent') {
+      (this.requestUrls ||= new Map()).set(p.requestId, p.request.url);
+    } else if (method === 'Network.loadingFailed') {
+      if (p.errorText !== 'net::ERR_ABORTED') this.failedLoads.push({ url: this.requestUrls?.get(p.requestId) || p.requestId, reason: p.errorText + (p.blockedReason ? ' ' + p.blockedReason : '') });
+    } else if (method === 'Page.downloadWillBegin') {
+      this.downloads.push(p.url || p.suggestedFilename || 'download');
     } else if (method === 'Log.entryAdded') {
       if (p.entry.level === 'error' || p.entry.level === 'warning') this.console.push({ type: p.entry.level, text: `${p.entry.source}: ${p.entry.text} ${p.entry.url || ''}`.trim() });
     } else if (method === 'Fetch.requestPaused') {
       const url = p.request.url;
       const ok = url.startsWith(this.baseUrl) || /^(data|blob|about):/.test(url);
+      const answer = ok ? null : this._route(url);
+      if (answer) {
+        this.fulfilled.push(url);
+        const headers = { 'content-type': answer.contentType || 'application/octet-stream', 'access-control-allow-origin': '*', ...(answer.headers || {}) };
+        this.send('Fetch.fulfillRequest', { requestId: p.requestId, responseCode: answer.status || 200, responseHeaders: Object.entries(headers).map(([name, value]) => ({ name, value })), body: Buffer.from(answer.body ?? '').toString('base64') }).catch(() => {});
+        return;
+      }
       if (!ok) {
         this.externalRequests.push(url);
         this.console.push({ type: 'error', text: 'blocked external request: ' + url });
@@ -47,6 +64,16 @@ class Page {
     }
   }
   send(method, params = {}) { return this.conn.send(method, params, this.sessionId); }
+  /** Answer off-origin requests the page makes: fn(url) returns { body, contentType, status?, headers? } or null (then the request is blocked and recorded). */
+  route(fn) { this.routes.push(fn); }
+  _route(url) { for (const fn of this.routes) { const r = fn(url); if (r) return r; } return null; }
+  /** Deny every download this page's context starts and record it in page.downloads. */
+  async denyDownloads() {
+    this.conn.onBrowserEvent((m, p) => { if (m === 'Browser.downloadWillBegin') this.downloads.push(p.url || p.suggestedFilename || 'download'); });
+    await this.conn.send('Browser.setDownloadBehavior', { behavior: 'deny', browserContextId: this.contextId, eventsEnabled: true });
+  }
+  /** Record requests that fail (after Fetch let them through): page.failedLoads. */
+  async watchNetwork() { await this.send('Network.enable'); this.networkWatched = true; }
   /** Console entries of type error (includes uncaught exceptions, failed loads, blocked external requests). */
   errors() { return this.console.filter((c) => c.type === 'error'); }
   async goto(url, { timeout = 30000 } = {}) {
@@ -85,13 +112,14 @@ class Page {
 
 class Conn {
   constructor(ws) {
-    this.ws = ws; this.id = 0; this.pending = new Map(); this.listeners = new Map(); this.waiters = [];
+    this.ws = ws; this.browserListeners = []; this.id = 0; this.pending = new Map(); this.listeners = new Map(); this.waiters = [];
     ws.addEventListener('message', (e) => {
       const m = JSON.parse(e.data);
       if (m.id) {
         const p = this.pending.get(m.id); this.pending.delete(m.id);
         if (p) m.error ? p.reject(new Error(`${p.method}: ${m.error.message}`)) : p.resolve(m.result);
       } else {
+        if (!m.sessionId) for (const fn of this.browserListeners) fn(m.method, m.params);
         this.listeners.get(m.sessionId)?.(m.method, m.params);
         this.waiters = this.waiters.filter((w) => !(w.sessionId === m.sessionId && w.method === m.method && (w.resolve(m.params), true)));
       }
@@ -106,6 +134,8 @@ class Conn {
     });
   }
   onEvent(sessionId, fn) { this.listeners.set(sessionId, fn); }
+  /** Events Chrome sends without a session (Browser.* domain). */
+  onBrowserEvent(fn) { this.browserListeners.push(fn); }
   waitEvent(sessionId, method, timeout) {
     return new Promise((resolve, reject) => {
       const w = { sessionId, method, resolve: (v) => { clearTimeout(t); resolve(v); } };

@@ -1,0 +1,11 @@
+{
+ "id": "home-2",
+ "file": "site/js/ui/home.js",
+ "find": "st.range = effRange(st.avail);",
+ "replace": "st.range = 7;",
+ "checks": [
+  "S-HOME"
+ ],
+ "expect": "killed",
+ "note": "Josh point 1: the card always builds 7 columns whatever the range. Killed by S-HOME choosing range 10 (and 15 on the phone) and counting the columns."
+}

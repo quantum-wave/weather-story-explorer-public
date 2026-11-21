@@ -317,6 +317,9 @@ const LEGEND = {
   },
 };
 
+/** An inch amount to two significant figures, no trailing zeros: 0.0039 -> "0.004", 0.039 -> "0.039", 1.97 -> "2". */
+const inchLabel = (x) => (x < 0.01 ? x.toFixed(3) : String(Number(x.toPrecision(2))));
+
 /**
  * What a legend draws for a palette on a ground over the value range [lo, hi]:
  * `{title, subtitle, unit, ends, ticks, stops, lineSample, hatch, footer}`.
@@ -324,7 +327,7 @@ const LEGEND = {
  * ticks: {value, label, major} only at hairlined edges (z500a) plus the gap edges; every edge for a banded ramp
  * that has no hairlines.
  */
-export function legendSpec(id, ground, lo, hi) {
+export function legendSpec(id, ground, lo, hi, units = 'metric') {
   const p = pal(id), words = LEGEND[id];
   const rgb = ground === 'night' ? p.night : p.paper;
   if (lo == null || hi == null) { const e = p.edges; lo = p.neutral[0] === -Infinity ? 0 : -Math.max(...e.filter((x) => Math.abs(x) <= 40).map(Math.abs)); hi = p.neutral[0] === -Infinity ? e[e.length - 1] + 10 : -lo; }
@@ -339,6 +342,12 @@ export function legendSpec(id, ground, lo, hi) {
   const gapEdges = p.neutral[0] === -Infinity ? [] : p.neutral;
   const major = p.majorEdges.length ? p.majorEdges : p.edges;
   const vals = [...new Set([...major, ...gapEdges])].filter((v) => v >= lo && v <= hi).sort((a, b) => a - b);
-  const ticks = vals.map((v) => ({ value: v, label: p.signed ? (v > 0 ? '+' : v < 0 ? MINUS : '') + Math.abs(v) : String(v), major: p.majorEdges.includes(v) || !p.majorEdges.length }));
-  return { title: words.title, subtitle: words.subtitle, unit: words.unit, ends: words.ends, ticks, stops, lineSample: words.lineSample, hatch: words.hatch, footer: words.footer };
+  // Rain has a mm / in switch (W4-05): the same bands and values, labelled in the chosen unit
+  const rain = id === 'tp6', us = rain && units === 'us';
+  const label = (v) => (us ? inchLabel(p.toDisplay(v, 'us')) : p.signed ? (v > 0 ? '+' : v < 0 ? MINUS : '') + Math.abs(v) : String(v));
+  const ticks = vals.map((v) => ({ value: v, label: label(v), major: p.majorEdges.includes(v) || !p.majorEdges.length }));
+  return {
+    title: words.title, subtitle: words.subtitle, unit: us ? 'in' : words.unit, ends: words.ends, ticks, stops, lineSample: words.lineSample, hatch: words.hatch, footer: words.footer,
+    unitSwitch: rain ? { options: ['mm', 'in'], active: us ? 'in' : 'mm' } : null,
+  };
 }

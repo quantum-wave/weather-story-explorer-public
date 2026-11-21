@@ -1,0 +1,11 @@
+{
+  "id": "explain-3",
+  "file": "site/js/render/annotate.js",
+  "find": "const f = s.focus && Number.isFinite(s.focus.lat) && Number.isFinite(s.focus.lon) ? mv.project([s.focus.lon, s.focus.lat]) : null;",
+  "replace": "const f = null;",
+  "checks": [
+    "S-EXPLAIN"
+  ],
+  "expect": "killed",
+  "note": "DESIGN-SPEC 4.5, W4-02 acceptance 4: a ridge or trough plate never sits over a higher-priority label. Without the focused-place keep-out, a plate lands on the focused place's pin and name. S-EXPLAIN's plate sweep focuses a place on the strongest extremum and asserts no drawn plate touches the pin or the name (4 px slack)."
+}

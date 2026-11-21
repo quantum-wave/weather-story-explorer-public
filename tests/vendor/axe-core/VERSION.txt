@@ -1,0 +1,4 @@
+axe-core 4.11.4 (npm, registry.npmjs.org, fetched 2026-11-19; published 2026-04-29). Licence: MPL-2.0 (LICENSE).
+axe.min.js and package.json are unmodified from the npm tarball axe-core-4.11.4.tgz.
+sha256 axe.min.js fb83a4378d978ecb7d2dae48a3a3778a84c971ac692f3afd45d714fba89c0f0d
+Used only by tests/site/checks/S-A11Y.mjs, injected with Runtime.evaluate. Not shipped (assemble.sh copies site/ only); never loaded from a CDN.

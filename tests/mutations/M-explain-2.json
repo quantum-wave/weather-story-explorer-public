@@ -1,0 +1,12 @@
+{
+  "id": "explain-2",
+  "file": "site/js/render/annotate.js",
+  "find": "cands.filter((c) => c.signal !== 'none')",
+  "replace": "cands.filter(() => true)",
+  "checks": [
+    "S-EXPLAIN",
+    "unit:wp14.annotate.test.mjs"
+  ],
+  "expect": "killed",
+  "note": "DESIGN-SPEC 4.5, W4-02 acceptance 4: label extrema in no-signal areas. A ridge or trough where the forecasts disagree is labelled as if it were certain. The annotation unit test (no label where the signal is none) and S-EXPLAIN's forced-spread state (a 12 dam candidate with signal none that must be a candidate but not a plate) must fail."
+}

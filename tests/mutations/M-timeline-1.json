@@ -1,0 +1,11 @@
+{
+  "id": "timeline-1",
+  "file": "site/js/time/scrubber.js",
+  "find": "let z500a = s.z500a;",
+  "replace": "let z500a = data.sampleSeries('z500a', place.lat, place.lon) || s.z500a;",
+  "checks": [
+    "S-TIMELINE"
+  ],
+  "expect": "killed",
+  "note": "DESIGN-SPEC 7.2 (MET-5, Josh point 14): colour the track from the single run after day 7. The days the zones call a blend and an average would then show one deterministic run. S-TIMELINE computes the blend independently and compares every late cell. Note: once the data client provides data.patternSeries (W3-09) the blend arrives through story.seriesFor and this fallback line is dead code; retarget the mutant then to the series read in patternAt. Round 2: the fallback blends the anomaly of the mean (z500em - (z500 - z500a)); M-timeline-3 covers the absolute-height mistake. Integration (W3-09 merged): data.patternSeries now exists, so the fallback is dead; retargeted to the series read in patternAt, which then takes the unblended single run."
+}

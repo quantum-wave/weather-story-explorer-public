@@ -17,12 +17,12 @@ export async function run({ page, baseUrl, assert }) {
   await mount(page, { width: 1000, height: 600, dpr: 1 });
   const out = await page.eval(`(async () => {
     const w = window.__wp2, m = window.__wse.data.getManifest(), t = m.fields.z500.steps[Math.min(1, m.fields.z500.steps.length - 1)];
-    await w.renderer.ensureFor({ t, layers: { z: true }, case: 'A' });
+    await w.renderer.ensureFor({ t, lens: 'z' });
     const res = { grid: m.domains.np05.dlon };
     for (const [name, centre] of [['zoom2', { lat: 37.77, lon: -122.42, zoom: 2 }], ['default', undefined]]) {
       const cv = document.createElement('canvas'); cv.width = 540; cv.height = 675;
       const c = cv.getContext('2d'), texts = []; const ft = c.fillText.bind(c); c.fillText = (s, ...r) => { texts.push(String(s)); return ft(s, ...r); };
-      w.renderer.renderTo(c, { width: 540, height: 675, t, view: 'np', layers: { z: true, j: false }, case: 'A', theme: 'dark', centre });
+      w.renderer.renderTo(c, { width: 540, height: 675, t, view: 'np', lens: 'z', theme: 'dark', centre });
       res[name] = texts.filter((s) => /^\\d{3}$/.test(s)).length;
     }
     return res;

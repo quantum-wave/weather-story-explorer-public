@@ -1,0 +1,9 @@
+{
+ "id": "data-3",
+ "file": "site/js/data/index.js",
+ "find": "const base = rawFieldAt(kind, domain, tHours, inner);",
+ "replace": "const base = rawFieldAt(kind, domain, tHours);",
+ "checks": ["S-DATA", "unit:wp2.data.test.mjs"],
+ "expect": "killed",
+ "note": "E-A6: the pattern reads the public raw buffer, so a later pattern call overwrites a frame a caller holds (a z500 frame at 100 h is overwritten by z500a at 204 h)."
+}

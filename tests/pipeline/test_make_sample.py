@@ -450,6 +450,42 @@ def test_the_tool_fails_when_a_decoded_frame_differs_from_the_source(src, work, 
     assert not (work / "rec").exists()
 
 
+def test_a_source_built_under_an_older_contract_scale_is_re_encoded_without_changing_a_value(work, monkeypatch):
+    """W4-05 review round 2: tp6 moved from 0.1 mm to 0.01 mm steps. A live build made before that change carries
+    scale 0.1 in its manifest; the recording must decode it with the source's own scale (not today's contract, which
+    would make every rain value ten times too small), write it at the contract scale, and still verify it equal."""
+    import pipeline.encode as enc
+    old = dict(enc.FIELD_META)
+    monkeypatch.setitem(enc.FIELD_META, "tp6", ("mm", 0.1, 0))
+    d = work / "live"
+    w = ManifestWriter(str(d), domains=DOMS)
+    g = DOMS["g1"]
+    yy, xx = np.mgrid[0:g["ny"], 0:g["nx"]]
+    tsteps = STEPS[1:]
+    rain = np.stack([np.maximum(0, 6 * np.sin(0.3 * xx + 0.2 * yy + 0.05 * i)) for i in range(len(tsteps))])
+    w.add_field("tp6", tsteps, {"g1": rain}, source={"dataset": "live tp6", "valid": None})
+    zg = {dm: np.stack([5500 + 150 * np.sin(0.3 * np.mgrid[0:DOMS[dm]["ny"], 0:DOMS[dm]["nx"]][1] + 0.05 * i)
+                        for i in range(len(STEPS))]) for dm in DOMS}
+    w.add_field("z500a", STEPS, {dm: a - 5500 for dm, a in zg.items()}, source={"dataset": "live z500a", "valid": None})
+    w.write({"schema": 1, "sample": False, "model": "ECMWF IFS HRES", "run": "2026-11-19T00:00Z",
+             "generated": "2026-11-19T08:09Z", "attribution": "ECMWF open data CC-BY-4.0",
+             "climatology": {"label": "ERA5 1990-2019", "source": "WeatherBench2", "method": "annual mean + 3 harmonics"}})
+    monkeypatch.setitem(enc.FIELD_META, "tp6", old["tp6"])
+    sm = json.load(open(d / "manifest.json"))
+    assert sm["fields"]["tp6"]["scale"] == 0.1 and enc.FIELD_META["tp6"][1] == 0.01
+    out = work / "rec"
+    ms.make_sample(str(d), str(out))
+    m = json.load(open(out / "manifest.json"))
+    assert m["fields"]["tp6"]["scale"] == 0.01
+    assert validate(str(out))["fields"] == ["tp6", "z500a"]
+    for step in (6, 120, 360):
+        a = dequantize(frame(str(d), sm, "tp6", "g1", step), 0.1, 0)
+        b = dequantize(frame(str(out), m, "tp6", "g1", step), 0.01, 0)
+        assert np.nanmax(a) > 3 and np.allclose(a, b, rtol=0, atol=1e-9, equal_nan=True), step
+    cmp = ms.compare_probes(str(d), str(out))
+    assert cmp["mismatches"] == 0 and cmp["checked"] > 0
+
+
 # ---- the committed recording (acceptance 2, 3 and 5 on the real run, not on a synthetic build) -------------------
 RECORDED = ROOT / "tests" / "site" / "fixtures" / "recorded"
 

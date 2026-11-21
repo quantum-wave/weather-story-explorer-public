@@ -1,0 +1,85 @@
+/* Home panel (W3-06): Your week, Trips, People, Places. Loaded by ui/home.js; it only adds to shell.css, keeping its class names. */
+
+/* ---------- targets: 44 px for every action in the panel ---------- */
+#home .link-btn, #home .range-btn, #home .btn, #home .chip { min-height: 44px; }
+#home .link-btn { min-width: 44px; padding-inline: var(--s2); display: inline-flex; align-items: center; justify-content: center; text-decoration: none; color: var(--ink); font-weight: 600; font-size: 13px; }
+#home .link-btn:hover { background: var(--card-active); border-radius: 22px; }
+#home .sec-head { align-items: center; }
+#home .sec-head .link-btn { margin-right: calc(-1 * var(--s2)); }
+.sec-note { margin: 0 0 var(--s2); font: 400 13px/17px var(--font-ui); color: var(--ink-2); }
+.sec-note.stale-head { color: var(--ink); }
+.sec-note.very-stale { font-weight: 600; }
+
+/* ---------- range: 7 days · 10 · 15 ---------- */
+.range { margin: 0 0 var(--s2); display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s3); }
+.range-group { display: inline-flex; border: 1px solid var(--hairline); border-radius: 22px; overflow: hidden; }
+.range-btn { min-width: 44px; padding: 0 var(--s3); background: none; border: 0; border-left: 1px solid var(--hairline); color: var(--ink-2); font: 500 13px/15px var(--font-ui); }
+.range-btn:first-child { border-left: 0; }
+.range-btn[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.range-btn:disabled { opacity: .45; cursor: not-allowed; text-decoration: line-through; text-decoration-thickness: 1px; }
+.range-note { margin: 0; font: 400 13px/17px var(--font-ui); color: var(--ink-2); }
+
+/* ---------- cards ---------- */
+.card-head { min-height: 44px; }
+.card .confidence { margin: var(--s1) 0 0; font: 400 13px/17px var(--font-ui); color: var(--ink-2); }
+.card .card-note { margin: var(--s1) 0 0; font: 400 13px/17px var(--font-ui); color: var(--ink-2); text-wrap: pretty; }
+.card .card-note.end-cell { border-left: 2px solid var(--hairline); padding-left: var(--s2); }
+.card .dayline { font-size: 13px; line-height: 18px; }
+.card.is-loading .strip-wrap .skeleton { height: 96px; }
+.card .retry-btn { align-self: flex-start; }
+.card[data-state="too-far"] .summary, .card[data-state="broad"] .summary { font-size: 17px; line-height: 23px; }
+.card .row-btn.trip-edit { align-self: flex-start; margin-left: calc(-1 * var(--s2)); }
+/* a finger on a strip pans the panel like anywhere else; home.js steps the sheet only at the scroll edge (never block vertical pan) */
+.strip-wrap { touch-action: pan-x pan-y; }
+/* labels and notes sit over the tappable columns: a tap on a word is a tap on its day */
+.strip text, .strip path, .strip polygon, .strip line { pointer-events: none; }
+/* the strip and what is pinned over it share one grid cell; the key, when it leaves the SVG, is the row under it */
+.strip-frame { display: grid; grid-template-columns: minmax(0, 1fr); margin-top: var(--s1); --strip-ground: var(--card); }
+.card.active .strip-frame { --strip-ground: var(--card-active); }
+.strip-frame > .strip-wrap { grid-area: 1 / 1; margin-top: 0; min-width: 0; }
+/* the expanded strip scrolls sideways and comes to rest on whole columns (one snap point per column, home.js) */
+.strip-wrap.expanded { position: relative; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; scroll-snap-type: x mandatory; }
+.strip-wrap.expanded svg { max-width: none; }
+.strip-snap { position: absolute; top: 0; height: 1px; scroll-snap-align: start; pointer-events: none; }
+/* "normal", pinned to the right edge on the line while the days scroll under it: an axis label on the card's ground */
+.strip-pin { grid-area: 1 / 1; align-self: start; justify-self: end; z-index: 1; pointer-events: none; padding: 0 2px 0 6px; font: 400 12px/16px var(--font-ui); color: var(--ink-2); background: var(--strip-ground); border-radius: 3px; box-shadow: -6px 0 6px -2px var(--strip-ground); }
+.strip-key-out { grid-row: 2; margin: var(--s1) 0 0; font: 400 12px/16px var(--font-ui); color: var(--ink-2); }
+.strip-key-out .strip-key { display: block; text-wrap: pretty; }
+.strip-end:focus-visible, .strip-day:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+#home .strip-collapse { align-self: flex-start; margin-left: calc(-1 * var(--s2)); }
+
+/* ---------- trips: an ended trip is one muted row ---------- */
+.trip-over { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); min-height: 44px; padding: 0 var(--s4); color: var(--ink-2); border: 1px dashed var(--hairline); border-radius: var(--r-card); }
+.trip-over-text { font: 400 13px/17px var(--font-ui); min-width: 0; }
+.trip-over .link-btn { margin-right: calc(-1 * var(--s2)); }
+
+/* ---------- people and places ---------- */
+.empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s2); }
+.empty-text { font: 400 15px/21px var(--font-serif); }
+.empty-add { display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--s4); border: 1px solid var(--hairline); border-radius: 22px; color: var(--ink); font: 600 13px/15px var(--font-ui); }
+button.empty:hover .empty-add { border-color: var(--ink-2); }
+.not-saved { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); padding: var(--s2) var(--s3); margin-bottom: var(--s3); border: 1px solid var(--hairline); border-left: 3px solid var(--ink-2); border-radius: 6px; background: var(--card); }
+.not-saved p { margin: 0; font: 400 13px/17px var(--font-ui); }
+.person-row { min-height: 44px; }
+.person-main { display: flex; align-items: baseline; gap: var(--s2); flex-wrap: wrap; row-gap: 0; }
+.person-main .dot { align-self: center; flex: none; }
+.person-name { flex: 0 1 auto; max-width: 100%; }
+.person-sub { flex: 1 1 auto; min-width: 0; }
+.person-why { margin: 0 0 var(--s2); padding-left: calc(10px + var(--s2)); font: 400 13px/17px var(--font-ui); color: var(--ink); }
+#sec-places .person-why { padding-left: 0; }
+.person .row-btn { flex: none; }
+
+/* ---------- the phone sheet ---------- */
+@media (max-width: 899px), (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+  #home-body { padding-inline: 0; }
+  #home-body > section, #home-body > #sec-notes { padding-inline: var(--s4); }
+  /* cards run edge to edge (their tint and rules), their text keeps the 16 px gutter */
+  #sec-week .card, #sec-trips .card, .person .card { border-inline: 0; border-radius: 0; margin-inline: calc(-1 * var(--s4)); padding-inline: var(--s4); }
+  /* the strip keeps the card's 16 px text column: seven 44 px columns (308) and the 50 px end cell are 358 px, exactly a 390 px phone's column */
+  /* the peek: the sentence is never clamped and the whole peek stays under 180 px (the 44 px handle, the place, the sentence) */
+  #app[data-snap="peek"] .focus-card .summary { display: block; -webkit-line-clamp: unset; overflow: visible; font-size: 17px; line-height: 22px; }
+  #app[data-snap="peek"] .focus-card .dayline { display: none; }
+  #app[data-snap="peek"] .focus-card .kicker { margin-bottom: 2px; }
+  /* half and full: the same place's card is the first card below, so the focus block is shown once (UX-19) */
+  #app:not([data-snap="peek"]) #home[data-dup="1"] .focus-card { display: none; }
+}

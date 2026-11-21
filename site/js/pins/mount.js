@@ -14,6 +14,7 @@ import { attachMapHold } from './maphold.js';
 import { mountQuickAdd } from './quickadd-ui.js';
 import { mountPinsPanel } from './panel.js';
 import { openEditSheet } from './edit.js';
+import { openAddSheet } from './addsheet.js';
 import { ensureStyles } from './dom.js';
 
 const MOUNTED = Symbol.for('wse.pins.mounted');
@@ -24,6 +25,7 @@ export function mountPins({ canvas = null, renderer = null, quickAddEl = null, p
   const mapDone = !!(canvas && canvas[MOUNTED]);
   const undo = [];
   const onEdit = (id) => openEditSheet(id, { pins });
+  const onAdd = (o = {}) => openAddSheet({ pins, onEdit, ...o });
   let overlay = null;
   if (renderer && !mapDone) {
     overlay = pinOverlay(renderer, { pins });
@@ -31,11 +33,11 @@ export function mountPins({ canvas = null, renderer = null, quickAddEl = null, p
     undo.push(bus.on('pins:changed', () => renderer.draw?.()));
     if (canvas) { undo.push(attachMapHold(canvas, { renderer, overlay, pins, onEdit })); canvas[MOUNTED] = true; undo.push(() => { canvas[MOUNTED] = false; }); }
   }
-  const qa = quickAddEl ? mountQuickAdd(quickAddEl, { pins, onEdit }) : null;
+  const qa = quickAddEl ? mountQuickAdd(quickAddEl, { pins, onEdit, openAdd: onAdd }) : null;
   const panel = panelEl ? mountPinsPanel(panelEl, { pins }) : null;
-  return { overlay, quickAdd: qa, panel, openEditSheet: onEdit, destroy() { undo.forEach((f) => f()); qa?.destroy(); panel?.destroy(); } };
+  return { overlay, quickAdd: qa, panel, openEditSheet: onEdit, openAddSheet: onAdd, destroy() { undo.forEach((f) => f()); qa?.destroy(); panel?.destroy(); } };
 }
 
-export { openEditSheet, mountQuickAdd, mountPinsPanel, attachMapHold };
-export { showToast, addedToast, closeToast } from './toast.js';
+export { openEditSheet, openAddSheet, mountQuickAdd, mountPinsPanel, attachMapHold };
+export { showToast, addedToast, removedToast, closeToast } from './toast.js';
 export { mountCityPicker } from './picker.js';

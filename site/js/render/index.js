@@ -5,9 +5,10 @@ import { store, bus } from '../state.js';
 import * as data from '../data/index.js';
 import { toGrid, bilinear } from '../data/grid.js';
 import { makeScene, needed, plan, domainFor } from './compose.js';
-import { IDENTITY, clampXf, sameXf, isDefaultXf, domainBox, dampOver, ZOOM_MAX, padKey } from './view.js';
+import { SLICE_MS } from './sample.js';
+import { IDENTITY, clampXf, sameXf, isDefaultXf, domainBox, worldLimits, dampOver, ZOOM_MAX, padKey, NO_PAD } from './view.js';
 import { dragRotate, inertia } from './globe.js';
-import { loadBasemap } from './basemap.js';
+import { loadBasemap, basemapTier } from './basemap.js';
 import { theme as themeTokens } from './theme.js';
 import { VIEWS } from '../contract.js';
 
@@ -19,7 +20,7 @@ const TAP_PX = 6, TAP_MS = 600, DOUBLE_TAP_MS = 320, DOUBLE_TAP_PX = 30;
 const KEY_DEG = 5; // arrows rotate or pan by this many degrees
 const ease = (u) => 1 - (1 - u) ** 3;
 const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-export const REDRAW_KEYS = ['t', 'layers', 'view', 'theme', 'case', 'lens', 'overlays', 'ground', 'range'];
+export const REDRAW_KEYS = ['t', 'view', 'theme', 'lens', 'overlays', 'ground', 'range', 'focus'];
 const ROTATES = (v) => v === 'nh' || v === 'gl';
 const wrap180 = (d) => ((d + 540) % 360) - 180;
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -71,7 +72,13 @@ export function createRenderer(canvas) {
     const dom = data.getManifest()?.domains?.[VIEWS.np];
     return dom ? domainBox(scene.viewFor(viewId, w, h, IDENTITY(), pad).base, dom) : null;
   }
-  const clampX = (x, viewId = state().view) => (W ? clampXf(x, W, H, boxFor(viewId)) : x);
+  /** World pans inside the Equal Earth outline: its box and the free frame it was fitted into. */
+  const worldFor = (viewId, w = W, h = H, p = pad) => (viewId === 'wm' ? worldLimits(scene.viewFor(viewId, w, h, IDENTITY(), p).base) : null);
+  const clampX = (x, viewId = state().view) => {
+    if (!W) return x;
+    const wl = worldFor(viewId);
+    return wl ? clampXf(x, W, H, wl.box, wl.frame) : clampXf(x, W, H, boxFor(viewId));
+  };
   /** A drag past a limit moves the map by a damped amount, never more than a few px. */
   function softClamp(x) {
     const c = clampX(x);
@@ -88,17 +95,57 @@ export function createRenderer(canvas) {
   }
 
   const fadeQ = () => (!firstFieldAt || reducedMotion() ? 32 : Math.round(Math.min(1, (performance.now() - firstFieldAt) / FADE_MS) * 32));
-  function composeFrame(s, x, q) {
+  /** True while the time axis moves (playback, or a step or scrub in the last REST_MS): frames are composed at 'motion' quality. */
+  let lastT = store.get().t, tChangedAt = -1e9, motionTimer = 0;
+  function timeMoving(s) {
+    if (s.t !== lastT) { lastT = s.t; tChangedAt = now(); }
+    return !!s.playing || now() - tChangedAt < REST_MS;
+  }
+  function composeFrame(s, x, q, moving) {
     const mv = scene.viewFor(s.view, W, H, x, pad);
     frameCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     mv.quality = 'rest';
-    const { drewField } = scene.compose(frameCtx, mv, { s, dpr, rasterScale: dpr >= 2 ? 0.5 : 0.8, alpha: ease(q / 32), quality: 'rest' });
-    counters.composes++; counters.quality = 'rest';
+    const common = { s, dpr, rasterScale: dpr >= 2 ? 0.5 : 0.8, alpha: ease(q / 32) };
+    let drewField, pending;
+    if (moving) {
+      // Playing or scrubbing (spec 4.2, 4.3): the half-size bilinear raster, synchronously, with contours (recomputed at most ten
+      // times a second inside compose) and labels. Never the coarse-then-pop of a restarted rest job on every time step.
+      abandonRest();
+      ({ drewField, pending } = scene.compose(frameCtx, mv, { ...common, quality: 'motion' }));
+      pending = false;
+      clearTimeout(motionTimer);
+      motionTimer = setTimeout(() => { motionTimer = 0; if (!destroyed) requestDraw(); }, REST_MS + 10); // the rest frame follows the last step
+    } else {
+      // The rest raster is rendered in slices of at most 12 ms (DESIGN-SPEC 4.2): a coarse field now, the crisp one a few frames later.
+      ({ drewField, pending } = scene.compose(frameCtx, mv, { ...common, quality: 'rest', sliceMs: SLICE_MS }));
+    }
+    counters.composes++; counters.quality = moving ? 'motion' : 'rest';
+    if (pending) pumpRest();
     if (drewField && !firstFieldAt && !reducedMotion()) { firstFieldAt = performance.now(); requestDraw(); }
     else if (drewField && q < 32) requestDraw();
     frameXf = copyXf(x);
     frameKey = looks(s);
     return mv;
+  }
+
+  /** Run the sliced rest raster on successive animation frames; when it is done the frame is composed again from it. */
+  let pumpRaf = 0;
+  function pumpRest() {
+    if (pumpRaf || destroyed) return;
+    pumpRaf = requestAnimationFrame(() => {
+      pumpRaf = 0;
+      if (destroyed) return;
+      const r = scene.stepPending(SLICE_MS);
+      if (r.done) { gen++; frameXf = null; lastKey = ''; requestDraw(); } else if (r.pending) pumpRest();
+    });
+  }
+  function abandonRest() { if (pumpRaf) { cancelAnimationFrame(pumpRaf); pumpRaf = 0; } scene.cancelPending(); }
+  /** The public draw(): the committed view at full quality, synchronously, so a rest raster in progress is finished now. */
+  function drawNow() {
+    draw();
+    if (destroyed || !scene.hasPending()) return;
+    if (pumpRaf) { cancelAnimationFrame(pumpRaf); pumpRaf = 0; }
+    if (scene.stepPending(Infinity).done) { gen++; frameXf = null; lastKey = ''; draw(); }
   }
 
   /** Full-quality draw of the committed view, synchronously. */
@@ -108,9 +155,9 @@ export function createRenderer(canvas) {
     if (!W) resize();
     const t0 = now(), s = state();
     if (s.view !== lastView) { lastView = s.view; xf = IDENTITY(); live = null; frameXf = null; }
-    const q = fadeQ(), key = [s.t, JSON.stringify(s.layers), s.case, looks(s), data.dataVersion(), W, H, dpr, xf.k, xf.tx, xf.ty, xf.rot[0], xf.rot[1], xf.rot[2], gen, q].join('|');
+    const moving = timeMoving(s), q = fadeQ(), key = [moving ? 'm' : 'r', basemapTier(), s.t, s.lens, looks(s), s.focus ? `${s.focus.lon},${s.focus.lat},${s.focus.label}` : '', data.dataVersion(), W, H, dpr, xf.k, xf.tx, xf.ty, xf.rot[0], xf.rot[1], xf.rot[2], gen, q].join('|');
     // callers may ask for a draw twice for one change: compose once, blit and draw overlays each time
-    const mv = frameXf && key === lastKey ? scene.viewFor(s.view, W, H, xf, pad) : composeFrame(s, xf, q);
+    const mv = frameXf && key === lastKey ? scene.viewFor(s.view, W, H, xf, pad) : composeFrame(s, xf, q, moving);
     lastKey = key;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.drawImage(frame, 0, 0);
@@ -187,7 +234,7 @@ export function createRenderer(canvas) {
   function prefetch(s) {
     const m = data.getManifest();
     if (!m) return;
-    const key = [s.view, s.case, JSON.stringify(s.layers), s.lens, Math.floor(s.t / 6), m.run].join('|');
+    const key = [s.view, s.lens, Math.floor(s.t / 6), m.run].join('|');
     if (key === ensureKey) return;
     ensureKey = key;
     const need = needed(s, m);
@@ -211,7 +258,7 @@ export function createRenderer(canvas) {
     if (coast) { const c = coast; coast = null; c.cancel(); }
     clearTimeout(restTimer); restTimer = 0;
   }
-  function setLive(next) { live = next; requestDraw(); }
+  function setLive(next) { live = next; abandonRest(); requestDraw(); } // new input abandons a rest raster in progress
   /** Rest quality returns REST_MS after the last input. */
   function scheduleRest() {
     clearTimeout(restTimer);
@@ -427,18 +474,20 @@ export function createRenderer(canvas) {
   function exportXf(opts, s, width, height) {
     if (opts.xf) {
       const sx = W ? width / W : 1, sy = H ? height / H : 1, x = opts.xf;
-      return clampXf({ k: x.k ?? 1, tx: (x.tx || 0) * sx, ty: (x.ty || 0) * sy, rot: rot3(x.rot) }, width, height);
+      const wl = worldFor(s.view, width, height, NO_PAD);
+      return clampXf({ k: x.k ?? 1, tx: (x.tx || 0) * sx, ty: (x.ty || 0) * sy, rot: rot3(x.rot) }, width, height, wl?.box, wl?.frame);
     }
     const { centre = null } = opts;
     if (centre) {
       const mv0 = scene.viewFor(s.view, width, height, IDENTITY()), b = mv0.project([centre.lon, centre.lat]);
       const k = centre.zoom ?? 1.5;
-      if (b && k > 1) return clampXf({ k, tx: width / 2 - k * b[0], ty: height / 2 - k * b[1], rot: [0, 0, 0] }, width, height);
+      const wl = worldFor(s.view, width, height, NO_PAD);
+      if (b && k > 1) return clampXf({ k, tx: width / 2 - k * b[0], ty: height / 2 - k * b[1], rot: [0, 0, 0] }, width, height, wl?.box, wl?.frame);
     }
     return IDENTITY();
   }
   const api = {
-    draw, resize,
+    draw: drawNow, resize,
     setView(id) { if (state().view !== id) store.set({ view: id }); },
     centreOn(lat, lon, ms = 500, zoom = null) { if (!W) resize(); return animateTo(xfCentred(lat, lon, zoom), ms); },
     resetView(ms = 400) { return animateTo(IDENTITY(), ms); },
@@ -482,14 +531,14 @@ export function createRenderer(canvas) {
       const signal = !Number.isFinite(anom) || (hasSpread && spread >= 4 && Math.abs(anom) < spread) ? 'none' : 'clear';
       return { values, t: s.t, signal };
     },
-    /** Load what renderTo needs for these options (t, view, layers, case); resolves when decoded. */
+    /** Load what renderTo needs for these options (t, view, lens); resolves when decoded. */
     async ensureFor(opts = {}) {
-      const s = { ...state(), ...opts, layers: { ...state().layers, ...(opts.layers || {}) } };
+      const s = { ...state(), ...opts };
       await Promise.all(needed(s).map(([f, d]) => data.ensure(f, d, s.t)));
     },
     /**
      * Render one frame into any 2D context at width x height (CSS px, no dpr scaling): basemap, field, contours,
-     * jet; no legend, pins or focus ring. Options: t, view, layers, theme, lens, ground, overlays-flags `flags`, case (default the
+     * jet; no legend, pins or focus ring. Options: t, view, theme, lens, ground, overlays-flags `flags` (default the
      * store), `xf` ({k, tx, ty, rot}: the on-screen transform, so a share keeps a rotated globe), centre {lat, lon, zoom},
      * overlays [fn(ctx, project, state)], rasterScale (default 0.75). `centre` zooms to centre.zoom (default 1.5, 1 = the whole
      * view) and puts the place mid-frame where the view allows. Returns {project, invert} of the drawn view.
@@ -498,8 +547,8 @@ export function createRenderer(canvas) {
       const { width, height, overlays: ovs = [], rasterScale = 0.75 } = opts;
       const base = state();
       const s = { ...base, t: opts.t ?? base.t, view: opts.view ?? base.view, theme: opts.theme ?? base.theme, lens: opts.lens ?? base.lens,
-        ground: opts.ground ?? base.ground, range: opts.range ?? base.range, case: opts.case ?? base.case,
-        layers: { ...base.layers, ...(opts.layers || {}) }, overlays: { ...(base.overlays || {}), ...(opts.flags || {}) } };
+        ground: opts.ground ?? base.ground, range: opts.range ?? base.range,
+        overlays: { ...(base.overlays || {}), ...(opts.flags || {}) } };
       const x = exportXf(opts, s, width, height);
       const mv = scene.viewFor(s.view, width, height, x);
       c2.save();
@@ -511,7 +560,7 @@ export function createRenderer(canvas) {
       return { project: proj, invert: (xy) => mv.invert(xy) };
     },
     destroy() {
-      destroyed = true; cancelAnimationFrame(raf); stopMotion(); clearTimeout(wheelTimer);
+      destroyed = true; cancelAnimationFrame(raf); stopMotion(); abandonRest(); clearTimeout(wheelTimer);
       unsub(); offChunk(); offManifest(); ro?.disconnect();
       if (typeof window !== 'undefined') window.removeEventListener('resize', onWinResize);
       canvas.removeEventListener('pointerdown', onDown); canvas.removeEventListener('pointermove', onMove);

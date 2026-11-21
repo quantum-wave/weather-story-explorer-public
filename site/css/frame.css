@@ -1,0 +1,89 @@
+/* frame.css: the map expanded to the whole viewport (design spec 4.7, 11.3). Loaded by ui/fullscreen.js.
+   Pure CSS mode (#app[data-expanded]), so it works inside a sandboxed iframe where native fullscreen is refused. */
+
+/* the pill look is for a button this module creates itself; the shell's own button (.tool-btn.glass, shell.css) keeps the shell's padding,
+   which tightens at 320-359 px so the one-row tools fit the stage */
+#btn-expand:not(.glass) { margin-left: auto; min-height: var(--touch, 44px); padding: 0 var(--s4, 16px); background: var(--scrim); border: 1px solid var(--hairline); border-radius: 22px; color: var(--ink); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); white-space: nowrap; }
+#map-tools .tools-end #btn-expand { margin-left: 0; }
+#btn-expand[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+
+#app[data-expanded] { position: fixed; inset: 0; z-index: 100; height: auto; display: block; background: var(--bg); }
+#app[data-expanded] #topbar,
+#app[data-expanded] #home,
+#app[data-expanded] #divider,
+#app[data-expanded] #layers-panel[hidden] { display: none; }
+#app[data-expanded] #stage { position: fixed; inset: 0; top: 0; left: 0; right: 0; bottom: 0; margin: 0; border: 0; border-radius: 0; box-shadow: none; } /* the desktop shell frames the stage as an inset card (shell.css); expanded, it is the whole viewport */
+#app[data-expanded] #map-tools { top: calc(var(--s3, 12px) + env(safe-area-inset-top, 0px)); left: max(var(--s3, 12px), env(safe-area-inset-left, 0px)); right: max(var(--s3, 12px), env(safe-area-inset-right, 0px)); }
+#app[data-expanded] #timeline { position: fixed; left: 0; right: 0; bottom: 0; z-index: 21; padding-bottom: env(safe-area-inset-bottom, 0px); border-top: 1px solid var(--hairline); transition: none; }
+/* slim timeline: the scrubber bar only */
+#app[data-expanded] .tl-root .tl-ribbon-wrap,
+#app[data-expanded] .tl-root .tl-words,
+#app[data-expanded] .tl-root .tl-trips { display: none; }
+
+/* The map legend (legend.css, W3-11) sits on the stage's bottom edge, which the fixed scrubber covers while expanded: lift it to stand on
+   the scrubber (--timeline-h, layout.js, follows the slim bar) and shorten it by the same amount, so it neither slides under the bar nor
+   climbs into the map tools. At phone width the sheet is hidden while expanded, so its height no longer counts; the top keeps clear of
+   the tools row, the sample chip and the status line under it. */
+#app[data-expanded] .mlg { bottom: calc(var(--timeline-h, 0px) + 12px); max-height: calc(100% - var(--timeline-h, 0px) - 84px); }
+@media (max-width: 899px), (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+  #app[data-expanded] .mlg { bottom: calc(var(--timeline-h, 0px) + 8px); max-height: calc(100% - var(--timeline-h, 0px) - 112px); }
+}
+
+/* The sample label while expanded (the header that carries it is hidden). A row of its own under the map tools, left, clear of the
+   renderer's Reset view button on the right; the status line and the toasts step down below it. Phone layouts only (narrow, or a
+   landscape touch phone of any width, where the legend is a one-row bar): the wide legend draws its own sample badge. */
+.wse-sample-chip { display: none; }
+@media (max-width: 899px), (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+  #app[data-expanded] .wse-sample-chip:not([hidden]) {
+    /* one line that hugs its words (ui/fullscreen.js picks the full or the short label to fit); the ellipsis is a last resort only */
+    display: block; width: max-content; position: absolute; z-index: 6; margin: 0; pointer-events: none;
+    top: calc(64px + env(safe-area-inset-top, 0px)); left: max(var(--s3, 12px), env(safe-area-inset-left, 0px));
+    max-width: calc(100% - 2 * var(--s3, 12px) - 112px); min-height: 0; padding: 0 10px; line-height: 28px; border-radius: 14px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-height: none;
+    background: color-mix(in srgb, var(--sample) 16%, var(--bg)); backdrop-filter: none;
+  }
+  #app[data-expanded] #stage:has(.wse-sample-chip:not([hidden])) #map-status { top: calc(104px + env(safe-area-inset-top, 0px)); }
+  #app[data-expanded] #stage:has(.wse-sample-chip:not([hidden])) #toasts { top: calc(104px + env(safe-area-inset-top, 0px)); }
+  #app[data-expanded] #stage:has(.wse-sample-chip:not([hidden])):has(#map-status:not(:empty)) #toasts { top: calc(164px + env(safe-area-inset-top, 0px)); }
+}
+
+/* ---------- the desktop divider and the folded rail (design spec 4.7; ui/layout.js) ---------- */
+/* A 6 px bar between the story panel and the chart. Its hit area is wider than it looks: the ::before reaches 5 px either side. */
+@media (min-width: 900px) and (not ((orientation: landscape) and (max-height: 500px) and (pointer: coarse))) {
+  /* The bar overlays the panel's right edge (margin-left -6 px), so its grid track stays 0 wide and the chart starts where it always did:
+     ui/firstpaint.js places the first-paint coastline from that geometry. */
+  #divider { position: relative; width: 6px; margin-left: -6px; cursor: col-resize; background: transparent; touch-action: none; z-index: 3; outline: none; }
+  #divider::before { content: ""; position: absolute; inset: 0 -5px; }
+  #divider::after { content: ""; position: absolute; top: 50%; left: 1px; width: 4px; height: 40px; margin-top: -20px; border-radius: 2px; background: var(--hairline); transition: background 120ms; }
+  #divider:hover::after, #app.resizing #divider::after { background: var(--text-2); }
+  #divider:focus-visible::after { background: var(--ring); height: 64px; margin-top: -32px; width: 6px; left: 0; } /* the grip is the focus ring: a full-height outline read as a second border */
+  #app.resizing { cursor: col-resize; user-select: none; -webkit-user-select: none; }
+  #app.resizing #stage { pointer-events: none; }
+  #btn-fold { margin-left: calc(-1 * var(--s2, 8px)); width: auto; min-width: var(--touch, 44px); grid-auto-flow: column; gap: 6px; padding: 0 12px 0 10px; font: 500 13px/1 var(--font-ui); }
+  #btn-fold .fold-label { white-space: nowrap; }
+  #app[data-folded] #home > * { visibility: hidden; }
+  #app[data-folded] #home { cursor: pointer; position: relative; }
+  #app[data-folded] #home::after { content: "Your week"; position: absolute; top: var(--s4, 16px); left: 0; right: 0; writing-mode: vertical-rl; text-align: left; padding-left: 14px; font: 600 13px/16px var(--font-ui); letter-spacing: .04em; color: var(--text-2); }
+}
+@media (max-width: 899px), (orientation: landscape) and (max-height: 500px) and (pointer: coarse) { #btn-fold, #divider { display: none; } }
+
+/* ---------- a phone on its side: the sheet is a strip down the left edge (spec 4.7, REF-9) ---------- */
+@media (max-width: 899px) and (orientation: landscape) and (max-height: 500px), (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+  #app { --strip-w: min(320px, 40vw); }
+  html #home { top: calc(var(--topbar-h) + env(safe-area-inset-top, 0px)); right: auto; bottom: 0; width: calc(var(--strip-w) + env(safe-area-inset-left, 0px)); height: auto; padding-left: env(safe-area-inset-left, 0px); border-radius: 0; border-top: 0; border-right: 1px solid var(--hairline); box-shadow: none; transition: none; }
+  html .sheet-handle { display: none; }
+  html #app[data-snap] .home-body { display: block; }
+  html #app[data-snap] #map-tools, html #app[data-snap] #layers-panel { visibility: visible; }
+  html #app[data-snap] #layers-panel[hidden] { visibility: hidden; }
+  html #app #stage { left: calc(var(--strip-w) + env(safe-area-inset-left, 0px)); }
+  html #app #timeline { left: calc(var(--strip-w) + env(safe-area-inset-left, 0px)); bottom: 0; transition: none; padding-bottom: env(safe-area-inset-bottom, 0px); }
+  html #app .mlg { bottom: calc(var(--timeline-h, 56px) + 8px); max-height: calc(100% - var(--timeline-h, 56px) - 72px); }
+  html #app #map-tools { right: max(var(--s2, 8px), env(safe-area-inset-right, 0px)); }
+  html #app .toasts, html #app #toasts { bottom: calc(var(--timeline-h, 56px) + 8px); }
+}
+/* expanded wins over the strip: the chart is the whole viewport, whichever way the phone is held */
+@media (max-width: 899px) and (orientation: landscape) and (max-height: 500px), (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+  html #app[data-expanded] #stage, html #app[data-expanded] #timeline { left: 0; }
+  html #app[data-expanded] #timeline { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  html #app[data-expanded] .mlg { bottom: calc(var(--timeline-h, 56px) + 8px); }
+}

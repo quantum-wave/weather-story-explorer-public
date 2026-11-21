@@ -3,11 +3,12 @@
 import { d3 } from '../vendor.js';
 import { toGrid, nodeLonLat } from '../data/grid.js';
 
-export const VIEW_IDS = ['np', 'nh', 'gl'];
+export const VIEW_IDS = ['np', 'nh', 'gl', 'wm'];
 export const SF = [-122.42, 37.77];
 const NH_CLIP = 75;
 export const ZOOM_MIN = 1, ZOOM_MAX = 8;
 export const GL_ROTATE = [140, -35, 0]; // the globe opens centred on 140W, 35N: the North Pacific and North America
+export const WM_ROTATE = [150, 0]; // World: the Pacific (150W) at the middle, so San Francisco and the date line both stay on screen
 export const OVERSHOOT_MAX = 22; // px a drag past a pan limit can move the map (spec: at most 24)
 
 const boxPoints = (lon0, lon1, lat0, lat1) => {
@@ -45,13 +46,17 @@ export function baseProjection(viewId, W, H, inset = NO_PAD) {
     rotate = [-SF[0], -90]; // north pole at the centre, San Francisco's meridian pointing down
     p = d3.geoStereographic().rotate(rotate).clipAngle(NH_CLIP);
     p.fitExtent(fit, { type: 'Sphere' });
+  } else if (viewId === 'wm') {
+    // World: the flat Equal Earth map of the whole sphere. Pan and zoom only; no rotation.
+    p = d3.geoEqualEarth().rotate(WM_ROTATE);
+    p.fitExtent(fit, { type: 'Sphere' });
   } else {
     // Globe: orthographic, free rotation. The far side is clipped (clipAngle) and project() returns null there.
     rotate = GL_ROTATE.slice();
     p = d3.geoOrthographic().rotate(rotate).clipAngle(90);
     p.fitExtent(fit, { type: 'Sphere' });
   }
-  return { viewId, W, H, inset: padKey(inset), proj: p, scale: p.scale(), translate: p.translate().slice(), rotate, scratch: new Map(), boxes: new Map() };
+  return { viewId, W, H, inset: padKey(inset), fit, proj: p, scale: p.scale(), translate: p.translate().slice(), rotate, scratch: new Map(), boxes: new Map() };
 }
 
 /**
@@ -80,11 +85,40 @@ export function domainBox(base, dom) {
 }
 
 /**
- * Clamp a zoom transform so the zoomed canvas still covers the canvas. With `box` (a domain's screen box, Regional only)
- * the allowed pan widens to the data's own edge: the map may move until the domain's edge reaches the frame's edge.
+ * World: the screen box [x0, y0, x1, y1] of the whole Equal Earth outline in the un-zoomed view, and the free frame
+ * [x0, y0, x1, y1] the base fit it into (the canvas less its margin and the reserved edges). Cached per base.
  */
-export function clampXf(xf, W, H, box = null) {
+export function worldLimits(base) {
+  let b = base.boxes.get('world');
+  if (b) return b;
+  const mv = new MapView(base), edge = 180 - 1e-4, lon0 = -WM_ROTATE[0];
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let lat = -90; lat <= 90; lat += 3) {
+    for (const lon of [lon0 + edge, lon0 - edge]) {
+      const q = mv.project([lon, lat]);
+      if (!q) continue;
+      x0 = Math.min(x0, q[0]); y0 = Math.min(y0, q[1]); x1 = Math.max(x1, q[0]); y1 = Math.max(y1, q[1]);
+    }
+  }
+  b = { box: [x0, y0, x1, y1], frame: base.fit.flat() };
+  base.boxes.set('world', b);
+  return b;
+}
+
+/**
+ * Clamp a zoom transform so the zoomed canvas still covers the canvas. With `box` (a domain's screen box, Regional only)
+ * the allowed pan widens to the data's own edge: the map may move until the domain's edge reaches the frame's edge. With `box`
+ * and `frame` (World) the map's outline is held against the frame instead.
+ */
+export function clampXf(xf, W, H, box = null, frame = null) {
   const k = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, xf.k));
+  if (box && frame) { // contain: the map's own outline stays against the free frame (no blank band); an axis where the map is smaller is centred
+    const axis = (t, b0, b1, f0, f1) => {
+      if (k * (b1 - b0) < f1 - f0) return (f0 + f1) / 2 - (k * (b0 + b1)) / 2;
+      return Math.min(f0 - k * b0, Math.max(f1 - k * b1, t));
+    };
+    return { ...xf, k, tx: axis(xf.tx, box[0], box[2], frame[0], frame[2]), ty: axis(xf.ty, box[1], box[3], frame[1], frame[3]) };
+  }
   let xlo = W - W * k, xhi = 0, ylo = H - H * k, yhi = 0;
   if (box) {
     xlo = Math.min(xlo, W - k * box[2]); xhi = Math.max(xhi, -k * box[0]);
@@ -157,7 +191,10 @@ export class MapView {
   _invert(xy) {
     const p = this.base.proj, ll = p.invert(xy);
     if (!ll || ll[0] !== ll[0] || ll[1] !== ll[1]) return null;
-    if (this.viewId === 'gl') { // off the disc the inverse extrapolates: accept only points that project back onto themselves
+    if (this.viewId === 'wm') { // off the Equal Earth outline the inverse extrapolates: accept only points that project back onto themselves
+      const q = p(ll);
+      if (!q || Math.abs(q[0] - xy[0]) > 0.75 || Math.abs(q[1] - xy[1]) > 0.75) return null;
+    } else if (this.viewId === 'gl') { // off the disc the inverse extrapolates: accept only points that project back onto themselves
       const q = p(ll);
       if (!q || Math.abs(q[0] - xy[0]) > 0.75 || Math.abs(q[1] - xy[1]) > 0.75 || !this._insideClip(ll[0], ll[1])) return null;
     } else if (this.viewId === 'nh' && !this._insideClip(ll[0], ll[1])) return null;

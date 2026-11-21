@@ -19,8 +19,8 @@ export async function run({ page, baseUrl, assert }) {
     const body = () => page.eval(`document.body.innerText`);
 
     // header: the case's real start, not the rebased run
-    const run = await page.eval(`document.getElementById('run-label').textContent`);
-    assert.match(run, /^Sample · \d+ Jan 2017 00Z$/, 'run label: ' + run);
+    const run = await page.eval(`document.getElementById('data-chip').dataset.full`);
+    assert.match(run, /^Sample · \d+ Jan 2017 · not a forecast$/, 'data chip: ' + run);
 
     // scrubber: real date with year, and the case named
     await page.eval(`__wse.store.set({ t: 12 })`);
@@ -29,7 +29,7 @@ export async function run({ page, baseUrl, assert }) {
     const sub = await page.eval(`document.querySelector('#timeline .tl-time-sub').textContent`);
     assert.match(main, /Sun 1 Jan 2017|Mon 2 Jan 2017|Sat 31 Dec 2016/, 'readout is the real date: ' + main);
     assert.ok(sub.includes('sample') && sub.includes(label), 'readout names the case: ' + sub);
-    assert.equal(await page.eval(`document.querySelector('#timeline .tl-ribbon').hidden`), true, 'no confidence ribbon from sample spread');
+    assert.equal(await page.eval(`!!document.querySelector('#timeline .tl-ribbon')`), false, 'no confidence ribbon from sample spread (the timeline draws none: W3-08)');
 
     // story lines: real dates, the case named, no confidence claim, no rain/air claims the sample lacks
     const text = await body();
@@ -54,7 +54,7 @@ export async function run({ page, baseUrl, assert }) {
     assert.ok(!/settled/i.test(await page.eval(`document.getElementById('home').innerText`)), 'the words settled and unsettled appear nowhere in the home panel');
 
     // deep link: the real date
-    await page.eval(`__wse.store.set({ view: 'np', layers: { z: true, j: false, c: false, t: false }, t: 12 })`);
+    await page.eval(`__wse.store.set({ view: 'np', lens: 'z', t: 12 })`);
     const hash = await page.eval(`import('./js/links.js').then((L) => L.formatHash(__wse.store.get()))`);
     assert.match(hash, /^#np-z-20170101\d\d/, 'link carries the real UTC hour of the case: ' + hash);
     assert.ok(!hash.includes(String(year)), 'link must not carry this year');
@@ -66,18 +66,15 @@ export async function run({ page, baseUrl, assert }) {
     assert.ok(meta.banner.includes(label));
     assert.match(meta.conf, /not meaningful for sample data/);
 
-    // the legend is on the map: draw once with a fillText spy (desktop-size viewport: title, ticks, baseline, badge)
-    const drawn = await page.eval(`(() => { const out = []; const o = CanvasRenderingContext2D.prototype.fillText;
-      CanvasRenderingContext2D.prototype.fillText = function (t, ...r) { out.push(String(t)); return o.call(this, t, ...r); };
-      __wse.store.set({ t: 13 }); __wse.renderer.draw();
-      CanvasRenderingContext2D.prototype.fillText = o; return out; })()`);
-    assert.ok(drawn.some((t) => t.startsWith('500 hPa height vs normal')), 'legend title drawn on the map: ' + drawn.slice(0, 12));
-    assert.ok(drawn.includes('+24') && drawn.includes('-24'), 'legend ticks drawn');
-    assert.ok(drawn.some((t) => t.includes(label)), 'the sample badge with the case is on the map');
+    // the legend is on the map (W3-11: a DOM card now, not canvas text): its title and ticks are in it, and the sample case is named in the legend words
+    const lg = await page.eval(`document.getElementById('map-legend').textContent`);
+    assert.ok(lg.startsWith('Pressure pattern aloft, vs normal'), 'legend title on the map: ' + lg.slice(0, 60));
+    assert.ok(lg.includes('+10') && lg.includes('−10'), 'legend ticks drawn');
+    assert.ok((await page.eval(`document.querySelector('#map-legend .mlg-run').textContent`)).includes(label), 'the sample case is named on the visible map legend');
 
     // another case: Irma shows September 2017 and its own name
     await page.eval(`document.getElementById('btn-layers').click()`);
-    await page.eval(`document.querySelector('#layers-panel [data-case="B"]').click()`);
+    await page.eval(`document.querySelector('#layers-panel [data-lens="j"]').click()`);
     await page.waitFor(`document.querySelector('#timeline .tl-time-main').textContent.includes('Sep 2017') || document.querySelector('#timeline .tl-time-main').textContent.includes('Sep 2017')`, { timeout: 3000 });
     const sub2 = await page.eval(`document.querySelector('#timeline .tl-time-sub').textContent`);
     assert.ok(sub2.includes(m.cases.B.label), 'case B named: ' + sub2);

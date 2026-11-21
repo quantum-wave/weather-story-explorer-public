@@ -204,11 +204,14 @@ function labelBox(x, y, w, h, angle) {
  * down (angle in [-pi/2, pi/2]), at least `minGap` px (320) from every other label, inside the margin, and its box
  * touches no `avoid` rectangle ({x, y, w, h}). Returns [{x, y, angle, text}].
  */
-export function labelSpots(lines, W, H, { minGap = 320, avoid = [], unit = 10, every = 12, bold = BOLD_DAM, margin = 24, charW = 6.5, straight = 0.985 } = {}) {
+export function labelSpots(lines, W, H, { minGap = 320, avoid = [], unit = 10, every = 12, bold = BOLD_DAM, margin = 24, charW = 6.5, straight = 0.985, maxDev = Infinity, taken = [], max = Infinity } = {}) {
+  // `taken`: spots already placed by another call ({x, y}); every new one keeps `minGap` from them. `max`: at most that many new spots.
+  // `maxDev`: the stretch under a label may sit at most that many px off its chord at three inner points (a corner inside it fails).
   const spots = [], boxes = [];
   const rank = (l) => (bold.includes(l.level / unit) ? 0 : 1);
   const levels = lines.filter((l) => (l.level / unit) % every === 0).sort((a, b) => rank(a) - rank(b) || a.level - b.level);
   for (const { level, lines: polys } of levels) {
+    if (spots.length >= max) break;
     const text = String(level / unit), w = text.length * charW + 2 * LABEL_PAD;
     for (const { pts, closed } of polys) {
       const m = pts.length / 2, cum = [0];
@@ -231,16 +234,25 @@ export function labelSpots(lines, W, H, { minGap = 320, avoid = [], unit = 10, e
         const [x0, y0] = at(sArc - w / 2), [x1, y1] = at(sArc + w / 2);
         const chord = Math.hypot(x1 - x0, y1 - y0);
         if (chord < straight * w) continue; // the stretch under the label bends too much
+        if (maxDev < Infinity) {
+          let bent = false;
+          for (const f of [0.25, 0.5, 0.75]) {
+            const [px, py] = at(sArc - w / 2 + f * w);
+            if (Math.abs((px - x0) * (y1 - y0) - (py - y0) * (x1 - x0)) / (chord || 1) > maxDev) { bent = true; break; }
+          }
+          if (bent) continue;
+        }
         // the middle of the stretch must sit on the chord as well (an S-curve has a short chord but not a long detour)
         let angle = Math.atan2(y1 - y0, x1 - x0);
         if (angle > Math.PI / 2) angle -= Math.PI; else if (angle < -Math.PI / 2) angle += Math.PI;
         if (angle === -Math.PI / 2) angle = Math.PI / 2;
-        if (spots.some((q) => Math.hypot(q.x - x, q.y - y) < minGap)) continue;
+        if (spots.some((q) => Math.hypot(q.x - x, q.y - y) < minGap) || taken.some((q) => Math.hypot(q.x - x, q.y - y) < minGap)) continue;
         const b = labelBox(x, y, w, LABEL_H, angle);
         if (b.x0 < margin / 2 || b.y0 < margin / 2 || b.x1 > W - margin / 2 || b.y1 > H - margin / 2) continue;
         if (avoid.some((r) => b.x1 > r.x && b.x0 < r.x + r.w && b.y1 > r.y && b.y0 < r.y + r.h)) continue;
         spots.push({ x, y, angle, text });
         boxes.push(b);
+        if (spots.length >= max) break;
       }
     }
   }

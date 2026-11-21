@@ -4,6 +4,7 @@
   sample-min           tests/site/fixtures/sample-min/           real data from the spike fixtures (SPEC section 11)
   synthetic-15d        tests/site/fixtures/synthetic-15d/        W1-02: 0-360 h on 2 deg / 1 deg grids, every field, named probes
   synthetic-15d-nomean tests/site/fixtures/synthetic-15d-nomean/ the same without z500em (a run whose ensemble mean is late)
+  synthetic-15d-em-g1only tests/site/fixtures/synthetic-15d-em-g1only/ the same with z500em on g1 only
   synthetic-partial    tests/site/fixtures/synthetic-partial/    0-48 h, no z500sd (a partial build)
   recorded-min         tests/site/fixtures/recorded-min/         recorded-shape sample: sample_label, no cases, pattern fields
   synthetic-hires-48h  tests/site/fixtures/synthetic-hires-48h/  the real 1 deg / 0.5 deg grids, one exactly circular anomaly
@@ -126,7 +127,7 @@ def bilinear(src, slon0, sdlon, slat0, sdlat, periodic, lon_t, lat_t):
 
 FIELD_META = {
     "z500": ("gpm", 1, 0), "z500a": ("gpm", 1, 0), "z500sd": ("gpm", 0.1, 0),
-    "ws250": ("m/s", 0.1, 0), "tp6": ("mm", 0.1, 0), "t850a": ("K", 0.1, 0),
+    "ws250": ("m/s", 0.1, 0), "tp6": ("mm", 0.01, 0), "t850a": ("K", 0.1, 0),
     "msl": ("Pa", 10, 101325), "ivt": ("kg/m/s", 1, 0), "t2a": ("K", 0.1, 0),
     # W1-02 (DESIGN-SPEC 13.2)
     "z500em": ("gpm", 1, 0), "pr1": ("%", 1, 0), "pr10": ("%", 1, 0), "t2m": ("K", 0.1, 0),
@@ -135,8 +136,9 @@ CHUNK_HOURS = {"a": (0, 120), "b": (126, 240), "c": (246, 360)}
 
 
 class Builder:
-    def __init__(self, outdir, domains):
+    def __init__(self, outdir, domains, meta=None):
         self.out = outdir
+        self.meta = meta or FIELD_META
         self.domains = domains
         self.fields = {}
         self.decoded = {}  # (field, domain) -> {step_hour: int16 frame}
@@ -147,7 +149,7 @@ class Builder:
 
     def add(self, fid, steps, grids, case=None, source=None):  # case=None: a recorded sample has no cases
         """grids: {domain: array (nsteps, ny, nx) of physical values (NaN = no data)}."""
-        units, scale, offset = FIELD_META[fid]
+        units, scale, offset = self.meta[fid]
         entry = {"units": units, "scale": scale, "offset": offset, "nodata": NODATA,
                  "filter": "dx-shuffle", "steps": list(steps), "domains": list(grids), "chunks": []}
         if case:
@@ -174,7 +176,7 @@ class Builder:
 
     def probe(self, name, lat, lon, fid, dom, step, allow_null=False):
         d = self.domains[dom]
-        units, scale, offset = FIELD_META[fid]
+        units, scale, offset = self.meta[fid]
         i = int(round(((lon - d["lon0"]) % 360) / d["dlon"])) if dom != "g1" else int(round((lon - d["lon0"]) / d["dlon"]))
         j = int(round((lat - d["lat0"]) / d["dlat"]))
         if not (0 <= i < d["nx"] and 0 <= j < d["ny"]):
@@ -214,7 +216,9 @@ def make_probes(b, fid, step):
 
 def synthetic(outdir):
     steps = list(range(0, 49, 6))
-    b = Builder(outdir, SYN_DOMAINS)
+    # `synthetic` is the frozen Phase 0 fixture: its files are pinned by sha256 (tests/site/unit/wp10.baseline-hashes.json),
+    # so it keeps the encoding it was committed with (tp6 at 0.1 mm). It has no msl, so the Storms lens never draws it.
+    b = Builder(outdir, SYN_DOMAINS, meta={**FIELD_META, "tp6": ("mm", 0.1, 0)})
 
     def wave(lon, lat, t):
         lo = np.radians(lon)[None, :]
@@ -596,6 +600,23 @@ def fixture_15d(outdir, variant="full"):
     b.write(head, P)
 
 
+def fixture_em_g1only(outdir):
+    """synthetic-15d with the ensemble mean (z500em) on g1 only: the full fixture, then z500em's np05 files and manifest
+    entries removed (W3-09: the mean is resampled across domains). Everything else, probes included, is synthetic-15d's."""
+    fixture_15d(outdir, "full")
+    path = os.path.join(outdir, "manifest.json")
+    with open(path) as fh:
+        m = json.load(fh)
+    f = m["fields"]["z500em"]
+    f["domains"] = [d for d in f["domains"] if d != "np05"]
+    for ch in f["chunks"]:
+        gone = ch["files"].pop("np05", None)
+        if gone:
+            os.remove(os.path.join(outdir, gone["path"]))
+    with open(path, "w") as fh:
+        json.dump(m, fh, indent=1)  # no trailing newline: byte-identical to the committed W3-09 fixture
+
+
 def fixture_recorded_min(outdir):
     steps = list(range(0, 241, 12))
     b = Builder(outdir, D15)
@@ -667,7 +688,7 @@ def fixture_hires(outdir):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("which", choices=["synthetic", "sample-min", "synthetic-15d", "synthetic-15d-nomean",
-                                      "synthetic-partial", "recorded-min", "synthetic-hires-48h"])
+                                      "synthetic-15d-em-g1only", "synthetic-partial", "recorded-min", "synthetic-hires-48h"])
     ap.add_argument("--fixtures", default=os.environ.get("WSE_FIXTURES"))
     ap.add_argument("--out")
     a = ap.parse_args()
@@ -676,6 +697,8 @@ def main():
         synthetic(out)
     elif a.which == "synthetic-15d":
         fixture_15d(out, "full")
+    elif a.which == "synthetic-15d-em-g1only":
+        fixture_em_g1only(out)
     elif a.which == "synthetic-15d-nomean":
         fixture_15d(out, "nomean")
     elif a.which == "synthetic-partial":

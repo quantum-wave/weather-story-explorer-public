@@ -1,0 +1,9 @@
+{
+ "id": "data-2",
+ "file": "site/js/data/index.js",
+ "find": "  const multi = isMultiCase(manifest);",
+ "replace": "  const multi = !!manifest.sample;",
+ "checks": ["unit:wp2.data.test.mjs"],
+ "expect": "killed",
+ "note": "E-B3: treating sample as multi-case. A recorded forecast (sample, no cases) then has no origin (caseOrigin null) and reads cases that are not there."
+}

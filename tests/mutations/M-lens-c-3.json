@@ -1,0 +1,11 @@
+{
+  "id": "lens-c-3",
+  "file": "site/js/lenses/surface.js",
+  "find": "          if (count > maxFraction * nx * ny) return null; // a broad low: no isobar of this size closes round one centre\n",
+  "replace": "",
+  "checks": [
+    "unit:wp15.lenses-c.test.mjs"
+  ],
+  "expect": "killed",
+  "note": "W4-05 review rv-maxfrac: a region larger than 60% of the grid is a broad low, not a centre. The mutant deletes the cap, so a basin of 90% of the grid that does not touch the edge is marked L."
+}

@@ -1,0 +1,11 @@
+{
+ "id": "frame-2",
+ "file": "site/js/ui/fullscreen.js",
+ "find": "  if (entering || exiting) return; // resolved when the change in flight lands\n  if (!rootNative()",
+ "replace": "  if (entering || exiting) { mine = false; return; } // resolved when the change in flight lands\n  if (!rootNative()",
+ "checks": [
+  "S-FRAME"
+ ],
+ "expect": "killed",
+ "note": "Exit while the native request is in flight disowns it (the round-3 race): the request lands with expanded off and is kept, so a double press on Expand (or F F) leaves the page in native fullscreen while expanded is off. Only S-FRAME's nativeRace, with requestFullscreen slowed by 300 ms, presses inside that window (design spec 4.7, E-B5)."
+}

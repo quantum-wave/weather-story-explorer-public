@@ -29,3 +29,25 @@ export function monthYearUTC(iso) { const d = new Date(iso); return d.toLocaleDa
  */
 export const STALE_AFTER_H = 30;
 export const isStale = (ageH) => ageH > STALE_AFTER_H;
+
+/** "1 day", "10 days". */
+export const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+/**
+ * The head line of a live card that is past its normal cycle (DESIGN-SPEC 3.2), in words: stale (26-48 h) "Forecast from
+ * 30 h ago"; very stale (over 48 h) "Old forecast from Tue 17 Nov". Empty for fresh and recorded data. `state` is
+ * data/kind.js staleness(); `m` the manifest ({run}); `now` epoch ms.
+ */
+export function staleHead(m, now, state) {
+  const run = m?.run ? parseRun(m.run).getTime() : NaN;
+  if (!(run === run)) return '';
+  if (state === 'stale') return `Forecast from ${Math.round((now - run) / 3600e3)} h ago`;
+  if (state === 'very-stale') return `Old forecast from ${weekdayDate(new Date(run))}`;
+  return '';
+}
+
+/** Why a range the data cannot fill is disabled: "This recording covers 10 days". `kind`: live | recorded | multi. */
+export function rangeReason(cov, days) {
+  const what = cov.kind === 'recorded' ? 'recording' : cov.kind === 'multi' ? 'sample' : 'forecast';
+  return `This ${what} covers ${plural(days, 'day')}`;
+}

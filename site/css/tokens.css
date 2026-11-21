@@ -1,0 +1,67 @@
+/* tokens.css (W3-04, design spec 10): the chrome colour tokens, both themes, plus type, space and shape.
+   Structure is fixed so tests/site/unit/wp16.tokens.test.mjs can parse it: one light block on bare :root, one dark block
+   under :root[data-theme="dark"], and the same dark block repeated for "Auto" under prefers-color-scheme.
+   Apart from --danger, no chrome token is blue, cyan, orange, red, yellow-green or violet-slate: those belong to lenses. */
+:root {
+  color-scheme: light;
+  --bg: #F4F2EE;
+  --surface: #FFFFFF;
+  --raised: #FFFFFF;
+  --glass: rgba(255, 255, 255, 0.86);
+  --glass-solid: rgba(255, 255, 255, 0.94);
+  --hairline: #DEDAD2;
+  --text: #1A1D21;
+  --text-2: #5A616B;
+  --text-3: #666D77;
+  --accent: #1A1D21;
+  --on-accent: #FFFFFF;
+  --danger: #C62A2F;
+  --scrim: rgba(20, 23, 26, 0.35);
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0E1114;
+  --surface: #161A1F;
+  --raised: #1D2228;
+  --glass: rgba(22, 26, 31, 0.86);
+  --glass-solid: rgba(22, 26, 31, 0.94);
+  --hairline: #2A3038;
+  --text: #ECEEF1;
+  --text-2: #A3ACB7;
+  --text-3: #808A96;
+  --accent: #F4F1EA;
+  --on-accent: #14171A;
+  --danger: #FF6369;
+  --scrim: rgba(0, 0, 0, 0.5);
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0E1114;
+    --surface: #161A1F;
+    --raised: #1D2228;
+    --glass: rgba(22, 26, 31, 0.86);
+    --glass-solid: rgba(22, 26, 31, 0.94);
+    --hairline: #2A3038;
+    --text: #ECEEF1;
+    --text-2: #A3ACB7;
+    --text-3: #808A96;
+    --accent: #F4F1EA;
+    --on-accent: #14171A;
+    --danger: #FF6369;
+    --scrim: rgba(0, 0, 0, 0.5);
+    --shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* Type, space and shape (spec 10.2 and 10.3). Monospace is declared once, for #debug, and used nowhere else. */
+:root {
+  --font-serif: ui-serif, "New York", "Iowan Old Style", Georgia, serif;
+  --font-ui: -apple-system, "SF Pro Text", system-ui, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+  --r-sheet: 14px; --r-card: 10px; --r-input: 8px; --r-chip: 999px;
+  --touch: 44px;
+}

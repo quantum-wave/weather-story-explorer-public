@@ -1,0 +1,11 @@
+{
+  "id": "timeline-2",
+  "file": "site/js/time/scrubber.js",
+  "find": "zoneSpans(hi, { hasMean: !!pattern?.hasMean })",
+  "replace": "zoneSpans(hi, { hasMean: true })",
+  "checks": [
+    "S-TIMELINE"
+  ],
+  "expect": "killed",
+  "note": "DESIGN-SPEC 7.2 (E-A5): the caption says '51 forecasts' on a run that has no ensemble mean. On synthetic-15d-nomean the zones and the words must be the hres-late row; S-TIMELINE asserts boundaries, captions and that no timeline text says '51 forecasts'."
+}

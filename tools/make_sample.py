@@ -42,7 +42,7 @@ if REPO not in sys.path:  # this file is the repo's own code; `python -I` drops 
 
 import numpy as np  # noqa: E402
 
-from pipeline.encode import FIELD_META, NODATA, ManifestWriter, decode_chunk, dequantize  # noqa: E402
+from pipeline.encode import NODATA, ManifestWriter, decode_chunk, dequantize  # noqa: E402
 from pipeline.grids import nearest_index  # noqa: E402
 from pipeline.validate import ValidationError, validate  # noqa: E402
 
@@ -126,7 +126,7 @@ def build(m, frames, out, drop):
         steps = [s for s in f["steps"] if keep_step(s)]
         if not steps:
             continue
-        _, scale, offset = FIELD_META[fid]
+        scale, offset = f["scale"], f["offset"]  # the source's own encoding: a build made before a contract change keeps its values
         grids = {}
         for dom in f["domains"]:
             if dom == "np05" and (no_np05 or fid not in NP05_FIELDS):
@@ -171,6 +171,17 @@ def compare_probes(src, out, points=PROBE_POINTS, n_steps=3):
     ms_, fs = read_source(src)
     mo, fo = read_source_any(out)
     checked = mismatches = 0
+
+    def same(key, a, b):
+        """Equal values: the same int16 when the encodings agree, else equal decoded values (the recording may re-encode
+        a field at a finer contract scale, e.g. tp6 0.1 -> 0.01 mm; every source value is still exactly representable)."""
+        fa, fb = mo["fields"][key[0]], ms_["fields"][key[0]]
+        if (fa["scale"], fa["offset"]) == (fb["scale"], fb["offset"]):
+            return np.array_equal(a, b)
+        da = np.where(a == NODATA, np.nan, a * fa["scale"] + fa["offset"])
+        db = np.where(b == NODATA, np.nan, b * fb["scale"] + fb["offset"])
+        return bool(np.allclose(da, db, rtol=0, atol=min(fa["scale"], fb["scale"]) / 2, equal_nan=True))
+
     for key, frs in fo.items():
         if key not in fs:
             raise SampleError(f"{key} is in the recording but not in the source")
@@ -183,10 +194,10 @@ def compare_probes(src, out, points=PROBE_POINTS, n_steps=3):
                 if ij is None:
                     continue
                 checked += 1
-                if int(frs[step][ij]) != int(fs[key][step][ij]):
+                if not same(key, np.array([frs[step][ij]]), np.array([fs[key][step][ij]])):
                     mismatches += 1
         for step in steps:  # whole frames too: the recording is the source's bytes, only thinned
-            if not np.array_equal(frs[step], fs[key][step]):
+            if not same(key, frs[step], fs[key][step]):
                 raise SampleError(f"{key} step {step} h: decoded frame differs from the source")
     if mismatches:
         raise SampleError(f"{mismatches} of {checked} probe values differ from the source")

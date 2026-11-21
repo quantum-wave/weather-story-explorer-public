@@ -10,7 +10,7 @@ const expectFns = (mod, names) => { for (const n of names) assert.equal(typeof m
 test('contract.js constants', async () => {
   const c = await load('contract.js');
   assert.deepEqual(c.DOMAIN_IDS, ['g1', 'np05']);
-  assert.deepEqual(c.VIEWS, { np: 'np05', nh: 'g1', gl: 'g1' });
+  assert.deepEqual(c.VIEWS, { np: 'np05', nh: 'g1', gl: 'g1', wm: 'g1' });
   assert.deepEqual(c.LAYER_CODES, { z: 'z500a', j: 'ws250', c: 'z500sd', t: 't2a' });
   assert.equal(c.NODATA, -32768);
   assert.equal(c.STORE_KEY, 'wse.v1.store');
@@ -25,14 +25,15 @@ test('state.js store and bus', async () => {
   store._reset();
   const seen = [];
   const off = store.subscribe((s, p) => seen.push(p));
-  store.set({ t: 6, layers: { j: true } });
+  store.set({ t: 6, overlays: { jetline: true } });
   assert.equal(store.get().t, 6);
-  assert.deepEqual(store.get().layers, { z: true, j: true, c: false, t: false });
+  assert.deepEqual(store.get().overlays, { contours: true, marks: true, doubt: true, jetline: true, pins: true, places: true });
   off(); store.set({ t: 12 });
   assert.equal(seen.length, 1);
   let got; const offB = bus.on('pin:focus', (d) => { got = d; }); bus.emit('pin:focus', { pinId: 'p1' }); offB();
   assert.deepEqual(got, { pinId: 'p1' });
-  for (const k of ['view', 'layers', 'case', 't', 'playing', 'speed', 'focus', 'theme', 'sheet', 'sample']) assert.ok(k in store.get(), k);
+  for (const k of ['view', 'overlays', 't', 'playing', 'speed', 'focus', 'theme', 'sheet', 'sample']) assert.ok(k in store.get(), k);
+  for (const k of ['layers', 'case']) assert.ok(!(k in store.get()), `${k} is retired (W4-01)`);
   store._reset();
 });
 
@@ -62,4 +63,23 @@ test('module interfaces (STUBS OK)', async () => {
   expectFns(await load('links.js'), ['formatHash', 'parseHash', 'copyLink']);
   expectFns(await load('share/index.js'), ['shareMeta', 'exportStill', 'exportLoop', 'deliver']);
   console.log('STUBS OK');
+});
+
+test('W3-09: contract lists the new field ids and lens codes; old hashes open as lens plus overlay', async () => {
+  const c = await load('contract.js'), g = await load('share/hashgrammar.js');
+  for (const f of ['z500em', 'pr1', 'pr10', 't2m']) assert.ok(c.FIELD_IDS.includes(f), f);
+  assert.deepEqual(c.LENS_CODES, ['z', 'j', 's', 'a', 'r', 'c']);
+  assert.deepEqual(Object.keys(c.LENS_FILL).sort(), [...c.LENS_CODES].sort());
+  assert.equal(c.LENS_FILL.z, 'z500a'); assert.equal(c.LENS_FILL.j, 'ws250');
+  const old = g.parseHash('#np-zj-2026112212-sf');
+  assert.equal(old.lens, 'z'); assert.equal(old.jetline, true); assert.deepEqual(old.layers, { z: true, j: true, c: false, t: false });
+  const jet = g.parseHash('#np-j-2017090600');
+  assert.equal(jet.lens, 'j'); assert.equal(jet.jetline, false);
+  assert.equal(g.parseHash('#np-t-2026112212').lens, 'a', 'the retired 2 m anomaly layer reads as Air mass');
+  assert.equal(g.parseHash('#np-0-2026112212').lens, null);
+  assert.equal(g.parseHash('#gl-sj-2026112212').lens, 's');
+  assert.equal(g.parseHash('#np-ss-2026112212'), null);
+  assert.equal(g.buildHash({ view: 'np', lens: 'z', jetline: true, layers: {}, validTime: '2026112212', place: 'sf' }), '#np-zj-2026112212-sf');
+  assert.equal(g.buildHash({ view: 'nh', lens: 'j', jetline: true, layers: {}, validTime: '2026112212' }), '#nh-j-2026112212');
+  assert.equal(g.buildHash({ view: 'np', lens: 'r', layers: {}, validTime: '2026112212' }), '#np-r-2026112212');
 });

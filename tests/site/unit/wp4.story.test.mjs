@@ -20,7 +20,7 @@ const shim = (dir, patch) => async (url) => {
   if (patch && url.endsWith('manifest.json')) { const m = patch(JSON.parse(buf.toString())); return { ok: true, status: 200, json: async () => m }; }
   return { ok: true, status: 200, json: async () => JSON.parse(buf.toString()), arrayBuffer: async () => buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) };
 };
-const open = async (name, patch) => { data._reset({ fetch: shim(path.join(fixtures, name), patch) }); store.set({ case: 'A' }); return data.loadManifest(); };
+const open = async (name, patch) => { data._reset({ fetch: shim(path.join(fixtures, name), patch) }); store.set({ lens: 'z' }); return data.loadManifest(); };
 const liveLike = (run) => (m) => { m.sample = false; delete m.cases; delete m.sample_note; for (const f of Object.values(m.fields)) delete f.case; m.run = run; m.generated = run.replace('00:00Z', '09:30Z'); return m; };
 
 // ---------- classifyDay on fixed series ----------
@@ -342,15 +342,15 @@ test('T4 today/tomorrow wording: tonight after 6 pm, full weekdays beyond, dates
 
 // ---------- the active case ----------
 
-test('C1 the story reads the active case: switching the map to case B reads Irma, not case A', async () => {
+test('C1 the story reads the active case: choosing the jet lens (case B) reads Irma, not case A', async () => {
   await open('sample-min');
-  store.set({ case: 'B' });
+  store.set({ lens: 'j' });
   try {
     const d = await S.buildDays(25, -80, 0, 6);
     assert.ok(d.length >= 1);
     assert.ok(d[0].date.startsWith('2017-09'), d[0].date);
     assert.ok(d.every((c) => c.pattern === 'none'), 'case B has no pattern field: the story does not borrow case A');
-  } finally { store.set({ case: 'A' }); }
+  } finally { store.set({ lens: 'z' }); }
 });
 
 test('C2 the story never reads manifest.sample as "has cases"', () => {

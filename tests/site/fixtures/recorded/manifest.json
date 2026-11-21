@@ -235,7 +235,7 @@
   },
   "tp6": {
    "units": "mm",
-   "scale": 0.1,
+   "scale": 0.01,
    "offset": 0,
    "nodata": -32768,
    "filter": "dx-shuffle",
@@ -298,8 +298,8 @@
      "files": {
       "g1": {
        "path": "tp6.g1.a.bin",
-       "bytes": 665462,
-       "sha256": "08b2256250b83e45abc5c204c1b3648deea41290a157a44de0d6be8da6cb7221"
+       "bytes": 695552,
+       "sha256": "b9400d518163723792befcad2e7fc5005363019282a3ee9c0972d3dfe53eef56"
       }
      }
     },
@@ -312,8 +312,8 @@
      "files": {
       "g1": {
        "path": "tp6.g1.b.bin",
-       "bytes": 462246,
-       "sha256": "edf03b94562a3ffd13a1e3a52541eb3c14e4377794fb023eef66b29ca704b3f4"
+       "bytes": 483570,
+       "sha256": "f29b7bf41b452fe651f4700e4b10690f256d9c709ddee8dc8657ac37ec7bb70d"
       }
      }
     },
@@ -326,8 +326,8 @@
      "files": {
       "g1": {
        "path": "tp6.g1.c.bin",
-       "bytes": 324070,
-       "sha256": "25cc274436c7f4ee13efa45cfeee2cf3e321e59c323feabbaa663df77ddaeada"
+       "bytes": 338807,
+       "sha256": "2b42195c1bb304853b4523005a525631212de657cdbf4db1c3e40acdde327917"
       }
      }
     }

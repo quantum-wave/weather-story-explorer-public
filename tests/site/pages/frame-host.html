@@ -1,0 +1,8 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>frame host</title>
+<!-- Test page: the app inside a sandboxed iframe that is smaller than the window and may not go fullscreen, like an artifact host.
+     The artifact frame is cross-origin, where Chrome refuses fullscreen without allowfullscreen; this frame is same-origin so the checks can reach
+     into it, and a permissions policy of fullscreen 'none' gives it the same refusal (document.fullscreenEnabled is false inside). -->
+<body style="margin:0;background:#444">
+<iframe id="app-frame" src="/" sandbox="allow-scripts allow-same-origin" allow="fullscreen 'none'" style="position:absolute;left:40px;top:30px;width:900px;height:600px;border:0"></iframe>

@@ -1,0 +1,11 @@
+{
+ "id": "layers-4",
+ "file": "site/js/ui/layers.js",
+ "find": "const restore = () => { for (const [el, top] of scrollers) if (el.scrollTop !== top) el.scrollTop = top; };",
+ "replace": "const restore = () => {};",
+ "checks": [
+  "S-LAYERS"
+ ],
+ "expect": "killed",
+ "note": "The rebuild no longer keeps the scroll position: on the phone every tap on a row sends the sheet back to the top and the tapped switch leaves the screen. S-LAYERS scrolls the sheet, taps an overlay and a lens, and requires scrollTop within 4 px."
+}

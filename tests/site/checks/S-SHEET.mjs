@@ -35,7 +35,7 @@ const HARNESS = `(() => {
   window.__open = async (o = {}) => {
     const m = await import(new URL('js/ui/sheet.js', document.baseURI).href);
     window.__log = []; window.__dirty = !!o.dirty;
-    const opener = document.getElementById('btn-theme'); opener.focus();
+    const opener = document.getElementById('data-chip'); opener.focus();
     window.__s = m.openSheet({
       title: 'Edit trip', content: window.__mk(o.text, o.extra),
       actions: [{ id: 'remove', label: 'Remove', kind: 'danger', onClick() {} }, { id: 'cancel', label: 'Cancel', onClick: (s) => s.close('cancel') }, { id: 'save', label: 'Save', kind: 'primary', onClick: (s) => s.close('save') }],
@@ -180,7 +180,7 @@ export async function run({ page, baseUrl, assert }) {
   assert.equal(await page.eval(`document.activeElement.dataset.action`), 'save', 'Shift+Tab from the first control goes to the last');
   for (let i = 0; i < 8; i++) { await inp.key(page, null, 'Tab'); assert.ok(await page.eval(`document.querySelector('.wse-sheet').contains(document.activeElement)`), 'focus never leaves the sheet (Tab ' + (i + 1) + ')'); }
   await page.eval(`__s.close('save')`); await gone(page);
-  assert.equal(await page.eval(`document.activeElement && document.activeElement.id`), 'btn-theme', 'focus returns to the opener');
+  assert.equal(await page.eval(`document.activeElement && document.activeElement.id`), 'data-chip', 'focus returns to the opener');
   assert.equal(await page.eval(`document.getElementById('app').inert`), false, 'the page is no longer inert');
   assert.deepEqual(await log(page), ['save']);
 
@@ -209,7 +209,7 @@ export async function run({ page, baseUrl, assert }) {
   await open(page); await sleep(300);
   await inp.key(page, null, 'Escape'); await gone(page);
   assert.deepEqual(await log(page), ['escape'], 'Escape dismisses');
-  assert.equal(await page.eval(`document.activeElement && document.activeElement.id`), 'btn-theme', 'focus returns after Escape');
+  assert.equal(await page.eval(`document.activeElement && document.activeElement.id`), 'data-chip', 'focus returns after Escape');
 
   await open(page); await sleep(300);
   await inp.tap(page, '.wse-sheet-close'); await gone(page);

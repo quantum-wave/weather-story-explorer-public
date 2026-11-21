@@ -56,7 +56,9 @@ export function loadBasemap(base = 'geo/', { onUpgrade } = {}) {
       idle(async () => {
         note('request50');
         const [l, c50, st] = await Promise.all([land50(base), countries50(base), states(base)]);
-        geo = { ...geo, tier: l || c50 || st ? 2 : 1, land: l ? l.feature : geo.land, coast: l ? l.mesh : geo.coast, borders: c50 || geo.borders, states: st };
+        const next = { ...geo, tier: l || c50 || st ? 2 : 1, land: l ? l.feature : geo.land, coast: l ? l.mesh : geo.coast, borders: c50 || geo.borders, states: st };
+        if (next.tier === 2) { try { await warm(next); } catch (e) { console.warn('basemap 50 m warm-up failed', e.message); } }
+        geo = next;
         note('ready50');
         if (onUpgrade) { try { onUpgrade(geo); } catch (e) { console.warn('basemap upgrade handler failed', e.message); } }
         resolve(geo);
@@ -86,18 +88,70 @@ export function setBasemap(g) { geo = g; pathCache.clear(); }
 
 // ---------- one Path2D per view and layer ----------
 const pathCache = new Map();
+// fills take the polygons, strokes take the line meshes (no pole or antimeridian closure, no clip-edge stroke)
+const objOf = (g, kind) => ({ land: g.land, landLow: g.landLow, coast: g.coast, coastLow: g.coastLow, border: g.borders, state: g.states })[kind];
+const keep = (key, p) => { pathCache.set(key, p); if (pathCache.size > 24) pathCache.delete(pathCache.keys().next().value); };
+let recent = null; // the last view whose rest linework was asked for: the one on screen, which the 50 m warm-up builds first
 function pathFor(mv, kind) {
   const tier = kind === 'coastLow' || kind === 'landLow' ? 1 : geo.tier, key = `${mv.key}|${kind}|${tier}`;
+  if (kind !== 'coastLow' && kind !== 'landLow') recent = mv;
   let p = pathCache.get(key);
   if (p) { pathCache.delete(key); pathCache.set(key, p); return p; }
   mv.apply();
   p = new Path2D();
-  // fills take the polygons, strokes take the line meshes (no pole or antimeridian closure, no clip-edge stroke)
-  const obj = { land: geo.land, landLow: geo.landLow, coast: geo.coast, coastLow: geo.coastLow, border: geo.borders, state: geo.states }[kind];
+  const obj = objOf(geo, kind);
   if (obj) d3.geoPath(mv.base.proj, p)(obj);
-  pathCache.set(key, p);
-  if (pathCache.size > 24) pathCache.delete(pathCache.keys().next().value);
+  keep(key, p);
   return p;
+}
+
+// ---------- the 50 m swap, projected in slices ----------
+// Projecting the 50 m land, coast and borders for one view takes about 150 ms of d3 (measured 2026-11-19 in thread CPU time: one
+// ~150 ms long task right after 'ready50', inside the first half second). Done in the swap's redraw, that blocked the main thread
+// while the page was first painted (input, timers and frames all late). So the swap is staged: the 50 m paths of the view on
+// screen are built first, a few polygons at a time in tasks of at most SLICE_MS, into the same Path2D a single call would make (d3
+// streams each polygon and each line on its own, so the pieces add up to the whole); only then do the 50 m files swap in, and the
+// swap's redraw finds its paths cached. A view drawn while the warm-up runs (a pan, another view) is built next, up to three views.
+const SLICE_MS = 8;
+const yieldTask = () => new Promise((r) => setTimeout(r, 0));
+/** The geometry as a list of pieces d3 streams independently: features, then each polygon and each line. */
+function pieces(obj, out = []) {
+  if (!obj) return out;
+  if (obj.type === 'FeatureCollection') for (const f of obj.features) pieces(f, out);
+  else if (obj.type === 'Feature') pieces(obj.geometry, out);
+  else if (obj.type === 'GeometryCollection') for (const g of obj.geometries) pieces(g, out);
+  else if (obj.type === 'MultiPolygon') for (const c of obj.coordinates) out.push({ type: 'Polygon', coordinates: c });
+  else if (obj.type === 'MultiLineString') for (const c of obj.coordinates) out.push({ type: 'LineString', coordinates: c });
+  else out.push(obj);
+  return out;
+}
+/** The projection's state as MapView.apply sets it; restored after each slice, so code in other tasks finds it as it left it. */
+const snap = (proj) => ({ r: proj.rotate ? proj.rotate() : null, s: proj.scale(), t: proj.translate() });
+const restore = (proj, x) => { if (x.r && proj.rotate) proj.rotate(x.r); proj.scale(x.s).translate(x.t); };
+async function slicedPath(mv, obj) {
+  const parts = pieces(obj), p = new Path2D(), proj = mv.base.proj;
+  for (let i = 0; i < parts.length;) {
+    const t0 = performance.now(), was = snap(proj);
+    mv.apply();
+    const path = d3.geoPath(proj, p);
+    try { do path(parts[i++]); while (i < parts.length && performance.now() - t0 < SLICE_MS); } finally { restore(proj, was); }
+    if (i < parts.length) await yieldTask();
+  }
+  return p;
+}
+/** Builds the 50 m paths of the view on screen (and of any view drawn meanwhile) before the swap. */
+async function warm(next) {
+  for (let n = 0; n < 3; n++) {
+    const mv = recent;
+    if (!mv) return;
+    const kinds = ['land', 'coast', 'border', ...(mv.viewId === 'np' && next.states ? ['state'] : [])];
+    for (const kind of kinds) {
+      const key = `${mv.key}|${kind}|2`;
+      if (!pathCache.has(key)) keep(key, await slicedPath(mv, objOf(next, kind)));
+    }
+    note('warm50');
+    if (recent.key === mv.key) return;
+  }
 }
 
 /** The chart ground a legacy theme token set stands for: light themes draw on Paper, dark on Night. */

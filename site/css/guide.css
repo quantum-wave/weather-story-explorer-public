@@ -1,0 +1,91 @@
+/* guide.css (W4-02): the explanation layer (DESIGN-SPEC section 5): the guide and "How sure is this?" inside the shared sheet and on
+   how.html, the readout card at the point you touch, the ridge/trough diagram, and the first-visit coach. Colour roles: ink and
+   muted ink for words, the hairline for rules; orange and blue appear only where they mean a ridge and a trough (the same
+   hues as the chart), never as an action colour. Every text is 12 px or more in the UI face; tokens fall back so how.html works alone. */
+.gd, .rdo, .coach {
+  --g-text: var(--text, #1A1D21); --g-text-2: var(--text-2, #5A616B); --g-rule: var(--hairline, #DEDAD2); --g-surface: var(--surface, #FFFFFF);
+  --g-ridge: #C2501A; --g-ridge-fill: rgba(224, 112, 48, 0.34); --g-trough: #2A62A8; --g-trough-fill: rgba(60, 120, 200, 0.30);
+  font: 400 15px/22px var(--font-ui, -apple-system, system-ui, sans-serif); color: var(--g-text);
+}
+:root[data-theme="dark"] .gd, :root[data-theme="dark"] .rdo, :root[data-theme="dark"] .coach {
+  --g-text: var(--text, #ECEEF1); --g-text-2: var(--text-2, #A3ACB7); --g-rule: var(--hairline, #2A3038); --g-surface: var(--surface, #161A1F);
+  --g-ridge: #F0925A; --g-ridge-fill: rgba(240, 130, 70, 0.38); --g-trough: #6FA8E8; --g-trough-fill: rgba(90, 150, 230, 0.36);
+}
+
+/* ---- the guide: an answer first, then the picture, then the parts ---- */
+.gd { display: flex; flex-direction: column; gap: 4px; max-width: 62ch; }
+.gd p { margin: 0; }
+.gd-p { color: var(--g-text); }
+.gd-answer { font-size: 16px; line-height: 24px; font-weight: 500; letter-spacing: -0.005em; padding-bottom: 4px; }
+.gd-sec { padding-top: 16px; margin-top: 12px; border-top: 1px solid var(--g-rule); display: flex; flex-direction: column; gap: 8px; }
+.gd-h { margin: 0; font: 600 13px/18px var(--font-ui, system-ui, sans-serif); letter-spacing: 0.02em; color: var(--g-text-2); }
+.gd-foryou { font-size: 17px; line-height: 24px; font-weight: 500; }
+.gd-sure { color: var(--g-text); }
+.gd-ladder { color: var(--g-text-2); }
+.gd-fig { margin: 12px 0 0; display: flex; flex-direction: column; gap: 8px; }
+.gd-fig figcaption { font-size: 13px; line-height: 18px; color: var(--g-text-2); }
+.gd-link { align-self: flex-start; min-height: 44px; padding: 0; background: none; border: 0; color: var(--g-text); font: 600 15px/20px var(--font-ui, system-ui, sans-serif); text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; border-radius: 6px; cursor: pointer; }
+.gd-link:focus-visible, .rdo button:focus-visible, .coach button:focus-visible { outline: 2px solid var(--g-text); outline-offset: 2px; }
+.gd-tips { margin-top: 12px; color: var(--g-text-2); }
+.gd-back { margin-bottom: 4px; }
+.gd-dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; font-size: 13px; line-height: 18px; }
+.gd-dl dt { color: var(--g-text-2); font-weight: 600; }
+.gd-dl dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 420px) { .gd-dl { grid-template-columns: 1fr; gap: 0; } .gd-dl dd { margin-bottom: 8px; } }
+
+/* ---- the picture: a side view of the atmosphere, and the spread chart ---- */
+.gd-svg { display: block; width: 100%; max-width: 360px; height: auto; overflow: visible; }
+.gd-t { font: 500 12px var(--font-ui, system-ui, sans-serif); fill: var(--g-text-2); }
+.gd-note { fill: var(--g-text-2); }
+.gd-tick { fill: var(--g-text-2); font-variant-numeric: tabular-nums; }
+.gd-k { font-weight: 700; font-size: 12px; letter-spacing: 0.1em; }
+.gd-k-ridge { fill: var(--g-ridge); } .gd-k-trough { fill: var(--g-trough); }
+.gd-air { fill: var(--g-text); }
+.gd-ridge { fill: var(--g-ridge-fill); } .gd-trough { fill: var(--g-trough-fill); }
+.gd-surface { fill: none; stroke: var(--g-text); stroke-width: 2.25; stroke-linecap: round; }
+.gd-normal { stroke: var(--g-text-2); stroke-width: 1; stroke-dasharray: 3 4; }
+.gd-ground { fill: var(--g-rule); }
+.gd-jet { fill: none; stroke: var(--g-text); stroke-width: 2.5; stroke-linecap: round; }
+.gd-jet-head { fill: var(--g-text); }
+.gd-jet-t { fill: var(--g-text); font-weight: 600; }
+.gd-axis { stroke: var(--g-text-2); stroke-width: 1; }
+.gd-ref { stroke: var(--g-text-2); stroke-width: 1; stroke-dasharray: 4 4; }
+.gd-line { fill: none; stroke: var(--g-text); stroke-width: 2.25; stroke-linejoin: round; stroke-linecap: round; }
+
+/* ---- the readout: one small card at the point, glass over the chart ---- */
+.rdo { position: absolute; left: 0; top: 0; z-index: 9; box-sizing: border-box; width: max-content; min-width: 168px; max-width: min(300px, calc(100vw - 32px)); padding: 10px 12px 10px; background: var(--glass-solid, rgba(22, 26, 31, 0.94)); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border: 1px solid var(--g-rule); border-radius: 12px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28); font-size: 13px; line-height: 18px; pointer-events: auto; outline: none; }
+.rdo[hidden], .rdo-dot[hidden] { display: none; }
+.rdo.rdo-hover, .rdo[data-mode="hover"] { pointer-events: none; }
+.rdo p { margin: 0; }
+.rdo-first { font-size: 15px; line-height: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.rdo-second { margin-top: 2px; font-size: 13px; line-height: 18px; color: var(--g-text-2); }
+.rdo-line { margin-top: 2px; color: var(--g-text-2); font-variant-numeric: tabular-nums; }
+.rdo-first + .rdo-line, .rdo-second + .rdo-line { margin-top: 6px; }
+.rdo-time { color: var(--g-text-2); }
+.rdo-step { font-style: normal; color: var(--g-text-2); }
+.rdo-act { display: flex; align-items: center; gap: 4px; margin: 8px -6px -4px 0; border-top: 1px solid var(--g-rule); padding-top: 4px; }
+.rdo-add { flex: 1 1 auto; min-height: 44px; padding: 0 4px 0 0; text-align: left; background: none; border: 0; color: var(--g-text); font: 600 14px/18px var(--font-ui, system-ui, sans-serif); text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; cursor: pointer; }
+.rdo-x { flex: none; min-width: 44px; min-height: 44px; padding: 0 10px; background: none; border: 0; color: var(--g-text-2); font: 500 14px/18px var(--font-ui, system-ui, sans-serif); cursor: pointer; border-radius: 8px; }
+.rdo-dot { position: absolute; left: 0; top: 0; z-index: 8; width: 0; height: 0; pointer-events: none; }
+.rdo-dot::before { content: ""; position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--g-text); background: var(--g-surface); box-shadow: 0 0 0 1.5px var(--g-surface); }
+.rdo[data-signal="none"] .rdo-first { color: var(--g-text); }
+
+/* ---- the coach: one hint at a time, never over the legend, the timeline or the map tools ---- */
+.coach { position: absolute; left: 0; top: 0; z-index: 7; box-sizing: border-box; width: max-content; max-width: min(260px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 0; padding: 10px 12px 2px; background: var(--g-text); color: var(--g-surface); border-radius: 12px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3); font-size: 14px; line-height: 19px; pointer-events: none; animation: coach-in 220ms ease-out both; }
+.coach[data-still] { animation: none; }
+.coach p { margin: 0; font-weight: 500; }
+.coach-skip { pointer-events: auto; align-self: flex-start; min-height: 44px; margin: 0 0 0 -4px; padding: 0 4px; background: none; border: 0; color: inherit; opacity: 0.78; font: 500 13px/18px var(--font-ui, system-ui, sans-serif); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.coach .coach-skip:focus-visible { outline-color: var(--g-surface); }
+@keyframes coach-in { from { opacity: 0; } to { opacity: 1; } }
+.coach-target { outline: 2px solid var(--g-ridge, #C2501A); outline-offset: 3px; border-radius: 8px; }
+@media (prefers-reduced-motion: reduce) { .coach { animation: none; } }
+
+/* ---- how.html: plain, linkable, one section per lens ---- */
+.how { box-sizing: border-box; max-width: 720px; margin: 0 auto; padding-block: 32px 64px; padding-inline: 16px; }
+.how-h1 { margin: 0 0 8px; font: 600 28px/34px var(--font-ui, system-ui, sans-serif); letter-spacing: -0.01em; }
+.how-lede { margin: 0 0 24px; font-size: 17px; line-height: 25px; color: var(--g-text-2, #5A616B); }
+.how-lens { padding-top: 24px; margin-top: 24px; border-top: 1px solid var(--hairline, #DEDAD2); }
+.how-lens > h2 { margin: 0 0 4px; font: 600 20px/26px var(--font-ui, system-ui, sans-serif); }
+.how-blurb { margin: 0 0 12px; color: var(--text-2, #5A616B); }
+.how-nav { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0 0 8px; padding: 0; list-style: none; }
+.how-nav a, .how-back { color: inherit; display: inline-flex; align-items: center; min-height: 44px; text-underline-offset: 4px; }

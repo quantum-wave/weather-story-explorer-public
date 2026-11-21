@@ -13,7 +13,7 @@
 //    168 h. The passed part of today is greyed; on a phone, ranges 10 and 15 show days 1-7 and one compressed end cell.
 // Columns are tappable rects (.strip-day) with data-day and data-t (the forecast hour to scrub to).
 import { bandRGBA } from '../render/palette.js';
-import { dayNumberLabel, dateLabel, addDays } from './localday.js';
+import { dayNumberLabel, dateLabel, addDays, weekdayShort } from './localday.js';
 import { zones, zoneAt, zoneNote } from './confidence.js';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -98,9 +98,10 @@ export function cubicSegments(xs, ys, m) {
 
 // ---------- column labels: fitted by width ----------
 
-// 12 px UI font. Estimated, not measured (the strip is built before it is in the page): advance widths of the glyphs the
-// labels use, measured once in the system UI font (SF Pro), +2% for other fonts and +6% more for the semibold active label.
-// The browser check in S-STORY measures the real boxes with getBBox.
+// 12 px UI font. The fallback estimate, used only where nothing can be measured (no document, as in the node unit tests):
+// advance widths of the glyphs the labels use, measured once in the system UI font (SF Pro), +2% for other fonts and +6%
+// more for the semibold active label. In a browser the strip measures the real rendered boxes instead (measureLabels),
+// because other platforms' fonts run wider: on GitHub's Linux runner the estimate let "Today ... Sun 22" overlap at 313 px.
 const GLYPH = { 0: 7.56, 1: 5.57, 2: 7.24, 3: 7.52, 4: 7.72, 5: 7.42, 6: 7.64, 7: 7.04, 8: 7.66, 9: 7.64, S: 7.65, u: 7, n: 7, M: 10.49, o: 7.09, T: 7.61, e: 6.86, W: 11.61, d: 7.37, h: 7.06, F: 6.87, r: 4.68, i: 2.97, a: 6.62, t: 4.36, m: 10.44, w: 9.29, D: 8.72, y: 6.52, s: 6.18, '–': 7, ' ': 3.38 };
 const WORD = { Today: 33.8, Tomorrow: 56.3 }; // whole words, kerning included
 const labelWidth = (str, bold) => {
@@ -109,38 +110,172 @@ const labelWidth = (str, bold) => {
   else for (const ch of str) w += GLYPH[ch] ?? (/[A-Z]/.test(ch) ? 8.6 : 7.2);
   return Math.ceil(w * 1.02 * (bold ? 1.06 : 1));
 };
-export const LABEL_GAP = 1;
+/** The clear space always kept between two day labels, in px, whatever the font. */
+export const LABEL_GAP = 4;
+export const MIN_LABEL_GAP = LABEL_GAP;
+// Half an em of the 12 px font is the preferred air: a row tightens from it to LABEL_GAP before a shorter form is used.
+export const PREFERRED_LABEL_GAP = 6;
+// How far a short-form label may be eased off its column's centre to keep the gap (at most a fifth of its column too).
+export const NUDGE = 4;
+const labelStyle = (bold) => `fill:${bold ? 'var(--ink)' : 'var(--ink-2)'};font:${bold ? 600 : 400} 12px var(--font-ui)`;
 
 /**
- * Which day labels to draw and where, so no two boxes meet and none leaves its region [0, regionW]. Each day offers its
- * forms longest first ("Today"; "Tomorrow" then "Fri 20"; "Sat 21"). Labels are thinned (every 2nd, 3rd, ...) only when
- * the shortest forms still collide; Today (the first column) and the active day are always kept, and a label that
- * would touch the active one gives way. A label near an edge slides inward. Returns [{i, text, cx, w}].
+ * A width function (text, bold) => px from real rendered boxes: the texts are drawn, styled exactly as the strip draws
+ * them, inside `host` (an SVG already in the page; by default a hidden probe SVG in document.body) and measured with
+ * getBBox, so the platform's fonts, a fallback font and any letter-spacing are all counted. Returns null when nothing
+ * can be measured (no DOM, or a zero box because the host is not rendered); the caller then uses the estimate.
  */
-export function layoutDayLabels(forms, colW, regionW, active) {
-  const n = forms.length;
-  const place = (i, text) => {
-    const w = labelWidth(text, i === active);
-    return { i, text, w, cx: clamp(colW * (i + 0.5), w / 2, Math.max(w / 2, regionW - w / 2)) };
-  };
-  const clash = (a, b) => Math.min(a.cx + a.w / 2, b.cx + b.w / 2) - Math.max(a.cx - a.w / 2, b.cx - b.w / 2) > -LABEL_GAP;
-  const ok = (L) => L.every((a, k) => k === 0 || !clash(L[k - 1], a));
-  let fallback = [];
-  for (let k = 1; k <= Math.max(1, n); k++) {
-    // per step: long forms, then short forms, then short forms with the labels that would touch the active one dropped
-    for (const [f, yieldToActive] of [[0, false], [1, false], [1, true]]) {
-      const pick = (i) => forms[i][Math.min(f, forms[i].length - 1)];
-      let L = [];
-      for (let i = 0; i < n; i++) if (i % k === 0 || i === active) L.push(place(i, pick(i)));
-      if (yieldToActive && active >= 0 && active < n) {
-        const a = L.find((x) => x.i === active);
-        L = L.filter((x) => x.i === active || !clash(x, a));
-      }
-      if (ok(L)) return L;
-      fallback = L;
+export function measureLabels(texts, host) {
+  if (typeof document === 'undefined' || typeof document.createElementNS !== 'function') return null;
+  let probe = null;
+  try {
+    if (!host) {
+      if (!document.body) return null;
+      probe = el('svg', { class: 'strip strip-probe', 'aria-hidden': 'true', width: 1, height: 1, style: 'position:absolute;left:-9999px;top:0;visibility:hidden' });
+      document.body.appendChild(probe);
+      host = probe;
+    }
+    const g = el('g', { 'aria-hidden': 'true', style: 'visibility:hidden' }, host);
+    const out = new Map();
+    for (const text of new Set(texts)) for (const bold of [false, true]) {
+      const t = el('text', { x: 0, y: 12, class: 'strip-label', style: labelStyle(bold) }, g);
+      t.textContent = text;
+      const w = typeof t.getBBox === 'function' ? t.getBBox().width : 0;
+      if (!(w > 0)) { g.remove(); return null; }
+      out.set(`${bold ? 1 : 0}${text}`, w);
+    }
+    g.remove();
+    return (text, bold) => out.get(`${bold ? 1 : 0}${text}`) ?? labelWidth(text, bold);
+  } catch { return null; } finally { if (probe) probe.remove(); }
+}
+
+/**
+ * Spreads a row of labels ([{cx, w}], left to right) apart so neighbours keep LABEL_GAP, moving each as little as
+ * possible (least squares, by pooling adjacent violators) and never more than `slackFrac` of a column (a fifth by
+ * default) from where it was placed, nor out of [0, regionW]: a label still reads as its own column's. Returns the
+ * moved copy, or null when the row cannot keep the gap that way (the caller then shortens or thins it).
+ */
+export function spreadLabels(L, colW, regionW, slackFrac = 0.2, gap = LABEL_GAP) {
+  const n = L.length;
+  if (n < 2) return L;
+  const need = (k) => (L[k - 1].w + L[k].w) / 2 + gap + 0.02; // + the 0.01 px rounding of each drawn x
+  const S = [0];
+  for (let k = 1; k < n; k++) S.push(S[k - 1] + need(k));
+  // y = x - S must be non-decreasing; pool adjacent violators toward the targets cx - S
+  const blocks = [];
+  for (let k = 0; k < n; k++) {
+    blocks.push({ sum: L[k].cx - S[k], cnt: 1 });
+    while (blocks.length > 1 && blocks.at(-2).sum / blocks.at(-2).cnt > blocks.at(-1).sum / blocks.at(-1).cnt) {
+      const b = blocks.pop(); blocks.at(-1).sum += b.sum; blocks.at(-1).cnt += b.cnt;
     }
   }
-  return fallback.length ? [fallback[0]] : [];
+  const x = [];
+  for (const b of blocks) for (let j = 0; j < b.cnt; j++) x.push(b.sum / b.cnt + S[x.length]);
+  // keep the edges: push in from the left, then from the right
+  const lo = (k) => L[k].w / 2, hi = (k) => regionW - L[k].w / 2;
+  for (let k = 0; k < n; k++) x[k] = Math.max(x[k], lo(k), k ? x[k - 1] + need(k) : -Infinity);
+  for (let k = n - 1; k >= 0; k--) x[k] = Math.min(x[k], hi(k), k + 1 < n ? x[k + 1] - need(k + 1) : Infinity);
+  const slack = colW * slackFrac + 1e-9;
+  for (let k = 0; k < n; k++) {
+    if (x[k] < lo(k) - 1e-9 || x[k] > hi(k) + 1e-9 || Math.abs(x[k] - L[k].cx) > slack) return null;
+    if (k && x[k] - x[k - 1] < need(k) - 1e-9) return null;
+  }
+  return L.map((a, k) => ({ ...a, cx: x[k] }));
+}
+
+/**
+ * Which day labels to draw and where, so no two boxes come within LABEL_GAP of each other and none leaves its region
+ * [0, regionW]. Each day offers its forms longest first, by level ("Today"; "Tomorrow", "Fri 20", "Fri"; "Sat 21",
+ * "Sat 21", "Sat"). The order: level 0 then level 1 with PREFERRED_LABEL_GAP of air, level 1 with LABEL_GAP (a dated
+ * row is kept whenever it fits at all), then level 2 with the active day keeping its level-1 form (dated), then level 2
+ * for every day, then that with the labels that would touch the active one dropped. A day whose forms stop at the date
+ * (no weekday-only form: the caller's choice) stays dated at every level. A label near an edge slides inward, and a row
+ * of short forms that misses the gap by a little is spread apart (spreadLabels, each label at most NUDGE px and a fifth
+ * of its column). Only when that still fails are labels thinned to every 2nd, 3rd, ... day, counted from the active
+ * day so it is always named; Today (the first column) is kept whenever it fits beside them.
+ * `measure(text, bold)` gives each label's width (real boxes in the browser; the glyph estimate by default).
+ * Returns [{i, text, cx, w}].
+ */
+export function layoutDayLabels(forms, colW, regionW, active, measure = labelWidth) {
+  const n = forms.length;
+  const hasActive = active >= 0 && active < n;
+  const place = (i, text) => {
+    const w = measure(text, i === active);
+    return { i, text, w, cx: clamp(colW * (i + 0.5), w / 2, Math.max(w / 2, regionW - w / 2)) };
+  };
+  const clash = (a, b, gap) => Math.min(a.cx + a.w / 2, b.cx + b.w / 2) - Math.max(a.cx - a.w / 2, b.cx - b.w / 2) > -gap + 1e-6;
+  // the long forms ('Tomorrow') only where they fit as placed; the short forms may be spread a little
+  const slack = Math.min(NUDGE / colW, 0.2);
+  const ok = (L, f, gap) => spreadLabels(L, colW, regionW, f === 0 ? 0 : slack, gap);
+  const G = PREFERRED_LABEL_GAP, g = LABEL_GAP;
+  const steps = [[0, G, false], [1, G, false], [1, g, false], [2, G, false], [2, g, false], [3, G, false], [3, g, false], [3, g, true]];
+  let fallback = [];
+  for (let k = 1; k <= Math.max(1, n); k++) {
+    // every k-th day, counted from the active day when there is one (so the rhythm runs through it), with the first
+    // column (Today) added when it fits
+    const on = (i) => (hasActive ? (((i - active) % k) + k) % k === 0 : i % k === 0);
+    const sets = [Array.from({ length: n }, (_, i) => i).filter((i) => on(i) || i === 0)];
+    if (!on(0)) sets.push(sets[0].filter((i) => i !== 0));
+    for (const [f, gap, yieldToActive] of steps) {
+      // at level 2 the active day keeps its dated (level-1) form
+      const pick = (i) => forms[i][Math.min(i === active && f === 2 ? 1 : f, forms[i].length - 1)];
+      for (const set of sets) {
+        let L = set.map((i) => place(i, pick(i)));
+        if (yieldToActive && hasActive) {
+          const a = L.find((x) => x.i === active);
+          L = L.filter((x) => x.i === active || !clash(x, a, gap));
+        }
+        const S = ok(L, f, gap);
+        if (S) return S.map(({ i, text, w, cx }) => ({ i, text, w, cx }));
+        fallback = L;
+      }
+    }
+  }
+  // nothing pairs up (columns narrower than any label): the active day alone, else the first
+  const keep = fallback.find((x) => x.i === active) || fallback[0];
+  return keep ? [{ i: keep.i, text: keep.text, w: keep.w, cx: keep.cx }] : [];
+}
+
+/**
+ * Draws the day labels of a strip from its stored layout inputs, measured in `host` (see measureLabels). With a host that
+ * cannot be measured (the strip sits in a hidden sheet) the labels already drawn are kept; returns whether it drew.
+ */
+function drawDayLabels(svg, host) {
+  const L0 = svg.__dayLabels;
+  if (!L0) return false;
+  const { forms, colW, regionW, act } = L0;
+  const measured = measureLabels(forms.flat(), host);
+  if (!measured && host) return false;
+  const measure = measured || labelWidth;
+  // a refit replaces the old labels in place (same paint order); the first draw appends
+  const old = svg.querySelectorAll ? [...svg.querySelectorAll('text.strip-label:not(.strip-label-end)')] : [];
+  for (const L of layoutDayLabels(forms, colW, regionW, act, measure)) {
+    const t = el('text', { x: r2(L.cx), y: 12, 'text-anchor': 'middle', class: 'strip-label', style: labelStyle(L.i === act) });
+    t.textContent = L.text;
+    if (old.length) svg.insertBefore(t, old[0]); else svg.appendChild(t);
+  }
+  for (const t of old) t.remove();
+  return true;
+}
+
+/**
+ * Re-fits a strip's day labels in place, measured inside the strip itself: the card it sits in may set a font or
+ * letter-spacing the hidden probe did not see, the strip may have been hidden when it was built, and fonts can finish
+ * loading late. Cheap and idempotent; stripSVG schedules it on its own (whenever the strip gets or changes its rendered
+ * box, and when document.fonts is ready). Returns whether it re-fitted (false when detached or not rendered).
+ */
+export function refitStripLabels(svg) {
+  if (!svg?.__dayLabels || !svg.isConnected) return false;
+  return drawDayLabels(svg, svg);
+}
+function scheduleRefit(svg) {
+  try {
+    // fires once the strip is in the page with a box (also when a hidden sheet opens), and on every later size change;
+    // the labels change no box size, so this never loops
+    if (typeof ResizeObserver === 'function') new ResizeObserver(() => refitStripLabels(svg)).observe(svg);
+    else if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(() => refitStripLabels(svg)));
+    document.fonts?.ready?.then(() => refitStripLabels(svg));
+  } catch { /* no observer or font loading API: the probe layout stands */ }
 }
 
 /**
@@ -336,7 +471,7 @@ export function placeNormalLabel({ wave, mid, regionW, yMin = -Infinity, yMax = 
  * @param {object[]} days day classes from buildDays (only days with data)
  * @param {object} series as returned by seriesFor with `windows` set (defaults to days.series)
  * @param {{compact?:boolean, range?:7|10|15, phone?:boolean, expanded?:boolean, width?:number, activeDay?:number,
- *   label?:(c:object)=>string, ground?:'paper'|'night', key?:boolean}} opts
+ *   label?:(c:object)=>string, ground?:'paper'|'night', key?:boolean, weekdayLabels?:boolean}} opts
  */
 export function stripSVG(days, series = days?.series, opts = {}) {
   const width = opts.width || 336;
@@ -377,7 +512,9 @@ export function stripSVG(days, series = days?.series, opts = {}) {
   const pat = el('pattern', { id: hid, width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, defs);
   el('line', { x1: 0, y1: 0, x2: 0, y2: 6, style: 'stroke:var(--hairline);stroke-width:2' }, pat);
 
-  const endW = endCell ? 56 : 0, gap = endCell ? 4 : 0;
+  // the end cell gives up width (56 down to 46 px, still a 44 px target) so days 1-7 keep 44 px columns in a 358 px
+  // phone text column (390 px less the 16 px gutters)
+  const gap = endCell ? 4 : 0, endW = endCell ? clamp(width - 7 * 44 - gap, 46, 56) : 0;
   const mainW = width - endW - gap;
   const colW = mainW / mainN;
   const top = labelH + noteH, mid = top + waveH / 2, px = (waveH / 2 - 4) / 20;
@@ -397,7 +534,16 @@ export function stripSVG(days, series = days?.series, opts = {}) {
     drawWave(svg, defs, { series, days, wins, h0: wins[mainN].startH, h1: wins[n - 1].endH, x0: ex + 3, x1: ex + endW - 3, top: top + waveH * 0.2, wh: waveH * 0.6, ground, px: px * 0.6, mini: true });
   }
   // columns
-  const labelAt = (c) => (c.today ? ['Today'] : cov.todayDate && c.date === addDays(cov.todayDate, 1) ? ['Tomorrow', dayNumberLabel(c.date)] : [dayNumberLabel(c.date)]);
+  // A weekday alone names a day only within one week, and only where a dated row cannot keep MIN_LABEL_GAP: the
+  // weekday-only level is offered on the phone (opts.weekdayLabels, default opts.phone) when at most 7 columns show.
+  // The caller turns it off where every column must show its date (a very stale run, DESIGN-SPEC 3.2); on desktop the
+  // row stays dated and thins instead (3.3).
+  const wk = mainN <= 7 && (typeof opts.weekdayLabels === 'boolean' ? opts.weekdayLabels : !!opts.phone);
+  const labelAt = (c) => {
+    if (c.today) return ['Today'];
+    const d = dayNumberLabel(c.date), short = wk ? [weekdayShort(c.date)] : [];
+    return cov.todayDate && c.date === addDays(cov.todayDate, 1) ? ['Tomorrow', d, ...short] : [d, d, ...short];
+  };
   let broadDone = false, patternDone = false, broadX = null, patternX = null, broadNote = '', patternNote = '', earlier = null;
   for (let i = 0; i < mainN; i++) {
     const c = days[i], w = wins[i], x = i * colW;
@@ -461,11 +607,10 @@ export function stripSVG(days, series = days?.series, opts = {}) {
   // day labels: fitted to the column width, thinned by width, the active day always named, clear of the end cell
   if (!compact) {
     const act = Number.isInteger(opts.activeDay) && opts.activeDay >= 0 && opts.activeDay < mainN ? opts.activeDay : -1;
-    for (const L of layoutDayLabels(days.slice(0, mainN).map(labelAt), colW, mainW, act)) {
-      const on = L.i === act;
-      const t = el('text', { x: r2(L.cx), y: 12, 'text-anchor': 'middle', class: 'strip-label', style: `fill:${on ? 'var(--ink)' : 'var(--ink-2)'};font:${on ? 600 : 400} 12px var(--font-ui)` }, svg);
-      t.textContent = L.text;
-    }
+    // measured now in a hidden probe, and again in place once the strip is in the page (refitStripLabels)
+    svg.__dayLabels = { forms: days.slice(0, mainN).map(labelAt), colW, regionW: mainW, act };
+    drawDayLabels(svg, null);
+    scheduleRefit(svg);
   }
 
   // the "normal" label, drawn last so the passed-hours block never covers it, and placed clear of the curve, the fill and

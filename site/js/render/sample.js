@@ -1,0 +1,426 @@
+// Field sampling and the banded raster (DESIGN-SPEC 4.2, W3-01). Pure: no DOM, no d3; the view comes in as an object with
+// `mesh(domId, dom)` and `_invert([x, y])` (MapView).
+//
+// What it does, in the order the spec gives it:
+//   - bilinear sampling on the field grid, Catmull-Rom bicubic at rest from 3x zoom;
+//   - one band per pixel: the palette's own bands, opacity always 1, so a pixel's colour is the band's hex at every lead time;
+//   - a 1 CSS px hairline in contour ink where a pixel's value crosses a major band edge (every fifth edge: z500a +-10, 20, 30, 40);
+//   - the doubt hatch where the ensemble spread is 6 dam or more (ink at 35%, 7 px pitch, 45 degrees); the pixels between the
+//     lines are untouched;
+//   - the data edge: a coarse global underlay wherever the finer regional field has no data, and a 3 degree smoothstep feather
+//     of the regional field over it (the values blend, so every pixel is still a band colour: nothing is ever half-opaque
+//     unless no field exists at all beneath the edge, and then the edge feathers to the ground).
+// The raster loop interpolates grid coordinates inline from the view's 8 px inverse mesh. It keeps no per-pixel lookup array:
+// its only buffers are the output pixels, two rows of band indices and two column/row counters.
+import { PALETTES, edgeHairline } from './palette.js';
+import { toGrid } from '../data/grid.js';
+import { chartTokens } from './chart-tokens.js';
+
+export const MAX_RASTER_PX = 1.5e6; // the rest raster never has more pixels than this (spec 4.2)
+export const FEATHER_DEG = 3;
+export const BICUBIC_FROM_ZOOM = 3;
+export const SLICE_MS = 12;
+const QUALITY_SCALE = { rest: 1, motion: 0.5, rotate: 0.25 }; // fraction of the rest raster scale (spec 4.2)
+
+/**
+ * The motion raster is bounded in time as well as in size: a playing frame spends at most about MOTION_RASTER_MS on it.
+ * `fit` (one of MOTION_FITS) scales the motion raster's side down from half the rest scale towards a quarter of it, chosen from
+ * the measured cost of this scene's rasters (motionFit). Half the rest scale stays the ceiling (spec 4.2); the quarter-size
+ * 'rotate' raster is the floor.
+ */
+export const MOTION_RASTER_MS = 6;
+export const MOTION_FITS = [1, 0.85, 0.71, 0.6, 0.5];
+
+/**
+ * Raster size for a view of w x h CSS px: min(dpr, 2) raster px per CSS px at rest, capped at 1.5 megapixels in total (above
+ * the cap the scale drops and the canvas scales the raster up); half that while playing or in a gesture (times `fit`, see
+ * MOTION_FITS), a quarter rotating.
+ */
+export function rasterSize(w, h, dpr = 1, quality = 'rest', fit = 1) {
+  let s = Math.min(Math.max(dpr, 1), 2);
+  if (w * h * s * s > MAX_RASTER_PX) s = Math.sqrt(MAX_RASTER_PX / (w * h));
+  s *= QUALITY_SCALE[quality] ?? 1;
+  if (quality === 'motion') s *= fit;
+  return { rw: Math.max(2, Math.round(w * s)), rh: Math.max(2, Math.round(h * s)), scale: s };
+}
+
+/**
+ * The largest MOTION_FITS step whose raster is predicted to take at most `budgetMs`, from the measured cost per raster pixel
+ * (ms) and the pixel count at fit 1. Moving to a larger raster than `current` needs 20% headroom, so the size does not flap
+ * between two steps. Unknown cost (0 or NaN): fit 1.
+ */
+export function motionFit(msPerPx, px1, current = 1, budgetMs = MOTION_RASTER_MS) {
+  if (!(msPerPx > 0) || !(px1 > 0)) return current;
+  for (const f of MOTION_FITS) {
+    const ms = msPerPx * px1 * f * f;
+    if (ms <= (f > current ? 0.8 : 1) * budgetMs) return f;
+  }
+  return MOTION_FITS[MOTION_FITS.length - 1];
+}
+
+/** The quality an old-style caller asks for with `low` and `rasterScale` (0.5 or less of device pixels is the motion raster). */
+export function qualityFrom({ quality, low, rasterScale } = {}) {
+  if (quality === 'rest' || quality === 'motion' || quality === 'rotate') return quality;
+  if (low) return 'rotate';
+  return typeof rasterScale === 'number' && rasterScale <= 0.5 ? 'motion' : 'rest';
+}
+
+// ---------- sampling ----------
+const bad = (v) => v !== v;
+
+export function bilinearAt(vals, nx, ny, gi, gj) {
+  let i0 = gi | 0, j0 = gj | 0;
+  if (i0 > nx - 2) i0 = nx - 2; if (j0 > ny - 2) j0 = ny - 2; if (i0 < 0) i0 = 0; if (j0 < 0) j0 = 0;
+  const x = gi - i0, y = gj - j0, k = j0 * nx + i0;
+  return (vals[k] * (1 - x) + vals[k + 1] * x) * (1 - y) + (vals[k + nx] * (1 - x) + vals[k + nx + 1] * x) * y;
+}
+
+const cr = (p0, p1, p2, p3, t) => 0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (-p0 + 3 * p1 - 3 * p2 + p3) * t * t * t);
+/** Catmull-Rom bicubic (taps clamped at the grid edge); a NaN anywhere in the 4 x 4 block falls back to the bilinear value. */
+export function bicubicAt(vals, nx, ny, gi, gj) {
+  let i1 = gi | 0, j1 = gj | 0;
+  if (i1 > nx - 2) i1 = nx - 2; if (j1 > ny - 2) j1 = ny - 2; if (i1 < 0) i1 = 0; if (j1 < 0) j1 = 0;
+  const tx = gi - i1, ty = gj - j1;
+  const xs = [Math.max(0, i1 - 1), i1, i1 + 1, Math.min(nx - 1, i1 + 2)];
+  const col = [0, 0, 0, 0];
+  for (let r = 0; r < 4; r++) {
+    const row = Math.min(ny - 1, Math.max(0, j1 - 1 + r)) * nx;
+    const a = vals[row + xs[0]], b = vals[row + xs[1]], c = vals[row + xs[2]], d = vals[row + xs[3]];
+    if (bad(a) || bad(b) || bad(c) || bad(d)) return bilinearAt(vals, nx, ny, gi, gj);
+    col[r] = cr(a, b, c, d, tx);
+  }
+  return cr(col[0], col[1], col[2], col[3], ty);
+}
+
+export const smoothstep = (x) => { const t = x <= 0 ? 0 : x >= 1 ? 1 : x; return t * t * (3 - 2 * t); };
+
+/** Feather weight 0..1 of a regional domain at fractional grid coordinates: 0 on its edge, 1 from `deg` degrees inside. */
+export function edgeWeight(dom, gi, gj, deg = FEATHER_DEG) {
+  const dx = Math.abs(dom.dlon), dy = Math.abs(dom.dlat);
+  const d = Math.min(gi * dx, (dom.nx - 1 - gi) * dx, gj * dy, (dom.ny - 1 - gj) * dy);
+  return smoothstep(d / deg);
+}
+
+/** A field on a 2x finer grid (bilinear, NaN where any corner is NaN): for contours of a global grid zoomed past 2x. */
+export function refine2x(vals, dom) {
+  const nx = dom.nx, ny = dom.ny, nx2 = 2 * nx - 1, ny2 = 2 * ny - 1, out = new Float32Array(nx2 * ny2);
+  for (let j = 0; j < ny2; j++) {
+    const j0 = j >> 1, j1 = Math.min(ny - 1, (j + 1) >> 1);
+    for (let i = 0; i < nx2; i++) {
+      const i0 = i >> 1, i1 = Math.min(nx - 1, (i + 1) >> 1);
+      out[j * nx2 + i] = (vals[j0 * nx + i0] + vals[j0 * nx + i1] + vals[j1 * nx + i0] + vals[j1 * nx + i1]) / 4;
+    }
+  }
+  return { vals: out, dom: { ...dom, nx: nx2, ny: ny2, dlon: dom.dlon / 2, dlat: dom.dlat / 2 } };
+}
+
+// ---------- bands ----------
+/**
+ * v -> interval index of palette `id`: the same rule as palette.bandIndex. A value table over the palette's range answers most
+ * values in one read: the range is cut into 4096 cells, and a cell with no edge (and no neutral bound) anywhere in it, closed
+ * and widened by a hair for rounding, has one interval for every value in it. A cell an edge touches, and a value outside the
+ * range, take the exact search. The table is per palette (a few KB), not per pixel.
+ */
+const edgeCache = new Map(), banderCache = new Map();
+const BAND_CELLS = 4096;
+export function makeBander(id) {
+  const hit = banderCache.get(id);
+  if (hit) return hit;
+  const p = PALETTES[id], n = p.edges.length, e = edgeCache.get(id) || (edgeCache.set(id, Float64Array.from(p.edges)), edgeCache.get(id)), [lo, hi] = p.neutral, seq = lo === -Infinity, nI = p.neutralInterval;
+  const exact = (v, hint) => {
+    let a = 0, b = n;
+    // `hint` is the interval of the neighbouring pixel: the interval is unique, so when v is still inside it nothing is searched
+    if (seq || v < lo) { if (hint !== undefined && (hint === 0 || e[hint - 1] <= v) && (hint === n || v < e[hint])) return hint; while (a < b) { const m = (a + b) >> 1; if (e[m] <= v) a = m + 1; else b = m; } return a; } // an edge value goes up
+    if (v <= hi) return nI;
+    if (hint !== undefined && hint !== nI && (hint === 0 || e[hint - 1] < v) && (hint === n || v <= e[hint])) return hint;
+    while (a < b) { const m = (a + b) >> 1; if (e[m] < v) a = m + 1; else b = m; } // above the gap an edge value goes down
+    return a;
+  };
+  const span = (e[n - 1] - e[0]) * 1.1 || 1, v0 = e[0] - span * 0.05, inv = BAND_CELLS / span, hair = span * 1e-9;
+  const marks = [...e, ...[lo, hi].filter(Number.isFinite)];
+  const lut = new Int16Array(BAND_CELLS);
+  for (let k = 0; k < BAND_CELLS; k++) {
+    const a = v0 + k / inv - hair, b = v0 + (k + 1) / inv + hair;
+    lut[k] = marks.some((m) => m >= a && m <= b) ? -1 : exact((a + b) / 2);
+  }
+  const bander = (v, hint) => {
+    const q = (v - v0) * inv;
+    if (q >= 0 && q < BAND_CELLS) { const j = lut[q | 0]; if (j >= 0) return j; }
+    return exact(v, hint);
+  };
+  banderCache.set(id, bander);
+  return bander;
+}
+
+const pack = (r, g, b, a) => ((a << 24) | (b << 16) | (g << 8) | r) >>> 0;
+const hexRGB = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+
+/** One packed RGBA per interval (0 for the unshaded gap), and the hairline ink per interval edge (or null). Cached per palette and ground. */
+const tableCache = new Map();
+export function bandTables(id, ground) {
+  const key = `${id}|${ground}`;
+  let T = tableCache.get(key);
+  if (T) return T;
+  const p = PALETTES[id], rgb = ground === 'night' ? p.rgb.night : p.rgb.paper, nI = p.neutralInterval;
+  const colors = new Uint32Array(p.edges.length + 1), rgbs = [];
+  for (let j = 0; j < colors.length; j++) {
+    if (j === nI) { colors[j] = 0; rgbs.push(null); continue; } // the unshaded interval (the gap, or everything below a sequential palette's first edge)
+    const i = p.neutral[0] === -Infinity ? j - 1 : (j < nI ? j : j - 1), c = rgb[Math.max(0, Math.min(rgb.length - 1, i))];
+    colors[j] = pack(c[0], c[1], c[2], 255); rgbs.push(c);
+  }
+  // sequential palettes: interval 0 is below the first edge (unshaded), the neutral interval is 0 (p.neutralInterval)
+  const major = p.edges.map((e, j) => {
+    const h = edgeHairline(id, ground, e);
+    return h ? { rgb: hexRGB(h.color), a: h.alpha, edge: e, j } : null;
+  });
+  const hasMajor = major.some(Boolean);
+  T = { colors, rgbs, major, hasMajor, nIntervals: colors.length };
+  tableCache.set(key, T);
+  return T;
+}
+
+// ---------- the raster job ----------
+/** The 8 px inverse mesh of a domain from `mv.invert`, for a view that has no `mesh()` (the same shape MapView.mesh returns). */
+export function meshFromInvert(mv, domId, dom, step = 8) {
+  const mw = Math.ceil(mv.W / step), mh = Math.ceil(mv.H / step), n = (mw + 1) * (mh + 1);
+  const mgi = new Float32Array(n), mgj = new Float32Array(n), mok = new Uint8Array(n);
+  for (let r = 0; r <= mh; r++) {
+    for (let c = 0; c <= mw; c++) {
+      const ll = mv.invert([c * step, r * step]), g = ll && toGrid(dom, ll[0], ll[1]);
+      if (g) { const k = r * (mw + 1) + c; mgi[k] = g[0]; mgj[k] = g[1]; mok[k] = 1; }
+    }
+  }
+  return { mgi, mgj, mok, mw, mh, step };
+}
+
+// Scratch buffers a rotating frame reuses (the globe redraws every frame: no allocation there, S-GESTURE).
+const POOL = new Map();
+const pooled = (name, Type, n) => { const k = `${name}|${n}`; let a = POOL.get(k); if (!a) { a = new Type(n); POOL.set(k, a); } return a; };
+
+const kindsOf = (M, pool, slot) => {
+  if (M.kinds && !pool) return M.kinds;
+  const { mgi, mgj, mok, mw, mh } = M, kinds = pool ? pooled(`kinds${slot}`, Uint8Array, mw * mh).fill(0) : new Uint8Array(mw * mh);
+  for (let n = 0; n < mh; n++) {
+    for (let m = 0; m < mw; m++) {
+      const a = n * (mw + 1) + m, b = a + 1, c = a + mw + 1, d = c + 1, ok = mok[a] + mok[b] + mok[c] + mok[d];
+      if (ok === 0) kinds[n * mw + m] = 2; // wholly outside the domain
+      else if (ok === 4) {
+        const lo = Math.min(mgi[a], mgi[b], mgi[c], mgi[d]), hi = Math.max(mgi[a], mgi[b], mgi[c], mgi[d]);
+        const jl = Math.min(mgj[a], mgj[b], mgj[c], mgj[d]), jh = Math.max(mgj[a], mgj[b], mgj[c], mgj[d]);
+        if (hi - lo < 6 && jh - jl < 6) kinds[n * mw + m] = 1; // smooth: interpolate; seams and poles are inverted exactly
+      }
+    }
+  }
+  if (!pool) M.kinds = kinds;
+  return kinds;
+};
+
+// ---------- the per-row fast sampler ----------
+// The common pixel of a raster row: its layer's mesh cell is smooth (kind 1), so its grid coordinates are a linear blend of two
+// per-row node buffers (the layer's two mesh rows around this raster row, blended once per row), and the field is sampled
+// inline. It is the same interpolation as RasterJob._layer (the mesh is bilinear: blending rows first and columns second is the
+// same function), with no per-pixel lookup array. Anything else (a seam or pole cell, a partly covered cell) answers SLOW and the
+// pixel takes the general path.
+const SLOW = Infinity, OUT = -Infinity; // OUT: wholly outside the layer (kind 2)
+
+/** Blend the layer's two mesh rows around screen row y into its row buffers. */
+function prepRow(L, y) {
+  const fy = y * L.invStep; let n = fy | 0; if (n > L.mh - 1) n = L.mh - 1;
+  const v = fy - n, iv = 1 - v, mw = L.mw, gi = L.mgi, gj = L.mgj, ri = L.rowGi, rj = L.rowGj;
+  L.kRow = n * mw;
+  for (let m = 0, a = n * (mw + 1), c = a + mw + 1; m <= mw; m++, a++, c++) { ri[m] = gi[a] * iv + gi[c] * v; rj[m] = gj[a] * iv + gj[c] * v; }
+}
+
+/** The layer's value at screen x on the prepared row; OUT outside it, SLOW when the general path must decide. */
+function rowSample(L, x, cubic) {
+  const fx = x * L.invStep; let m = fx | 0; if (m > L.mw - 1) m = L.mw - 1;
+  const kind = L.kinds[L.kRow + m];
+  if (kind !== 1) return kind === 2 ? OUT : SLOW;
+  const u = fx - m, ri = L.rowGi, rj = L.rowGj, gi = ri[m] + (ri[m + 1] - ri[m]) * u, gj = rj[m] + (rj[m + 1] - rj[m]) * u;
+  L.gi = gi; L.gj = gj;
+  const vals = L.vals, nx = L.nx, ny = L.ny;
+  if (cubic) return bicubicAt(vals, nx, ny, gi, gj);
+  let i0 = gi | 0, j0 = gj | 0;
+  if (i0 > nx - 2) i0 = nx - 2; if (j0 > ny - 2) j0 = ny - 2; if (i0 < 0) i0 = 0; if (j0 < 0) j0 = 0;
+  const tx = gi - i0, ty = gj - j0, k = j0 * nx + i0, k2 = k + nx;
+  return (vals[k] * (1 - tx) + vals[k + 1] * tx) * (1 - ty) + (vals[k2] * (1 - tx) + vals[k2 + 1] * tx) * ty;
+}
+
+/** A layer set's value at screen x on the prepared row (primary, else the first underlay), or SLOW. Never a feathered blend. */
+function fastValue(LS, x, cubic) {
+  const L0 = LS[0], v0 = rowSample(L0, x, cubic);
+  if (v0 === OUT) {
+    if (LS.length < 2) return SLOW;
+    const u = rowSample(LS[1], x, cubic);
+    return u === u && u !== OUT && u !== SLOW ? u : SLOW;
+  }
+  if (v0 !== v0 || v0 === SLOW) return SLOW;
+  if (!L0.feather || (L0.gi >= L0.fx && L0.gi <= L0.fHi && L0.gj >= L0.fy && L0.gj <= L0.gHi)) return v0;
+  return SLOW; // inside the feather: the general path blends
+}
+
+/**
+ * Paints the bands of one field into `u32` (rw x rh), row by row, resumable: `step(budgetMs)` does rows until the budget is
+ * spent (never starting a row it expects to overrun) and returns true when the last row is done; `cancel()` stops it for good.
+ *
+ * spec: {
+ *   mv, W, H, rw, rh, u32,
+ *   layers: [{domId, dom, vals, feather?: bool}, ...]  primary (finest) first; later layers are underlays,
+ *   factor: field units -> palette units (z500a: 0.1, gpm -> dam),
+ *   palette: id, ground: 'paper' | 'night',
+ *   bicubic: bool,
+ *   hairlines: bool,
+ *   doubt: null | {layers: [...same shape], limit: spread in field units at which the hatch starts (60 gpm = 6 dam)},
+ * }
+ */
+export class RasterJob {
+  constructor(spec) {
+    const { mv, W, H, rw, rh, palette, ground } = spec;
+    Object.assign(this, spec);
+    this.y = 0; this.cancelled = false; this.doneAll = false; this.rowMs = 0.05;
+    this.sx = W / rw; this.sy = H / rh; this.scale = rw / W;
+    this.bander = makeBander(palette);
+    this.T = bandTables(palette, ground);
+    const tk = chartTokens(ground), hx = hexRGB(tk.hatch.color);
+    this.hatchInk = { r: hx[0], g: hx[1], b: hx[2], rgb: hx, solo: pack(hx[0], hx[1], hx[2], Math.round(tk.hatch.alpha * 255)), a: tk.hatch.alpha, pitch: tk.hatch.pitch, width: tk.hatch.width };
+    const prep = (L, slot) => { const M = mv.mesh?.(L.domId, L.dom) ?? meshFromInvert(mv, L.domId, L.dom); return { M, kinds: kindsOf(M, spec.pool, slot), mgi: M.mgi, mgj: M.mgj, mw: M.mw, mh: M.mh, step: M.step, invStep: 1 / M.step, kRow: 0, gi: 0, gj: 0, fHi: L.dom.nx - 1 - FEATHER_DEG / Math.abs(L.dom.dlon), gHi: L.dom.ny - 1 - FEATHER_DEG / Math.abs(L.dom.dlat), rowGi: new Float64Array(M.mw + 1), rowGj: new Float64Array(M.mw + 1), dom: L.dom, nx: L.dom.nx, ny: L.dom.ny, vals: L.vals, feather: !!L.feather, fx: FEATHER_DEG / Math.abs(L.dom.dlon), fy: FEATHER_DEG / Math.abs(L.dom.dlat) }; };
+    this.LS = spec.layers.map((L, i) => prep(L, `L${i}`));
+    this.DS = spec.doubt ? spec.doubt.layers.map((L, i) => prep(L, `D${i}`)) : null;
+    const take = (name, Type, n) => (spec.pool ? pooled(name, Type, n) : new Type(n));
+    this.ivPrev = take('ivA', Uint8Array, rw).fill(255); this.ivCur = take('ivB', Uint8Array, rw);
+    this.runV = take('run', Uint8Array, rw).fill(0);
+    this.vInk = spec.pool ? (POOL.get(`vInk|${rw}`) || (POOL.set(`vInk|${rw}`, new Array(rw)), POOL.get(`vInk|${rw}`))).fill(null) : new Array(rw).fill(null);
+    this.wLine = Math.max(1, Math.round(this.scale * 1)); // hairline width in raster px: 1 CSS px
+    this.gi = 0; this.gj = 0; this.fa = 1;
+    this.stats = { rows: 0, maxRowMs: 0, slices: 0, maxSliceMs: 0, ms: 0 };
+  }
+
+  /** The value of one layer at screen point (x, y), or NaN outside it or where it has no data. Leaves the grid coordinates in this.gi, this.gj. */
+  _layer(L, x, y, cubic) {
+    const STEP = L.step, mw = L.mw, mh = L.mh, fx = x / STEP, fy = y / STEP;
+    let m = fx | 0, n = fy | 0;
+    if (m > mw - 1) m = mw - 1; if (n > mh - 1) n = mh - 1;
+    const kind = L.kinds[n * mw + m];
+    if (kind === 2) return NaN;
+    let gi, gj;
+    if (kind === 1) {
+      const u = fx - m, v = fy - n, a = n * (mw + 1) + m, c = a + mw + 1, mgi = L.mgi, mgj = L.mgj, iu = 1 - u, iv = 1 - v;
+      gi = (mgi[a] * iu + mgi[a + 1] * u) * iv + (mgi[c] * iu + mgi[c + 1] * u) * v;
+      gj = (mgj[a] * iu + mgj[a + 1] * u) * iv + (mgj[c] * iu + mgj[c + 1] * u) * v;
+    } else {
+      const ll = (this.mv._invert ? this.mv._invert([x, y]) : this.mv.invert([x, y])), g = ll && toGrid(L.dom, ll[0], ll[1]);
+      if (!g) return NaN;
+      gi = g[0]; gj = g[1];
+    }
+    this.gi = gi; this.gj = gj;
+    return cubic ? bicubicAt(L.vals, L.nx, L.ny, gi, gj) : bilinearAt(L.vals, L.nx, L.ny, gi, gj);
+  }
+
+  /** The field at screen point (x, y): the primary layer feathered over the underlay; NaN where no layer has data. this.fa < 1 only with nothing beneath the edge. */
+  _value(LS, x, y, cubic) {
+    this.fa = 1;
+    const n = LS.length, L0 = LS[0];
+    const v0 = this._layer(L0, x, y, cubic);
+    if (v0 === v0) {
+      if (!L0.feather) return v0;
+      const gi = this.gi, gj = this.gj;
+      if (gi >= L0.fx && gi <= L0.nx - 1 - L0.fx && gj >= L0.fy && gj <= L0.ny - 1 - L0.fy) return v0; // deeper than the feather: weight 1
+      const w = edgeWeight(L0.dom, gi, gj);
+      if (w >= 1) return v0;
+      if (n === 1) { this.fa = w; return v0; } // nothing beneath: fade to the ground
+      const u = this._under(LS, x, y, cubic);
+      return u === u ? u + (v0 - u) * w : v0;
+    }
+    return n > 1 ? this._under(LS, x, y, cubic) : NaN;
+  }
+
+  _under(LS, x, y, cubic) { // the first underlay that has data at the point
+    for (let li = 1; li < LS.length; li++) { const v = this._layer(LS[li], x, y, cubic); if (v === v) return v; }
+    return NaN;
+  }
+
+  /** Do up to `budgetMs` of rows. Returns true when the raster is complete. */
+  step(budgetMs = SLICE_MS) {
+    if (this.cancelled) return false;
+    if (this.doneAll) return true;
+    this.mv.apply?.();
+    const t0 = performance.now(), rh = this.rh;
+    this.stats.slices++;
+    let rowsDone = 0;
+    while (this.y < rh) {
+      const rt = performance.now();
+      if (rowsDone > 0 && rt - t0 + this.rowMs > budgetMs) break; // a slice always does at least one row, never starts one it expects to overrun
+      this._row(this.y);
+      this.y++; this.stats.rows++; rowsDone++;
+      const dt = performance.now() - rt;
+      this.rowMs = Math.max(dt, this.rowMs * 0.9);
+      if (dt > this.stats.maxRowMs) this.stats.maxRowMs = dt;
+    }
+    const sl = performance.now() - t0;
+    this.stats.ms += sl;
+    if (sl > this.stats.maxSliceMs) this.stats.maxSliceMs = sl;
+    this.doneAll = this.y >= rh;
+    return this.doneAll;
+  }
+
+  /**
+   * Paint raster row py. A method of its own (not the body of step's loop) so the engine optimises it as an ordinary hot
+   * function with full type feedback, rather than by on-stack replacement inside a long first call.
+   */
+  _row(py) {
+    const { rw, u32, factor, T, bander, hairlines, bicubic, LS, DS, sx, runV, vInk } = this;
+    const hatchOn = DS !== null, limit = hatchOn ? this.doubt.limit : 0, hk = this.hatchInk, period = hk.pitch * Math.SQRT2, line = hk.width * Math.SQRT2;
+    const major = T.major, anyMajor = hairlines && T.hasMajor, colors = T.colors, wl = this.wLine;
+    const y = (py + 0.5) * this.sy, iv = this.ivCur, prev = this.ivPrev, base = py * rw;
+    let runH = 0, hInk = null, pj = undefined;
+    for (let li = 0; li < LS.length; li++) prepRow(LS[li], y);
+    if (hatchOn) for (let li = 0; li < DS.length; li++) prepRow(DS[li], y);
+    // hatch phase along the row: ((px + 0.5) + (py + 0.5)) / scale modulo the period, advanced by 1 / scale a pixel
+    const invScale = 1 / this.scale; let ph = hatchOn ? (((0.5 + py + 0.5) * invScale) % period + period) % period : 0;
+    for (let px = 0; px < rw; px++, ph += invScale) {
+      if (ph >= period) ph -= period * Math.floor(ph / period);
+      const x = (px + 0.5) * sx;
+      let v = fastValue(LS, x, bicubic), a = 1;
+      if (v === SLOW) { v = this._value(LS, x, y, bicubic); a = this.fa; }
+      if (v !== v) { u32[base + px] = 0; iv[px] = 255; runH = 0; runV[px] = 0; continue; }
+      const j = bander(v * factor, pj); pj = j;
+      iv[px] = j;
+      let col = colors[j];
+      // hairline on a major edge crossed between this pixel and its left or upper neighbour; it runs `wl` raster px on
+      let ink = null;
+      if (anyMajor) {
+        let cross = null;
+        const l = px ? iv[px - 1] : 255, u = py ? prev[px] : 255;
+        if (l !== 255 && l !== j) cross = firstMajor(major, l, j);
+        if (!cross && u !== 255 && u !== j) cross = firstMajor(major, u, j);
+        if (cross) { ink = cross; runH = wl - 1; hInk = cross; runV[px] = wl - 1; vInk[px] = cross; }
+        else if (runH > 0) { ink = hInk; runH--; }
+        else if (runV[px] > 0) { ink = vInk[px]; runV[px]--; }
+      }
+      if (ink) col = mixInk(col, ink.rgb, ink.a);
+      if (hatchOn && ph < line) { // on a hatch line: is the spread here 6 dam or more?
+        let sd = fastValue(DS, x, false);
+        if (sd === SLOW) sd = this._value(DS, x, y, false);
+        if (sd === sd && sd >= limit) col = col === 0 ? hk.solo : mixInk(col, hk.rgb, hk.a);
+      }
+      if (a < 1 && col !== 0) col = (col & 0x00ffffff) | (Math.round(((col >>> 24) * a)) << 24);
+      u32[base + px] = col >>> 0;
+    }
+    this.ivCur = prev; this.ivPrev = iv; // the row just done becomes "previous"
+  }
+
+  cancel() { this.cancelled = true; }
+}
+
+function firstMajor(major, a, b) {
+  const lo = a < b ? a : b, hi = a < b ? b : a;
+  for (let e = lo; e < hi; e++) if (major[e]) return major[e];
+  return null;
+}
+
+/** Blend ink (rgb, alpha) over a packed pixel. A pixel with no colour (the unshaded gap) becomes the ink at its alpha. */
+function mixInk(col, rgb, a) {
+  if (col === 0) return pack(rgb[0], rgb[1], rgb[2], Math.round(a * 255));
+  const r = col & 255, g = (col >>> 8) & 255, b = (col >>> 16) & 255, al = col >>> 24;
+  return pack(Math.round(r + (rgb[0] - r) * a), Math.round(g + (rgb[1] - g) * a), Math.round(b + (rgb[2] - b) * a), al);
+}

@@ -1,0 +1,11 @@
+{
+  "id": "field-2",
+  "file": "site/js/render/compose.js",
+  "find": "ctx.globalAlpha = alpha; ctx.imageSmoothingEnabled = true;",
+  "replace": "ctx.globalAlpha = alpha * (1 - Math.min(0.5, Math.max(0, spreadAt(s.t)) / 200)); ctx.imageSmoothingEnabled = true;",
+  "checks": [
+    "S-COLOR"
+  ],
+  "expect": "killed",
+  "note": "DESIGN-SPEC 4.2 'opacity is always 1.0' and Top 3 / B1: the old confidence fade made a colour mean different numbers at different lead times. Fading the field by the ensemble spread must fail S-COLOR's +11 dam probe (the same hex at 0 h and 300 h) and its exact-hex probes."
+}

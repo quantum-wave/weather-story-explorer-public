@@ -6,7 +6,7 @@ import { pins as defaultPins } from './index.js';
 import * as gaz from './gazetteer.js';
 import { addedToast } from './toast.js';
 
-const HOLD_MS = 550, SLOP = 8, TAP_MS = 350;
+export const HOLD_MS = 550, SLOP = 6, TAP_MS = 350; // 6 px: a hold that moves further is a pan or a pinch, never an add
 
 /**
  * @param {HTMLCanvasElement} canvas

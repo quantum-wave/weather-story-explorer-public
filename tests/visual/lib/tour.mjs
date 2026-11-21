@@ -102,12 +102,15 @@ export async function runTour(opts = {}) {
       for (const vpName of stop.viewports.filter((v) => !opts.viewports || opts.viewports.includes(v))) {
         const vp = VIEWPORTS[vpName];
         if (!vp) throw new Error(`stop ${stop.id}: unknown viewport ${vpName}`);
+        browser.baseUrl = baseUrl; // the page may load only its own stop's server (page.mjs blocks other origins)
         const page = await browser.newPage(); // its own browser context: clean storage per stop and size
+        page.baseUrl = baseUrl; // a stop that names another fixture (W4-05: synthetic-15d) is served by its own server; the page may talk to that one
         const snaps = [];
         const snap = async (name) => {
           const { png, stable } = await settle(page);
           const key = safe(name ? `${stop.id}--${name}` : stop.id) + `--${vpName}`;
-          const lay = await runLayoutAssertions(page, { phone: vpName === 'phone', allowOverlap: stop.allowOverlap || [], scrollers: stop.scrollers || [] });
+          const lay = await runLayoutAssertions(page, { phone: vpName === 'phone', allowOverlap: stop.allowOverlap || [], allowTarget: stop.allowTarget || [], scrollers: stop.scrollers || [] });
+          for (const o of lay.allowedTargets || []) console.log(`  [5 target, allowed by ${stop.id}] ${describeOffender(o)}`);
           const newPath = path.join(outDir, 'new', key + '.png');
           fs.writeFileSync(newPath, png);
           const frame = { stop: stop.id, owner: stop.owner, gate: stop.gate, mvpFails: stop.mvpFails || [], mvpReason: stop.mvpReason || '', viewport: vpName, name: name || '', key, newPath, stable, layout: lay, referenceFile: null, baseline: null, diff: null, error: null };
@@ -132,7 +135,7 @@ export async function runTour(opts = {}) {
           const inp = boundInput(page, vpName === 'phone');
           if (stop.theme) {
             const cur = await page.eval(`document.documentElement.dataset.theme || ''`);
-            if (cur !== stop.theme) await inp.activate('#btn-theme');
+            if (cur !== stop.theme) { await inp.activate(vpName === 'phone' ? '#btn-more' : '#btn-display'); await inp.activate(`#display-menu [data-group="theme"] button[data-value="${stop.theme}"]`); await inp.key(null, 'Escape'); }
           }
           await stop.run(page, inp, { snap, viewport: vpName, baseUrl });
           await snap('');

@@ -1,0 +1,11 @@
+{
+  "id": "explain-7",
+  "file": "site/js/lenses/pattern.js",
+  "find": "in winter, valleys can stay cold and foggy under one. ",
+  "replace": "",
+  "checks": [
+    "S-EXPLAIN"
+  ],
+  "expect": "killed",
+  "note": "W4-02 acceptance 1: the Read it text is DESIGN-SPEC 5.2 item 3 word for word, with the winter-valley correctness clause (MET-13). S-EXPLAIN compares the shown text with the spec text, not with the descriptor."
+}

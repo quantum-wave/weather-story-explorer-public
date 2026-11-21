@@ -1,0 +1,12 @@
+{
+  "id": "lens-c-7",
+  "file": "site/js/lenses/surface.js",
+  "find": "const { minDepthPa, minAreaKm2, minSepKm, minLat } = { ...CENTRE_RULES, ...opts };",
+  "replace": "const { minDepthPa, minAreaKm2, minSepKm, minLat } = { ...CENTRE_RULES, minDepthPa: 1, minAreaKm2: 0, minSepKm: 0, minLat: 0, ...opts };",
+  "checks": [
+    "unit:wp15.lenses-c.test.mjs",
+    "S-LENS-C"
+  ],
+  "expect": "killed",
+  "note": "W4-05 review round 1 (2026-11-19): the significance filter. The mutant keeps only the old rule (any closed region under the next isobar): no 4 hPa depth, no minimum area, no spacing between marks of a kind, no tropics cut. On the recorded ECMWF run the Hemisphere then draws about 44 marks and the Regional view 18, with H and L overwriting other marks' values; S-LENS-C's recorded section (bounded count, boxes 4 px apart) must fail. The synthetic fixture has three to six tidy centres and cannot see it."
+}

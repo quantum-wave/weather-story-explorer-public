@@ -3,8 +3,8 @@
 // play()/pause() write it, and the loop follows it, so any module may set it directly.
 import { store, bus } from '../state.js';
 import * as data from '../data/index.js';
-import { FIELD_IDS, VIEWS, LAYER_CODES } from '../contract.js';
-import { advance, clamp, easeInOutCubic, nextStep, spanOf, unionSteps } from './model.js';
+import { VIEWS } from '../contract.js';
+import { advance, clamp, easeInOutCubic, nearestStep, nextStep, spanOf, unionSteps } from './model.js';
 
 const env = {
   now: () => (typeof performance !== 'undefined' ? performance.now() : Date.now()),
@@ -24,15 +24,23 @@ let tween = null; // {from, to, start, ms, resolve}
 let speedChosen = false;
 const frameHooks = new Set();
 
-function caseFields() {
-  const c = store.get().case;
-  const inCase = FIELD_IDS.filter((f) => { try { return env.src.caseOf(f)?.id === c; } catch { return false; } });
-  return inCase.length ? inCase : ['z500a', 'z500'];
-}
+// The fields each lens animates (DESIGN-SPEC 6.1; codes as store.lens): the clock loops over the steps of the active
+// lens's fields, so a lens whose field stops at day 7 does not play 8 empty days.
+export const LENS_FIELDS = Object.freeze({ z: ['z500a', 'z500'], j: ['ws250'], s: ['tp6', 'msl'], a: ['t850a'], r: ['ivt'], c: ['z500sd'] });
+
+/** The fields a state animates: its lens' own (Pattern when it has none, or one the table lacks). */
+const fieldsOf = (s) => LENS_FIELDS[s.lens] || LENS_FIELDS.z;
+function stepsOf(fields) { return fields.map((f) => { try { return env.src.fieldSteps(f) || []; } catch { return []; } }); }
 function compute() {
-  const arrays = caseFields().map((f) => { try { return env.src.fieldSteps(f) || []; } catch { return []; } });
+  const s = store.get();
+  let arrays = stepsOf(fieldsOf(s));
+  if (!arrays.some((a) => a.length)) arrays = stepsOf(LENS_FIELDS.z); // a lens this run does not carry: the pattern's steps
   const sp = spanOf(arrays) || [0, 0];
-  return { key: store.get().case, steps: unionSteps(arrays), lo: sp[0], hi: sp[1] };
+  let lo = sp[0], hi = sp[1];
+  // The chosen range (store.range, 7 | 10 | 15 days) sets the loop range; absent, the whole run loops.
+  if (Number.isFinite(s.range) && hi - lo > s.range * 24) hi = Math.min(hi, lo + s.range * 24);
+  const steps = unionSteps(arrays).filter((t) => t >= lo - 1e-9 && t <= hi + 1e-9);
+  return { key: `${s.lens || ''}|${s.range || ''}`, steps, lo, hi };
 }
 function info() { return cache || (cache = compute()); }
 
@@ -54,6 +62,8 @@ export function range() { const { lo, hi } = info(); return [lo, hi]; }
 export function steps() { return info().steps.slice(); }
 /** Speed choices for the active range (forecast hours per second). */
 export function speeds() { const [lo, hi] = range(); return hi - lo <= SHORT_SPAN_H ? [1.5, 3, 6] : [6, 12, 24]; }
+/** The named speed menu: Slow, Normal, Fast with the forecast hours per second each stands for (UX-31). */
+export function speedChoices() { const names = ['Slow', 'Normal', 'Fast']; return speeds().map((value, i) => ({ name: names[i], value })); }
 export function reducedMotion() { return env.reduced(); }
 export function isRunning() { return rafId !== 0; }
 /** Register fn(intervalMs, workMs) called once per loop frame (debug readout). Returns remove. */
@@ -73,7 +83,7 @@ function prefetch(t) {
   const s = store.get();
   const domain = VIEWS[s.view] || 'np05';
   const fields = new Set(['z500a', 'z500']);
-  for (const [code, on] of Object.entries(s.layers)) if (on && LAYER_CODES[code]) fields.add(LAYER_CODES[code]);
+  for (const f of fieldsOf(s)) fields.add(f);
   const { hi } = info();
   for (const f of fields) {
     try { Promise.resolve(env.src.ensure(f, domain, Math.min(hi, t + 36))).catch(() => {}); } catch { /* no data module yet */ }
@@ -139,6 +149,19 @@ export function step(dir) {
   return tweenTo(to, 180);
 }
 
+/** Move one model day (24 h) to the nearest step; clamps at the ends. Pauses playback. */
+export function stepDay(dir) {
+  const { steps: st, lo, hi } = info();
+  const to = nearestStepTo(st, clamp(store.get().t + 24 * dir, lo, hi));
+  return tweenTo(to, 300);
+}
+/** A release eases to the nearest model step (REF-37). Resolves when settled. */
+export function easeToStep(ms = 220) {
+  const { steps: st } = info();
+  return tweenTo(nearestStepTo(st, store.get().t), ms);
+}
+function nearestStepTo(st, t) { return st.length ? nearestStep(st, t) : t; }
+
 export function setSpeed(h) { speedChosen = true; store.set({ speed: h }); }
 
 /** The opening loop (SPEC section 2): play now, pause on first touch; stays paused under reduced motion. */
@@ -156,7 +179,7 @@ export function openingPlay() {
 // Wiring
 store.subscribe((s, patch) => {
   if ('playing' in patch) { if (s.playing) { cancelTween(false); ensureLoop(); } else if (!tween) stopLoop(); }
-  if ('case' in patch) refresh();
+  if ('lens' in patch || 'range' in patch) refresh();
 });
 bus.on('data:manifest', () => refresh());
 if (typeof document !== 'undefined') {

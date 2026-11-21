@@ -1,4 +1,4 @@
-// Debug readout (SPEC section 4): `#debug` in the hash, or five taps on #run-label, shows frame p95 and JS heap
+// Debug readout (SPEC section 4): `#debug` in the hash, or five taps on #data-chip, shows frame p95 and JS heap
 // so a real phone can report them. Keeps window.__wse.frameTimes (loop frame intervals in ms, last 600).
 import { onFrame } from './clock.js';
 import { percentile } from './model.js';
@@ -42,7 +42,7 @@ export function installDebug() {
 
   let taps = [];
   const onTap = (e) => {
-    if (!e.target.closest || !e.target.closest('#run-label')) return;
+    if (!e.target.closest || !e.target.closest('#data-chip')) return;
     const now = Date.now();
     taps = taps.filter((t) => now - t < 3000); taps.push(now);
     if (taps.length >= 5) { taps = []; show(el.hidden); }

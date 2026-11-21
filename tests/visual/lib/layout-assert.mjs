@@ -15,7 +15,9 @@ export const ASSERTIONS = { 1: 'overlap', 2: 'hscroll', 3: 'textsize', 4: 'clipp
 export const MIN_TEXT_PX = 12;
 export const MIN_TARGET_PX = 44;
 
-/** Runs in the page. opts: { phone, allowOverlap: [[selA, selB]], scrollers: [sel], root?: sel, minText, minTarget }. */
+/** Runs in the page. opts: { phone, allowOverlap: [[selA, selB]], allowTarget: [sel], scrollers: [sel], root?: sel, minText, minTarget }.
+ *  allowTarget lists controls whose small size is a documented design decision (each stop says why); they are not offenders but
+ *  are returned in `allowedTargets` with their measured size, so the exception stays visible in the report. */
 export function collect(opts) {
   const MIN_OVERLAP = 1; // px a box must intrude on another, on both axes, to count
   const vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
@@ -110,7 +112,7 @@ export function collect(opts) {
     const cs = getComputedStyle(el);
     items.push({ kind: 'text', el, node: n, own: rectOf(r), vis, hidden: !vis, text: n.nodeValue.trim().replace(/\s+/g, ' ').slice(0, 40), fontSize: Math.round(parseFloat(cs.fontSize) * renderScale(el) * 100) / 100 }); // the rendered size, not the computed one
   }
-  const out = [];
+  const out = [], allowedTargets = [];
   const desc = (it) => ({ sel: sel(it.el), kind: it.kind, text: it.text, box: [it.own.x, it.own.y, it.own.w, it.own.h].map((v) => Math.round(v * 10) / 10) });
   const matches = (el, s) => { try { return el.matches(s) || !!el.closest(s); } catch { return false; } };
   const allowed = (a, b) => (opts.allowOverlap || []).some(([p, q]) => (matches(a.el, p) && matches(b.el, q)) || (matches(a.el, q) && matches(b.el, p)));
@@ -169,15 +171,18 @@ export function collect(opts) {
     for (const it of items) {
       if (it.kind !== 'control') continue;
       const m = opts.minTarget ?? 44;
-      if (it.own.w < m - 0.5 || it.own.h < m - 0.5) out.push({ assertion: 5, name: 'target', a: desc(it), detail: `${Math.round(it.own.w * 10) / 10} x ${Math.round(it.own.h * 10) / 10} px, needs ${m} x ${m}` });
+      if (it.own.w < m - 0.5 || it.own.h < m - 0.5) {
+        const o = { assertion: 5, name: 'target', a: desc(it), detail: `${Math.round(it.own.w * 10) / 10} x ${Math.round(it.own.h * 10) / 10} px, needs ${m} x ${m}` };
+        if ((opts.allowTarget || []).some((q) => matches(it.el, q))) allowedTargets.push(o); else out.push(o);
+      }
     }
   }
-  return { offenders: out, scopedTo, counts: { text: items.filter((i) => i.kind === 'text').length, controls: items.filter((i) => i.kind === 'control').length, onScreen: shown.length } };
+  return { offenders: out, allowedTargets, scopedTo, counts: { text: items.filter((i) => i.kind === 'text').length, controls: items.filter((i) => i.kind === 'control').length, onScreen: shown.length } };
 }
 
 /** Run the assertions in `page`. Returns { offenders, counts, failing: [assertion numbers present] }. */
-export async function runLayoutAssertions(page, { phone, allowOverlap = [], scrollers = [], root } = {}) {
-  const r = await page.eval(`(${collect.toString()})(${JSON.stringify({ phone: !!phone, allowOverlap, scrollers, root })})`);
+export async function runLayoutAssertions(page, { phone, allowOverlap = [], allowTarget = [], scrollers = [], root } = {}) {
+  const r = await page.eval(`(${collect.toString()})(${JSON.stringify({ phone: !!phone, allowOverlap, allowTarget, scrollers, root })})`);
   r.failing = [...new Set(r.offenders.map((o) => o.assertion))].sort();
   return r;
 }

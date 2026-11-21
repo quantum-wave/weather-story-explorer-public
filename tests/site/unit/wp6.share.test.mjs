@@ -3,10 +3,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { HASH_RE, RESERVED_HASHES, isReservedHash } from '../../../site/js/contract.js';
 import { buildHash, parseHash, placeToken, placeIdOf, layersToken, utcStamp, dateOfStamp } from '../../../site/js/share/hashgrammar.js';
-import { formatValid, defaultHeadline, confidenceFor, footerLine, sampleBanner, legendWords, valueAt } from '../../../site/js/share/format.js';
+import { formatValid, defaultHeadline, confidencePhrase, footerLine, valueAt } from '../../../site/js/share/format.js';
+import { confidenceAt } from '../../../site/js/story/confidence.js';
 
 test('buildHash and parseHash round trip over every view and layer subset', () => {
-  const views = ['np', 'nh', 'gl'];
+  const views = ['np', 'nh', 'gl', 'wm'];
   for (const view of views) for (let m = 0; m < 16; m++) {
     const layers = { z: !!(m & 1), j: !!(m & 2), c: !!(m & 4), t: !!(m & 8) };
     for (const place of [null, 'sf', 'c123456']) {
@@ -20,6 +21,15 @@ test('buildHash and parseHash round trip over every view and layer subset', () =
   }
   assert.equal(buildHash({ view: 'np', layers: { z: true, j: true }, validTime: '2026112212', place: 'sf' }), '#np-zj-2026112212-sf');
   assert.equal(layersToken({}), '0');
+});
+
+test('World is a view: #wm-z-2026112212-sf parses and rebuilds, the region reads World', async () => {
+  const p = parseHash('#wm-z-2026112212-sf');
+  assert.equal(p.view, 'wm');
+  assert.equal(buildHash({ view: 'wm', lens: 'z', validTime: '2026112212', place: 'sf' }), '#wm-z-2026112212-sf');
+  const { regionName } = await import('../../../site/js/share/format.js');
+  assert.equal(regionName('wm'), 'World');
+  assert.equal(regionName('gl'), 'Global');
 });
 
 test('parseHash rejects reserved names, junk, impossible dates and unknown places', () => {
@@ -62,22 +72,22 @@ test('headline defaults to a factual label', () => {
   assert.equal(defaultHeadline({ placeLabel: '', view: 'nh', dayLabel: 'Sat 22 Nov' }), 'Northern Hemisphere · Sat 22 Nov');
 });
 
-test('confidence follows spread and lead time', () => {
-  assert.equal(confidenceFor({ sd: 2, leadHours: 30 }).level, 'high');
-  assert.equal(confidenceFor({ sd: 4, leadHours: 30 }).level, 'medium');
-  assert.equal(confidenceFor({ sd: 7, leadHours: 30 }).level, 'low');
-  assert.equal(confidenceFor({ sd: 1, leadHours: 8 * 24 }).level, 'medium', 'days 8-10 at most medium');
-  assert.equal(confidenceFor({ sd: 1, leadHours: 11 * 24 }).level, 'pattern-only');
-  assert.equal(confidenceFor({ sd: null, leadHours: 24 }).level, 'high');
-  assert.equal(confidenceFor({ sd: null, leadHours: 5 * 24 }).level, 'medium');
-  assert.equal(confidenceFor({ sd: null, leadHours: 9 * 24 }).level, 'low');
+test('the share words the one confidence table (story/confidence.js), never its own', () => {
+  const words = (h, o) => confidencePhrase(confidenceAt(h, o));
+  assert.equal(words(30, { spreadDam: 2, hasSpread: true }), 'Pattern: confident');
+  assert.equal(words(30, { spreadDam: 4, hasSpread: true }), 'Pattern: fairly sure of the timing');
+  assert.equal(words(30, { spreadDam: 7, hasSpread: true }), 'Pattern: timing uncertain');
+  assert.equal(words(8 * 24, { spreadDam: 1, hasSpread: true }), 'Pattern: fairly sure of the timing', 'days 8-10 at most medium');
+  assert.equal(words(11 * 24, { spreadDam: 1, hasSpread: true }), 'Pattern only, not specifics');
+  assert.equal(words(24, { hasSpread: false }), 'Pattern: confident');
+  assert.equal(words(9 * 24, { hasSpread: false }), 'Pattern: timing uncertain');
+  assert.match(words(24, { spreadDam: 0, hasSpread: true }), /^Pattern confidence: not shown \(the ensemble spread is not meaningful here\)$/, 'no claim from nothing');
+  assert.doesNotMatch(words(24, { hasSpread: false }), /settled/);
 });
 
-test('footer, sample banner, legend words, series interpolation', () => {
+test('footer and series interpolation', () => {
   assert.equal(footerLine({ attribution: 'ECMWF open data CC-BY-4.0', climatologyLabel: 'ERA5 1990-2019' }),
     'Model output, not an official forecast · ECMWF open data CC-BY-4.0 · anomaly vs ERA5 1990-2019');
-  assert.equal(sampleBanner('ERA5, 1-2 Jan 2017'), 'SAMPLE DATA · ERA5, 1-2 Jan 2017 · not a forecast');
-  assert.match(legendWords('z'), /Blue: lower pressure aloft, usually unsettled\. Amber: higher, usually settled\./);
   const s = { steps: [0, 12], values: [0, 10] };
   assert.equal(valueAt(s, 6), 5);
   assert.equal(valueAt(s, -5), 0);

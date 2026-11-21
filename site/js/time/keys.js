@@ -1,8 +1,8 @@
-// Keyboard: Space play/pause, Left/Right one data step, 1 2 3 switch view (np, nh, gl). Nothing else (SPEC section 4).
+// Keyboard: Space play/pause, Left/Right one data step, Shift+Left/Right one day, 1 2 3 4 switch view (np, nh, gl, wm). Nothing else (SPEC section 4).
 import { store } from '../state.js';
 import * as clock from './clock.js';
 
-const VIEW_KEYS = { 1: 'np', 2: 'nh', 3: 'gl' };
+const VIEW_KEYS = { 1: 'np', 2: 'nh', 3: 'gl', 4: 'wm' };
 
 function typing(el) {
   if (!el || !el.tagName) return false;
@@ -21,7 +21,9 @@ export function handleKey(e) {
     clock.toggle(); e.preventDefault(); return true;
   }
   if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-    clock.step(e.key === 'ArrowRight' ? 1 : -1); e.preventDefault(); return true;
+    const dir = e.key === 'ArrowRight' ? 1 : -1;
+    if (e.shiftKey) clock.stepDay(dir); else clock.step(dir);
+    e.preventDefault(); return true;
   }
   if (VIEW_KEYS[e.key]) { store.set({ view: VIEW_KEYS[e.key] }); return true; }
   return false;

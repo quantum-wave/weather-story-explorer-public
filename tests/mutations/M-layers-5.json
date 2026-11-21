@@ -1,0 +1,11 @@
+{
+ "id": "layers-5",
+ "file": "site/css/layers.css",
+ "find": "padding: 0 var(--s2); min-height: 44px; min-width: 44px;",
+ "replace": "padding: 0 var(--s1); min-height: 40px;",
+ "checks": [
+  "S-LAYERS"
+ ],
+ "expect": "killed",
+ "note": "Copy link back at 40 px tall: under the 44 x 44 touch target. S-LAYERS measures it on the phone."
+}

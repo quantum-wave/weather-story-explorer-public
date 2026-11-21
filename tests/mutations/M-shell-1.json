@@ -1,0 +1,9 @@
+{
+ "id": "shell-1",
+ "file": "site/js/ui/layout.js",
+ "find": "peekH = Math.min(PEEK_MAX, natural);",
+ "replace": "peekH = Math.max(320, natural);",
+ "checks": ["S-SHELL"],
+ "expect": "killed",
+ "note": "Peek height 320 px: the phone sheet ignores its content and the 180 px cap and takes most of the screen. S-SHELL's peek height (at most 180 px) and chart share (at least 55%) assertions must fail (design spec 11.1, Josh point 5)."
+}

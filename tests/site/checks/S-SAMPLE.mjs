@@ -1,5 +1,5 @@
 // S-SAMPLE: sample manifest -> amber badge in the header and the legend text, a dismissible demo card, one case at a
-// time (the layer switch is a case switch), and a friend opening a link is asked for their city.
+// time (choosing a lens shows the case that holds its field), and a friend opening a link is asked for their city.
 export const id = 'S-SAMPLE';
 export const freshProfile = true;
 export async function run({ page, baseUrl, assert, newPage }) {
@@ -8,7 +8,7 @@ export async function run({ page, baseUrl, assert, newPage }) {
   const m = await page.eval('__wse.data.getManifest()');
   if (m.sample !== true) {
     // live data: none of the sample furniture appears
-    assert.equal(await page.eval(`document.querySelector('#topbar #sample-badge')?.hidden !== false`), true, 'live data: no sample badge');
+    assert.equal(await page.eval(`!/^(Sample|Recorded)/.test(document.getElementById('data-chip').dataset.full || '')`), true, 'live data: no sample badge');
     assert.equal(await page.eval(`!!document.getElementById('demo-card')`), false, 'live data: no demo card');
     const lg = await page.eval(`document.getElementById('legend').textContent`);
     assert.ok(!/not a forecast/.test(lg), 'live data: legend has no sample line: ' + lg);
@@ -19,10 +19,11 @@ export async function run({ page, baseUrl, assert, newPage }) {
   const label = (c) => m.cases[c].label;
 
   // badge in the header, words in the legend
-  const badge = () => page.eval(`document.querySelector('#topbar #sample-badge').hidden ? '' : document.querySelector('#topbar #sample-badge').textContent`);
+  // the badge sentence lives in the data chip's popover (W3-04): open it with a tap, read it, close it
+  const badge = async () => { await page.eval(`document.getElementById('data-chip').click()`); const t = await page.eval(`document.querySelector('#data-popover .full')?.textContent || ''`); await page.eval(`document.getElementById('data-chip').click()`); return t; };
   assert.equal(await badge(), `Sample data · ${label('A')} · not a forecast`);
   const legend = await page.eval(`document.getElementById('legend').textContent`);
-  assert.ok(legend.includes('Blue: lower pressure aloft') && legend.includes(`Sample data · ${label('A')} · not a forecast`), 'legend: ' + legend);
+  assert.ok(legend.includes('Pressure pattern aloft, vs normal') && legend.includes(`Sample data · ${label('A')} · not a forecast`), 'legend: ' + legend);
 
   // demo card, dismissible, stays dismissed after a reload
   const demo = await page.eval(`document.getElementById('demo-card')?.textContent || ''`);
@@ -39,21 +40,24 @@ export async function run({ page, baseUrl, assert, newPage }) {
   assert.ok(wk.cols >= 1 && wk.cols <= 7, 'columns: ' + wk.cols);
   assert.ok(!/No data past|settled/i.test(wk.text), 'card text: ' + wk.text);
 
-  // one case at a time
-  const shown = (l) => Object.entries(l).filter(([, v]) => v).map(([k]) => k);
+  // one case at a time: choosing a lens in the Layers panel shows the case that holds its field, and the badge and legend follow it
   await page.eval(`document.getElementById('btn-layers').click()`);
-  const radios = await page.eval(`[...document.querySelectorAll('#layers-panel [data-case]')].map(b => b.dataset.case)`);
-  assert.ok(radios.length >= 2, 'case switch lists the cases that have a layer: ' + radios);
-  for (const c of radios) {
-    await page.eval(`document.querySelector('#layers-panel [data-case="${c}"]').click()`);
-    const st = await page.eval(`({ ...__wse.store.get() })`);
-    assert.equal(st.case, c);
-    assert.equal(shown(st.layers).length, 1, `case ${c} shows one layer, got ${shown(st.layers)}`);
-    assert.equal(await badge(), `Sample data · ${label(c)} · not a forecast`, 'badge follows the case');
-    const enabled = await page.eval(`[...document.querySelectorAll('#layers-panel [data-layer]:not([disabled])')].map(b => b.dataset.layer)`);
-    assert.ok(enabled.includes(shown(st.layers)[0]), 'the active layer is toggleable');
-    assert.ok(!enabled.includes('t') || c === 'C', 'the motion layer is only on in case C');
+  const lenses = await page.eval(`[...document.querySelectorAll('#layers-panel [data-lens]:not([disabled])')].map(b => b.dataset.lens)`);
+  assert.ok(lenses.length >= 2, 'the panel offers the lenses this sample can draw: ' + lenses);
+  assert.equal(await page.eval(`document.querySelectorAll('#layers-panel [data-case], #layers-panel [data-layer]').length`), 0, 'no case switch and no layer toggles are left');
+  const FILL = { z: 'z500a', j: 'ws250', s: 'tp6', a: 't850a', r: 'ivt', c: 'z500sd' };
+  for (const code of lenses) {
+    await page.eval(`document.querySelector('#layers-panel [data-lens="${code}"]').click()`);
+    const st = await page.eval(`({ lens: __wse.store.get().lens ?? 'z', keys: Object.keys(__wse.store.get()), active: __wse.data.activeCase() })`);
+    assert.equal(st.lens, code);
+    assert.ok(!st.keys.includes('case') && !st.keys.includes('layers'), 'the retired keys are not in the store: ' + st.keys);
+    assert.equal(st.active, m.fields[FILL[code]].case, `the ${code} lens shows the case that holds ${FILL[code]}`);
+    assert.equal(await badge(), `Sample data · ${label(st.active)} · not a forecast`, 'badge follows the case');
+    const sr = await page.eval(`document.getElementById('legend').textContent`);
+    assert.ok(sr.includes(`Sample data · ${label(st.active)}`), 'the legend names the case: ' + sr);
   }
+  const motion = await page.eval(`[...document.querySelectorAll('#layers-panel [role=radio]')].map(b => b.textContent).join(' ')`);
+  assert.ok(!/motion demo|surface temperature/i.test(motion), 'the sample-only motion layer is not offered: ' + motion);
 
   // a friend opening a link is never shown "Your week" as theirs
   const p2 = await newPage();

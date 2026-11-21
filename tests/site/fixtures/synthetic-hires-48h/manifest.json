@@ -285,7 +285,7 @@
   },
   "tp6": {
    "units": "mm",
-   "scale": 0.1,
+   "scale": 0.01,
    "offset": 0,
    "nodata": -32768,
    "filter": "dx-shuffle",
@@ -312,8 +312,8 @@
      "files": {
       "g1": {
        "path": "tp6.g1.a.bin",
-       "bytes": 1418,
-       "sha256": "c36f32fabfa967b8a2fde30084298bdbc1a690e0524dc3b83f594084bbb00421"
+       "bytes": 1885,
+       "sha256": "c7ec35e374514049a942e9efa0d70b25eeaadd0c98792a88e8699ab570d3a4cb"
       }
      }
     }

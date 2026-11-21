@@ -1,0 +1,11 @@
+{
+ "id": "shell-5",
+ "file": "site/js/ui/layout.js",
+ "find": "export const HALF_TOP = 0.58;",
+ "replace": "export const HALF_TOP = 0.54;",
+ "checks": [
+  "S-SHELL"
+ ],
+ "expect": "killed",
+ "note": "The half snap back at the spec's 54%: the chart is 31.7% of 390 x 844 under the tools row and the always-visible legend. S-SHELL's 35% half share and its half-top check must fail (spec 11.1, review round 4)."
+}

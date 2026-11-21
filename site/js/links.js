@@ -6,18 +6,24 @@
 //   copyLink()         -> copies canonicalUrl + hash; true on success
 import { store } from './state.js';
 import * as data from './data/index.js';
-import { isReservedHash } from './contract.js';
+import { isReservedHash, LENS_CODES, LENS_FILL } from './contract.js';
+import { isMultiCase, caseForLens } from './data/kind.js';
 import { buildHash, parseHash as parseGrammar, placeToken, placeIdOf, utcStamp, dateOfStamp, SF_FOCUS } from './share/hashgrammar.js';
-import { activeField, nearestStep } from './share/meta.js';
+import { nearestStep } from './share/meta.js';
 import { formatValid } from './share/format.js';
 
 export { parseGrammar as parseHash };
 
 const HOUR = 3600e3;
 
+const validLens = (l) => LENS_CODES.includes(l);
+
+/** The field a state draws: its lens's fill (Pattern when the store has no lens yet). */
+const fieldOfState = (state) => LENS_FILL[validLens(state.lens) ? state.lens : 'z'];
+
 /** The valid time (UTC hour stamp) a link should carry for forecast hour t, snapped to a real step of the layer's field. */
 function stampFor(state) {
-  const field = activeField(state);
+  const field = fieldOfState(state);
   const ns = nearestStep(field, state.t);
   const t = ns ? ns.step : state.t;
   return utcStamp(new Date(Math.round(data.validTime(t).getTime() / HOUR) * HOUR));
@@ -27,7 +33,8 @@ function stampFor(state) {
 export function formatHash(state = store.get()) {
   const f = state.focus;
   const place = f && f.kind !== 'person' ? placeToken(f.placeRef) : null;
-  return buildHash({ view: state.view, layers: state.layers, validTime: stampFor(state), place });
+  const lens = validLens(state.lens) ? state.lens : 'z';
+  return buildHash({ view: state.view, lens, jetline: !!state.overlays?.jetline, validTime: stampFor(state), place });
 }
 
 /** Resolve a place token to a focus. 'sf' is built in; other ids need `gazetteer.byId` (optional, see report). */
@@ -41,6 +48,11 @@ async function resolvePlace(token) {
     if (city) return { lat: city.lat, lon: city.lon, label: city.name, kind: 'place', placeRef: city.id };
   } catch { /* unresolved: the view still opens at the linked time */ }
   return null;
+}
+
+/** The field a parsed link draws: its lens's fill (an old 't' link reads as the Air mass lens, hashgrammar). */
+function linkField(p) {
+  return LENS_FILL[p.lens] || LENS_FILL.z;
 }
 
 let noticeTimer = null;
@@ -65,24 +77,24 @@ export async function applyHash(hash = location.hash) {
   if (!p) return { applied: false, snapped: false, notice: null };
   applying = true;
   try {
-    const patch = { view: p.view, layers: p.layers };
-    const st = store.get();
-    if (st.sample) {
-      if (p.layers.t) patch.case = 'C';
-      else if (p.layers.j && !p.layers.z) patch.case = 'B';
-      else if (st.case !== 'A') patch.case = 'A';
-    }
-    const probe = { ...st, ...patch, layers: p.layers };
-    const field = activeField(probe);
+    // The retired layers letters read as a lens and the Jet outline (hashgrammar parseHash): an old 'zj' link is the pattern with the
+    // jet outline; a link with no letters ('0') shows the pattern.
+    const lens = p.lens || 'z';
+    const patch = { view: p.view, lens, overlays: { jetline: p.jetline } };
+    const m = data.getManifest();
+    // The link's time is read against the dataset it will be shown on: for a multi-case sample, the case that holds the
+    // linked lens's field (MET-11); a recorded or live run has one clock and no case.
+    const field = linkField(p);
+    const caseId = isMultiCase(m) ? caseForLens(m, lens) : undefined;
     const steps = data.fieldSteps(field) || [];
     let notice = null, snapped = false;
-    const asked = (dateOfStamp(p.validTime).getTime() - data.validTime(0).getTime()) / HOUR;
+    const asked = (dateOfStamp(p.validTime).getTime() - data.validTime(0, caseId).getTime()) / HOUR;
     if (steps.length) {
       const ns = nearestStep(field, asked);
       patch.t = ns.step;
       if (Math.abs(ns.step - asked) > 0.5) {
         snapped = true;
-        const when = formatValid(data.validTime(ns.step));
+        const when = formatValid(data.validTime(ns.step, caseId));
         notice = `That moment is not in this forecast. Showing the nearest step: ${when.local}.`;
       }
     }
@@ -119,7 +131,7 @@ export async function installLinks() {
     timer = setTimeout(write, wait);
   };
   const unsub = store.subscribe((_s, patch) => {
-    if ('view' in patch || 'layers' in patch || 't' in patch || 'focus' in patch || 'case' in patch) schedule();
+    if ('view' in patch || 'lens' in patch || 'overlays' in patch || 't' in patch || 'focus' in patch) schedule();
   });
   const onHash = () => { if (parseGrammar(location.hash) && location.hash !== lastWritten) applyHash(location.hash); };
   addEventListener('hashchange', onHash);

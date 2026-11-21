@@ -36,11 +36,10 @@ export function joinKicker(title, label) {
   return `${t} · ${l}`;
 }
 
-/** Row tag from story.notability's reason: "Trough Sun" reads "Unsettled Sun", with the term in the tooltip. */
+/**
+ * The row's reason phrase. It is written by story/phrases.js (reasonPhrase: "Rain likely from Sunday", "Under a trough
+ * from Sun 1 Jan") and shown as it is; nothing here rewrites it, and nothing lives only in a tooltip (UX-9).
+ */
 export function reasonTag(reason) {
-  const m = /^(Trough|Ridge) (.+)$/.exec(reason || '');
-  if (!m) return { text: reason || '', title: '' };
-  return m[1] === 'Trough'
-    ? { text: `Unsettled ${m[2]}`, title: 'A trough: a dip in the jet stream, often unsettled weather' }
-    : { text: `Settled ${m[2]}`, title: 'A ridge: high pressure aloft, often settled weather' };
+  return { text: reason || '', title: '' };
 }

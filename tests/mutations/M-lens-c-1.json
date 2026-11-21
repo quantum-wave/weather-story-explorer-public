@@ -1,0 +1,12 @@
+{
+  "id": "lens-c-1",
+  "file": "site/js/lenses/surface.js",
+  "find": "      let level = first, area = grow(level);\n      if (area === null) continue;\n",
+  "replace": "      let level = first, area = grow(level) ?? Infinity;\n",
+  "checks": [
+    "unit:wp15.lenses-c.test.mjs",
+    "S-LENS-C"
+  ],
+  "expect": "killed",
+  "note": "W4-05 / DESIGN-SPEC 6.1 and 14.3: H and L only at closed centres. The mutant treats a region that runs off the grid, into missing data or into a deeper node as closed, so every local minimum and maximum is marked whether or not an isobar closes round it (an open trough, a node on a regional grid's edge, a dip beside missing data). The unit test's open-trough grids (minimum on the edge row; a true interior minimum whose isobar runs off the west edge) and NaN-hole grids must see an L that is not there."
+}

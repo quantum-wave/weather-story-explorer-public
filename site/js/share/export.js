@@ -1,7 +1,8 @@
 // exportStill and exportLoop (SPEC section 7).
 import { store } from '../state.js';
 import * as data from '../data/index.js';
-import { VIEWS, LAYER_CODES } from '../contract.js';
+import { VIEWS, LAYER_CODES, LENS_CODES, LENS_FILL } from '../contract.js';
+import { LENS_FIELDS } from '../render/palette.js';
 import { gifenc } from '../vendor.js';
 import { shareMeta, primeManifest, activeField, validDateFor } from './meta.js';
 import { formatValid } from './format.js';
@@ -21,15 +22,15 @@ const nextFrame = () => new Promise((res) => {
 });
 const abortError = () => Object.assign(new Error('Cancelled'), { name: 'AbortError', code: 'aborted' });
 
-/** Make sure the chunks that time t needs for this view are loaded. */
+/** Make sure the chunks that time t needs for this view are loaded: the lens's fill and lines. */
 async function ensureFor(state, t) {
   const domain = VIEWS[state.view];
   const fields = new Set();
-  for (const k of Object.keys(state.layers)) if (state.layers[k]) fields.add(LAYER_CODES[k]);
-  if (state.layers.z) fields.add('z500');
+  const lens = LENS_CODES.includes(state.lens) ? state.lens : 'z';
+  fields.add(LENS_FILL[lens]); if (LENS_FIELDS[lens]?.lines) fields.add(LENS_FIELDS[lens].lines);
   for (const f of fields) await data.ensure(f, domain, t);
   // the renderer knows best which chunks renderTo needs (spread, contour source, case)
-  try { await getRenderer().ensureFor?.({ t, view: state.view, layers: state.layers, case: state.case }); } catch { /* renderTo draws what is loaded */ }
+  try { await getRenderer().ensureFor?.({ t, view: state.view, lens }); } catch { /* renderTo draws what is loaded */ }
 }
 
 export async function exportStill({ headline } = {}) {

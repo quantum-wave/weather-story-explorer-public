@@ -1,0 +1,11 @@
+{
+ "id": "layers-2",
+ "file": "site/js/render/index.js",
+ "find": "export const REDRAW_KEYS = ['t', 'view', 'theme', 'lens',",
+ "replace": "export const REDRAW_KEYS = ['t', 'view', 'theme',",
+ "checks": [
+  "S-LAYERS"
+ ],
+ "expect": "killed",
+ "note": "The renderer ignores a lens change: the legend and the Layers row change but the chart keeps the old frame (the stale frame that made choosing a lens look broken). S-LAYERS requires the canvas to change within 500 ms of each lens click."
+}

@@ -1,0 +1,11 @@
+{
+  "id": "explain-4",
+  "file": "site/js/render/compose.js",
+  "find": "taken: labels, avoid: opts.avoid ?? domAvoid(mv)",
+  "replace": "taken: [], avoid: opts.avoid ?? domAvoid(mv)",
+  "checks": [
+    "S-EXPLAIN"
+  ],
+  "expect": "killed",
+  "note": "DESIGN-SPEC 4.5, W4-02 acceptance 4: contour labels win over plates. With the labels not handed to the plate picker, plates sit on contour labels. S-EXPLAIN's plate sweep compares every drawn plate with the contour label spots the compositor drew (renderer.stats().labelSpots), 4 px slack."
+}

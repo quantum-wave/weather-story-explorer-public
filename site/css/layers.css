@@ -1,0 +1,64 @@
+/* The Layers panel (W4-01, design spec 6.1 and 11.4): lens radio rows with a swatch strip of the bands each draws, then the overlay
+   switches. A popover in the stage from 900 px; on the phone the same element sits inside the one sheet (ui/sheet.js), .in-sheet.
+   Chrome tokens only (tokens.css): the swatches are the only colour, and they are the lens's own bands. */
+#layers-panel { width: min(440px, calc(100% - 24px)); max-height: calc(100% - 64px - var(--s3)); padding: var(--s2) var(--s3) var(--s2); overflow-y: auto; overscroll-behavior: contain; }
+#layers-panel.in-sheet {
+  position: static; width: auto; max-height: none; overflow: visible; padding: 0 var(--s3) var(--s3);
+  background: none; border: 0; border-radius: 0; box-shadow: none; animation: none;
+}
+#layers-panel.in-sheet[hidden] { display: none; }
+
+.lyr-h { margin: var(--s3) 0 var(--s1); font: 600 12px/16px var(--font-ui); letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); }
+.lyr-h.lyr-title { margin-top: var(--s2); }
+.in-sheet .lyr-h.lyr-title { margin-top: 0; }
+.lyr-group { display: flex; flex-direction: column; }
+
+.lyr-row {
+  display: grid; align-items: center; column-gap: var(--s3); width: 100%; min-height: 48px; padding: var(--s2) var(--s1);
+  background: none; border: 0; border-radius: var(--r-card); color: var(--text); text-align: left; font: inherit; cursor: pointer;
+  touch-action: manipulation;
+}
+.lyr-row + .lyr-row { border-top: 1px solid var(--hairline); border-radius: 0; }
+.lyr-row:hover:not(:disabled) { background: color-mix(in srgb, var(--text) 5%, transparent); }
+.lyr-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--r-card); }
+.lyr-row:disabled { cursor: default; }
+.lyr-row:disabled .lyr-name { color: var(--text-2); }
+.lyr-name { display: block; font-weight: 600; font-size: 15px; line-height: 20px; }
+.lyr-sub { display: block; color: var(--text-2); font-size: 13px; line-height: 17px; }
+
+/* a lens: the radio mark, the words, and under them the strip of the bands the lens draws */
+.lyr-lens { grid-template-columns: 20px minmax(0, 1fr); grid-template-areas: "mark text" ". swatch"; row-gap: 6px; }
+.lyr-mark { grid-area: mark; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--text-2); display: grid; place-items: center; box-sizing: border-box; }
+.lyr-lens[aria-checked="true"] .lyr-mark { border-color: var(--accent); }
+.lyr-lens[aria-checked="true"] .lyr-mark::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.lyr-lens .lyr-text { grid-area: text; min-width: 0; }
+.lyr-swatch { grid-area: swatch; width: 100%; position: relative; display: block; height: 8px; border-radius: 4px; overflow: hidden; box-shadow: inset 0 0 0 1px var(--hairline); }
+.lyr-swatch i { position: absolute; top: 0; bottom: 0; }
+
+/* an overlay: the words and a switch */
+.lyr-overlay { grid-template-columns: minmax(0, 1fr) auto; }
+.lyr-switch { position: relative; width: 40px; height: 24px; border-radius: 12px; background: var(--hairline); box-shadow: inset 0 0 0 1px var(--text-3); transition: background 120ms; }
+.lyr-switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--text-2); transition: transform 120ms, background 120ms; }
+.lyr-overlay[aria-checked="true"] .lyr-switch { background: var(--accent); box-shadow: none; }
+.lyr-overlay[aria-checked="true"] .lyr-switch::after { transform: translateX(16px); background: var(--on-accent); }
+.lyr-overlay[aria-disabled="true"] { cursor: default; }
+.lyr-overlay[aria-disabled="true"] .lyr-switch { opacity: .55; }
+.lyr-overlay[aria-disabled="true"] .lyr-sub { color: var(--text); }
+
+.lyr-foot { margin-top: var(--s2); padding-top: 0; border-top: 1px solid var(--hairline); display: flex; justify-content: flex-start; }
+.lyr-link { background: none; border: 0; padding: 0 var(--s2); min-height: 44px; min-width: 44px; color: var(--text-2); text-decoration: underline; text-underline-offset: 3px; font: inherit; font-size: 13px; cursor: pointer; }
+.lyr-link:hover { color: var(--text); }
+.lyr-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) { .lyr-switch, .lyr-switch::after { transition: none; } }
+
+/* Dense on purpose: the overlays are two to a row with their one-line help left to the tooltip (a locked switch still prints its reason).
+   The popover has a short stage to live in, so there a lens is one row with its swatch beside the words; the sheet stacks the swatch under them. */
+#layers-panel:not(.in-sheet) .lyr-lens { grid-template-columns: 20px minmax(0, 1fr) 72px; grid-template-areas: "mark text swatch"; row-gap: 0; min-height: 48px; padding-block: 6px; }
+#layers-panel .lyr-overlays { display: grid; grid-template-columns: 1fr 1fr; column-gap: var(--s3); }
+#layers-panel .lyr-overlay { min-height: 44px; }
+#layers-panel .lyr-overlays .lyr-overlay:nth-child(n + 3) { border-top: 1px solid var(--hairline); }
+#layers-panel .lyr-overlays .lyr-overlay:nth-child(-n + 2) { border-top: 0; }
+#layers-panel .lyr-overlay:not([data-locked]) .lyr-sub { display: none; }
+#layers-panel .lyr-overlay[data-locked] { grid-column: 1 / -1; }
+#layers-panel:not(.in-sheet) .lyr-name { font-size: 14px; line-height: 18px; }

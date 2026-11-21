@@ -1,0 +1,11 @@
+{
+ "id": "share-1",
+ "file": "site/js/share/meta.js",
+ "find": "if (LENS_CODES.includes(state.lens)) return state.lens;",
+ "replace": "if (false) return state.lens;",
+ "checks": [
+  "S-SHARE"
+ ],
+ "expect": "killed",
+ "note": "The share reads store.layers instead of store.lens: with lens 'j' set and the layer flags saying pattern, the picture must still draw the jet legend. S-SHARE's lens/ground/rotation block (drawn 'Jet stream wind speed', meta.lens 'j') must fail (design spec W4-07, C3: readers of store.layers outside ui/)."
+}

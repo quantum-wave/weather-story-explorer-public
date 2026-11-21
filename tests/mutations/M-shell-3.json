@@ -1,0 +1,11 @@
+{
+ "id": "shell-3",
+ "file": "site/css/timeline.css",
+ "find": "  height: 56px; padding: 0 8px;",
+ "replace": "  height: 136px; padding: 0 8px;",
+ "checks": [
+  "S-SHELL"
+ ],
+ "expect": "killed",
+ "note": "The phone timeline's docked row grows from its spec 56 px to 136 px at peek (and full). S-SHELL measures the real timeline box (no substitution), so its 56 px timeline check and the peek chart share must fail (design spec 7.1, 11.1). Retargeted in rescue round 1: the docked layout now lives in timeline.css (W3-08) and the shell's own copy of it was removed."
+}

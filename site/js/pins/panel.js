@@ -43,16 +43,13 @@ export function mountPinsPanel(root, { pins = defaultPins, deliver = null } = {}
   async function doCsv() {
     const blob = new Blob([pins.exportCSV()], { type: 'text/csv' });
     const filename = 'weather-story-pins.csv';
-    let how = 'downloaded';
+    let how = 'failed';
     try {
       const d = deliver || (await import('../share/index.js')).deliver;
-      how = await d(blob, filename);
-    } catch {
-      try { const a = h('a', { href: URL.createObjectURL(blob), download: filename }); document.body.append(a); a.click(); a.remove(); }
-      catch { how = 'failed'; }
-    }
+      how = await d(blob, filename); // the file goes to the host's save or Web Share, or into the page as text to copy: never a download link
+    } catch { how = 'failed'; }
     status.className = 'pn-msg' + (how === 'declined' || how === 'failed' ? ' warn' : '');
-    status.textContent = how === 'declined' ? 'Not saved.' : how === 'failed' ? 'Could not save the file. Use Copy all pins instead.' : how === 'inline' ? 'Press and hold the file to save it.' : 'CSV ready.';
+    status.textContent = how === 'declined' ? 'Not saved.' : how === 'failed' ? 'Could not save the file. Use Copy all pins instead.' : how === 'inline' ? 'Select the text and copy it.' : 'CSV ready.';
   }
 
   function render() {

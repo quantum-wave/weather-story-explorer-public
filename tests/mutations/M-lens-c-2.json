@@ -1,0 +1,11 @@
+{
+  "id": "lens-c-2",
+  "file": "site/js/lenses/surface.js",
+  "find": "            if (!Number.isFinite(w)) return null; // missing data inside: the isobar is not known to close\n",
+  "replace": "            if (!Number.isFinite(w)) continue; // missing data inside: the isobar is not known to close\n",
+  "checks": [
+    "unit:wp15.lenses-c.test.mjs"
+  ],
+  "expect": "killed",
+  "note": "W4-05 review rv-nan: missing data beside a candidate centre must count as open (the isobar is not known to close). The mutant skips NaN neighbours, so a hole inside a bowl's region is treated as closed and an L is marked."
+}

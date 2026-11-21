@@ -20,9 +20,11 @@ NODATA = -32768
 MiB = 1024 * 1024
 
 # field id -> (units, scale, offset)   (SPEC section 9)
+# tp6 is kept to 0.01 mm (saturating at 327.67 mm in 6 h): the rain map's lowest band starts at 0.1 mm, and at a 0.1 mm step
+# every value near that edge is 0 or 0.1, so the edge can only fall on grid nodes and draws as a staircase (W4-05 review).
 FIELD_META = {
     "z500": ("gpm", 1, 0), "z500a": ("gpm", 1, 0), "z500sd": ("gpm", 0.1, 0),
-    "ws250": ("m/s", 0.1, 0), "tp6": ("mm", 0.1, 0), "t850a": ("K", 0.1, 0),
+    "ws250": ("m/s", 0.1, 0), "tp6": ("mm", 0.01, 0), "t850a": ("K", 0.1, 0),
     "msl": ("Pa", 10, 101325), "ivt": ("kg/m/s", 1, 0), "t2a": ("K", 0.1, 0),
     # contract rows for the fields W3-10 builds; same numbers as tools/make_fixtures.py
     "z500em": ("gpm", 1, 0), "pr1": ("%", 1, 0), "pr10": ("%", 1, 0), "t2m": ("K", 0.1, 0),

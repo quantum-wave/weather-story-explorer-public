@@ -408,7 +408,16 @@ export function tripLine(trip, days, coverage, opts = {}) {
   // Dates are the days tripState actually changes: the forecast's last day is first + 14, so it reaches the trip's first
   // day once first = start - 14 (broad), and day 7 is first + 6, so the trip is detail once first = start - 6. (The spec's
   // "15 days before" and "minus 7" count days from 1; this reads them against the same day numbering tripState uses.)
-  if (state === 'too-far') return `Too far out. The forecast starts covering it on ${dateLabel(addDays(trip.start, -TRIP_COVER_LEAD))}.`;
+  // A recording or sample never updates: it either covers the trip or it does not, and it never promises a later date.
+  // On a live run a "starts covering" or "firmer from" date is only given when it falls after the run's first day.
+  const fixed = !!(coverage?.kind && coverage.kind !== 'live');
+  const noun = coverage?.kind === 'recorded' ? 'recording' : 'sample';
+  const after = (d) => !coverage?.firstDate || d > coverage.firstDate;
+  if (state === 'too-far') {
+    if (fixed) return `This ${noun} doesn’t cover these dates.`;
+    const d = addDays(trip.start, -TRIP_COVER_LEAD);
+    return after(d) ? `Too far out. The forecast starts covering it on ${dateLabel(d)}.` : 'Too far out. This forecast doesn’t reach it yet.';
+  }
   const inTrip = (days || []).filter((c) => c.date >= trip.start && c.date <= trip.end);
   if (state === 'detail') {
     const s = summary(Object.assign(inTrip, { coverage: days?.coverage }), opts);
@@ -416,7 +425,9 @@ export function tripLine(trip, days, coverage, opts = {}) {
   }
   const lean = leaning(inTrip.filter((c) => c.lead >= 8));
   const core = lean === 'unknown' ? 'No broad-pattern data for these days yet.' : lean === 'ridge' ? 'The broad pattern leans toward a ridge (drier).' : lean === 'trough' ? 'The broad pattern leans toward a trough (wetter).' : lean === 'normal' ? 'The broad pattern looks near normal.' : `${NO_CLEAR_SIGNAL}.`;
-  return `Too early for details. ${core} Firmer from ${dateLabel(addDays(trip.start, -TRIP_DETAIL_LEAD))}.`;
+  if (fixed) return `Beyond this ${noun}’s detailed days. ${core}`;
+  const firm = addDays(trip.start, -TRIP_DETAIL_LEAD);
+  return after(firm) ? `Too early for details. ${core} Firmer from ${dateLabel(firm)}.` : `Too early for details. ${core}`;
 }
 
 export { dayNumberLabel, cityName };

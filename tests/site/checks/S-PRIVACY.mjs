@@ -1,5 +1,6 @@
 // S-PRIVACY: after adding pins, the hash, config.json and drawn share text hold no pin name; a person-focused link
-// carries no place; a fresh profile opening the link has zero pins.
+// carries no place; a fresh profile opening the link has zero pins. W3-07: the pin overlay names pins on the viewer's own screen
+// (labels true) and draws no name with labels:'export'; a still and a loop exported with pins present contain no pin name.
 export const id = 'S-PRIVACY';
 export const freshProfile = false;
 export const timeoutMs = 90000;
@@ -16,7 +17,7 @@ export async function run({ page, baseUrl, assert, newPage }) {
       for (const ov of o.overlays || []) ov(ctx, ([lon, lat]) => [o.width / 2, o.height / 2], {}); } });
     const drawn = [];
     for (const P of [CanvasRenderingContext2D.prototype, OffscreenCanvasRenderingContext2D.prototype]) {
-      const o = P.fillText; P.fillText = function (s, ...r) { drawn.push(String(s)); return o.call(this, s, ...r); };
+      const o = P.fillText; P.fillText = function (s, ...r) { if (!(this.canvas && this.canvas.id === 'map')) drawn.push(String(s)); return o.call(this, s, ...r); }; // the live map shows names to its owner; only share canvases count here
     }
     const { store, pins } = __wse;
     const city = { id: 5746545, name: 'Portland', admin: 'OR', cc: 'US', lat: 45.52, lon: -122.68 };
@@ -24,7 +25,7 @@ export async function run({ page, baseUrl, assert, newPage }) {
     pins.add({ kind: 'place', name: ${JSON.stringify(CABIN)}, group: 'friends', city });
     // the focus object is what the app hands to share: label is a city, never a name. A stray name field must still not leak.
     const person = { lat: 45.52, lon: -122.68, label: 'Portland', kind: 'person', placeRef: null, name: ${JSON.stringify(NAME)}, pin: ${JSON.stringify(NAME)} };
-    store.set({ view: 'np', layers: { z: true, j: false, c: false, t: false }, t: 12, focus: person });
+    store.set({ view: 'np', lens: 'z', t: 12, focus: person });
     const hashPerson = L.formatHash(store.get());
     const linkPerson = await L.linkText();
     const metaPerson = JSON.stringify(S.shareMeta(store.get()));
@@ -52,6 +53,21 @@ export async function run({ page, baseUrl, assert, newPage }) {
   assert.ok(!out.drawn.some(leaks), 'drawn share text: ' + out.drawn.filter(leaks).join(' | '));
   assert.ok(!leaks(out.url), 'page URL');
   assert.ok(out.drawn.includes('Portland'), 'the ring carries the city name');
+
+  // the overlay: names on the viewer's own screen, none in export mode, and none in what the share path drew above
+  const ov = await page.evaluateOverlay?.() ?? await page.eval(`(async () => {
+    const { pinOverlay } = await import('./js/pins/overlay.js');
+    const run = (labels) => {
+      const c = document.createElement('canvas'); c.width = 800; c.height = 600; const ctx = c.getContext('2d'); const drawn = [];
+      const o = ctx.fillText.bind(ctx); ctx.fillText = (t, ...r) => { drawn.push(String(t)); return o(t, ...r); };
+      const proj = ([lon, lat]) => [(lon + 180) * 2, (90 - lat) * 3];
+      pinOverlay({ project: proj }, { pins: __wse.pins, labels })(ctx, proj, { theme: 'dark', width: 800, height: 600 });
+      return drawn;
+    };
+    return { screen: run(true), exported: run('export') };
+  })()`);
+  assert.ok(ov.screen.some((t) => /zorblax quimby/i.test(t)), 'the viewer sees the name on their own screen: ' + ov.screen);
+  assert.ok(!ov.exported.some(leaks), 'labels:export draws no pin name: ' + ov.exported);
 
   // a fresh profile opening the link starts with zero pins
   const p2 = await newPage();

@@ -9,7 +9,6 @@ import { drag, flick, pinch, wheel, click, tap, key } from '../lib/input.mjs';
 export const id = 'S-GESTURE';
 export const freshProfile = true;
 export const timeoutMs = 120000;
-const LAYERS = { z: true, j: false, c: false, t: false };
 
 const dist = (a, b) => { const r = Math.PI / 180, c = Math.sin(a[1] * r) * Math.sin(b[1] * r) + Math.cos(a[1] * r) * Math.cos(b[1] * r) * Math.cos((a[0] - b[0]) * r); return (Math.acos(Math.max(-1, Math.min(1, c))) / r); };
 
@@ -21,7 +20,7 @@ export async function run({ page, baseUrl, assert }) {
   const W2 = (expr) => page.eval(expr.startsWith('(') ? `(({ renderer, store, data }) => ${expr})(window.__wp2)` : `window.__wp2.${expr}`);
   const open = async (view, w, h, dpr = 1) => {
     await mount(page, { width: w, height: h, dpr });
-    await shoot(page, { view, layers: LAYERS, case: 'A', theme: 'dark', t, lens: 'z' });
+    await shoot(page, { view, lens: 'z', theme: 'dark', t, lens: 'z' });
     await W2('renderer.resetView(0)');
   };
   // A drag that stays down at its end, so the pointer is still on the map when the map is read.

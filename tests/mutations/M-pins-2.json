@@ -1,0 +1,11 @@
+{
+ "id": "pins-2",
+ "file": "site/js/pins/addsheet.js",
+ "find": "drange = mountDateRange(box, dates, { onChange: () => { updateSave(); } });",
+ "replace": "drange = mountDateRange(box, dates, { onChange: () => { if (edit) pins.update(id, { start: dates.value().start, end: dates.value().end }); updateSave(); } });",
+ "checks": [
+  "S-DATES"
+ ],
+ "expect": "killed",
+ "note": "Commit on change: every date event writes the draft to the store, so a half-typed or inverted date reaches the stored trip before Save. S-DATES reads the store after every key and must fail (design spec 8.3, Josh point 3, UX-3)."
+}

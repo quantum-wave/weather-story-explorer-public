@@ -19,6 +19,16 @@ export async function mustBeVisible(page, selector, what) {
   if (!ok) throw new Error(`expected ${what || selector} to be on screen`);
 }
 
+/** Open the share sheet the way a person does at this width: the header's Share button on desktop; on the phone (where shell.css hides
+ *  #btn-share below 900 px, spec 3.1) More, then the menu's Share item. */
+export async function openShare(page, inp) {
+  if (inp.phone) {
+    await inp.activate('#btn-more');
+    await page.waitFor(`!document.getElementById('display-menu').hidden`, { timeout: 5000 });
+    await inp.activate('#display-menu [data-share]');
+  } else await inp.activate('#btn-share');
+}
+
 /** Open quick add from the empty "people" row and type `text`, the way a person does (the field takes focus when opened). */
 export async function openQuickAddAndType(page, inp, selector, text) {
   await inp.activate(selector);

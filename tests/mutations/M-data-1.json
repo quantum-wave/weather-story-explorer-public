@@ -1,0 +1,9 @@
+{
+ "id": "data-1",
+ "file": "site/js/data/index.js",
+ "find": "    const w = weightAt(t, { lat, lon });\n    if (w === 0) return;\n    values[i] =",
+ "replace": "    const w = 0;\n    if (w === 0) return;\n    values[i] =",
+ "checks": ["S-DATA", "unit:wp2.data.test.mjs"],
+ "expect": "killed",
+ "note": "MET-5 / E-A6: blend the map but not the series. A card at day 9 would then describe a different pattern from the map. Killed by the series-versus-field comparison at 168-240 h."
+}

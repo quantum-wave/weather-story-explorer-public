@@ -28,12 +28,10 @@ export function setManifest(m) { manifest = m; }
 bus.on('data:manifest', setManifest);
 const mf = () => manifest || data.getManifest?.() || null;
 
-/** The case the map shows (data.activeCase once the data client has it), else case A of a multi-case manifest. */
+/** The case the map shows (data.activeCase: the case of the active lens' field), or undefined for a live or recorded run. */
 const activeCaseId = () => {
   const m = mf();
-  const c = data.activeCase?.();
-  if (c) return c;
-  return isMultiCase(m) ? (store.get().case || 'A') : undefined;
+  return data.activeCase?.() ?? undefined;
 };
 /** Valid time for the story: the dataset's own clock, at the active case's real dates for a multi-case sample. */
 const vt = (h) => data.validTime(h, activeCaseId());
@@ -229,7 +227,7 @@ export function seriesFor(lat, lon) {
   // hasMean: the run carries the ensemble mean (z500em), so the zones table has its blend and mean rows (DESIGN-SPEC
   // 7.2). Unknown (no manifest) counts as no mean: nothing then implies a blend toward an average.
   return {
-    hasMean: !!ok?.has('z500em'),
+    hasMean: !!ok?.has('z500em') && (typeof data.hasMean === 'function' ? data.hasMean({ lat, lon }) : true), // a place no mean covers is the single run, say so
     windows: [], z500a: get('z500a', true), z500sd: get('z500sd'), tp6: get('tp6'), t850a: get('t850a'),
     t2m: get('t2m'), pr1: get('pr1'), pr10: get('pr10'), ws250max: ws,
   };

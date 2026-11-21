@@ -1,0 +1,11 @@
+{
+  "id": "lens-c-8",
+  "file": "site/js/lenses/surface.js",
+  "find": "    if (keepOut.some((r) => hit(letter, r, MARK_SLACK)) || others.some((r) => hit(letter, r, MARK_SLACK))) continue;\n",
+  "replace": "",
+  "checks": [
+    "S-LENS-C"
+  ],
+  "expect": "killed",
+  "note": "W4-05 review round 1 (2026-11-19): a letter keeps clear of every placed box, the focus ring and its label. The mutant checks a letter against the map controls only, as the first build did, so letters overwrite each other and other marks' values and the place label is drawn over an L. S-LENS-C's recorded section (the place moved onto each mark in turn, no two boxes within 4 px) must fail."
+}

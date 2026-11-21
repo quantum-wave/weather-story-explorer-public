@@ -1,6 +1,6 @@
-// Pure text helpers for shares: valid-time strings, default headline, confidence words, footer, legend words.
+// Pure text helpers for shares: valid-time strings, default headline, confidence words, footer, series interpolation.
 
-const REGION = { np: 'North Pacific', nh: 'Northern Hemisphere', gl: 'Global' };
+const REGION = { np: 'North Pacific', nh: 'Northern Hemisphere', gl: 'Global', wm: 'World' };
 export const regionName = (view) => REGION[view] || REGION.np;
 
 /**
@@ -26,26 +26,15 @@ export function defaultHeadline({ placeLabel, view, dayLabel }) {
   return `${placeLabel || regionName(view)} · ${dayLabel}`;
 }
 
-const PHRASE = {
-  high: 'Pattern: confident',
-  medium: 'Pattern: fairly sure of the timing',
-  low: 'Pattern: timing uncertain',
-  'pattern-only': 'Pattern only: details are not reliable this far out',
-};
 /**
- * Pattern confidence word (SPEC section 6 thresholds). sd: ensemble spread of z500 in dam (or null);
- * leadHours: hours from the run. Day 1 is the first 24 h.
+ * The words a share prints for a confidenceAt() result: "Pattern: confident", "Pattern: fairly sure of the timing",
+ * "Pattern only, not specifics", or the reason when there is no claim. The level and its words are story/confidence.js's, one table
+ * for the card, the legend and the share; this only phrases them.
  */
-export function confidenceFor({ sd, leadHours }) {
-  const day = Math.floor(Math.max(0, leadHours) / 24) + 1;
-  let level;
-  if (day > 10) level = 'pattern-only';
-  else if (sd == null || !Number.isFinite(sd)) level = day <= 4 ? 'high' : day <= 7 ? 'medium' : 'low';
-  else {
-    level = sd < 3 ? 'high' : sd <= 6 ? 'medium' : 'low';
-    if (day >= 8 && level === 'high') level = 'medium';
-  }
-  return { level, phrase: PHRASE[level] };
+export function confidencePhrase(c) {
+  if (!c || c.level === 'none') return `Pattern confidence: not shown${c?.reason ? ` (${c.reason})` : ''}`;
+  if (c.level === 'pattern-only') return 'Pattern only, not specifics';
+  return `Pattern: ${c.phrase}`;
 }
 
 export function footerLine({ attribution, climatologyLabel }) {
@@ -54,16 +43,6 @@ export function footerLine({ attribution, climatologyLabel }) {
   if (climatologyLabel) parts.push(`anomaly vs ${climatologyLabel}`);
   return parts.join(' · ');
 }
-
-export const sampleBanner = (caseLabel) => `SAMPLE DATA · ${caseLabel || 'demo'} · not a forecast`;
-
-const WORDS = {
-  z: 'Blue: lower pressure aloft, usually unsettled. Amber: higher, usually settled.',
-  j: 'Purple to cream: faster jet-stream winds, where storms tend to travel.',
-  c: 'Brighter: the forecasts agree. Dimmer: the pattern is less certain.',
-  t: 'Blue: cooler than usual. Amber: warmer than usual.',
-};
-export const legendWords = (layerCode) => WORDS[layerCode] || WORDS.z;
 
 /** Linear interpolation of a {steps, values} series at t (clamped to the ends); null if the series is empty. */
 export function valueAt(series, t) {

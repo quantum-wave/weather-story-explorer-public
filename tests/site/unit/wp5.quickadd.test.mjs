@@ -45,3 +45,30 @@ test('extractDates takes a Date or an ISO string and ignores plain numbers', () 
   assert.equal(extractDates('Route 66', T), null);
   assert.deepEqual(extractDates('Tahoe Nov 27', new Date(2026, 10, 17)), { rest: 'Tahoe', start: '2026-11-27', end: '2026-11-27' });
 });
+
+// ---- W3-07: a place several matches answer to is never picked (design spec 8.2, UX-6) ----
+import fs from 'node:fs';
+import * as gaz from '../../../site/js/pins/gazetteer.js';
+import { resolvePlace, kindWord } from '../../../site/js/pins/picker.js';
+
+const geo = (f) => JSON.parse(fs.readFileSync(new URL('../../../site/geo/' + f, import.meta.url), 'utf8'));
+gaz.setData(geo('cities.json'), geo('places-extra.json'));
+
+test('resolvePlace: Tahoe and Portland are a choice, never settled for the person', async () => {
+  for (const q of ['Tahoe', 'Portland']) {
+    const r = await resolvePlace(q, gaz);
+    assert.equal(r.state, 'choose', q);
+    assert.equal(r.city, undefined, q + ': no place was picked');
+  }
+  const tahoe = (await resolvePlace('Tahoe', gaz)).found.map((c) => c.name);
+  for (const want of ['North Lake Tahoe', 'South Lake Tahoe', 'Lake Tahoe']) assert.ok(tahoe.includes(want), want + ' in ' + tahoe);
+});
+
+test('resolvePlace: a qualified or unshared name is settled; nothing is none; curated entries say region', async () => {
+  const pdx = await resolvePlace('Portland, OR', gaz);
+  assert.equal(pdx.state, 'one'); assert.equal(pdx.city.admin, 'OR');
+  assert.equal((await resolvePlace('Seattle', gaz)).state, 'one');
+  assert.equal((await resolvePlace('Zzzzqqq', gaz)).state, 'none');
+  const north = (await resolvePlace('Tahoe', gaz)).found.find((c) => c.name === 'North Lake Tahoe');
+  assert.equal(kindWord(north), 'region');
+});

@@ -213,3 +213,208 @@ test('data: a live (non-sample) manifest keeps run + t; a sample without dates f
   await data.loadManifest();
   assert.equal(data.validTime(0, 'A').toISOString(), '2026-11-17T00:00:00.000Z', 'undated sample falls back to the run');
 });
+
+// ---------- W3-09: ensemble blend for the map and the story, dataset kinds, visible failures ----------
+
+const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg}: ${a} vs ${b}`);
+/** Bilinear value of a frame at a place (the same arithmetic the series uses), from the domain in the manifest. */
+async function bil(frame, d, lat, lon) {
+  const { toGrid, bilinear } = await load('data/grid.js');
+  const [gi, gj] = toGrid(d, lon, lat);
+  return bilinear(frame, d, gi, gj);
+}
+
+test('blend: patternField weights are 0 at 168 h, 0.5 at 204 h, 1 at 240 h (z500 and z500a), from the stored frames', async () => {
+  const { data, m } = await open('synthetic-15d');
+  assert.equal(data.hasMean(), true);
+  await data.ensureAll('z500', 'g1'); await data.ensureAll('z500a', 'g1'); await data.ensureAll('z500em', 'g1');
+  const n = m.domains.g1.nx * m.domains.g1.ny;
+  for (const [t, w, src] of [[0, 0, 'hres'], [150, 0, 'hres'], [168, 0, 'blend'], [204, 0.5, 'blend'], [240, 1, 'mean'], [300, 1, 'mean']]) {
+    const z = Float32Array.from(data.storedFieldAt('z500', 'g1', t)), za = Float32Array.from(data.storedFieldAt('z500a', 'g1', t));
+    const em = t >= 144 ? Float32Array.from(data.storedFieldAt('z500em', 'g1', t)) : null;
+    const pz = data.patternField('z500', 'g1', t), pa = data.patternField('z500a', 'g1', t);
+    assert.equal(data.patternSource(t), src, `source at ${t} h`);
+    let checked = 0;
+    for (let k = 0; k < n; k += 53) {
+      const e = em ? em[k] : 0;
+      const wantZ = z[k] + w * (e - z[k]), wantA = za[k] + w * (e - z[k]); // anomaly of the mean: z500em - (z500 - z500a)
+      if (!(wantZ === wantZ)) continue;
+      near(pz[k], wantZ, 1e-3, `z500 ${t} h node ${k}`); near(pa[k], wantA, 1e-3, `z500a ${t} h node ${k}`); checked++;
+    }
+    assert.ok(checked > 100, `${checked} nodes checked at ${t} h`);
+  }
+  assert.equal(data.patternField('z500a', 'g1', 361), null, 'beyond the last step');
+});
+
+test('blend: the point series uses the same weights as the field (identical at the place)', async () => {
+  const { data, m } = await open('synthetic-15d');
+  await data.ensureAll('z500', 'g1'); await data.ensureAll('z500a', 'g1'); await data.ensureAll('z500em', 'g1');
+  const [lat, lon] = [37.77, -122.42], d = m.domains.g1;
+  for (const kind of ['z500a', 'z500']) {
+    const s = data.patternSeries(kind, lat, lon);
+    assert.deepEqual(s.steps, data.fieldSteps(kind));
+    for (const t of [0, 162, 168, 174, 204, 222, 240, 300, 360]) {
+      const i = s.steps.indexOf(t);
+      const fromField = await bil(data.patternField(kind, 'g1', t), d, lat, lon);
+      near(s.values[i], fromField, 1e-3, `${kind} series vs field at ${t} h`);
+    }
+    // the weights themselves: the series at 204 h is half way between the single run and the mean
+    const raw = data.sampleSeries(kind, lat, lon), z = data.sampleSeries('z500', lat, lon), em = data.sampleSeries('z500em', lat, lon);
+    const at = (S, t) => S.values[S.steps.indexOf(t)];
+    for (const [t, w] of [[168, 0], [204, 0.5], [240, 1]]) near(s.values[s.steps.indexOf(t)], at(raw, t) + w * (at(em, t) - at(z, t)), 1e-3, `${kind} weight ${w} at ${t} h`);
+  }
+  assert.equal(data.patternSeries('nope', lat, lon), null);
+});
+
+test('blend: no mean in the run means the single run at every t, and hasMean() is false', async () => {
+  const { data } = await open('synthetic-15d-nomean');
+  assert.equal(data.hasMean(), false);
+  await data.ensureAll('z500', 'g1'); await data.ensureAll('z500a', 'g1');
+  for (const t of [0, 168, 204, 240, 300, 360]) {
+    assert.equal(data.patternSource(t), 'hres', `source at ${t} h`);
+    const p = data.patternField('z500a', 'g1', t), r = data.storedFieldAt('z500a', 'g1', t);
+    for (let k = 0; k < p.length; k += 211) { if (r[k] === r[k]) near(p[k], r[k], 1e-6, `no-mean ${t} h`); }
+  }
+  const s = data.patternSeries('z500a', 37.77, -122.42), r = data.sampleSeries('z500a', 37.77, -122.42);
+  assert.deepEqual(Array.from(s.values), Array.from(r.values), 'the series is the single run too');
+  assert.deepEqual(data.missing().map((x) => x.field), ['z500em']);
+  assert.ok(data.missing()[0].reason.length > 5);
+});
+
+test('blend: consecutive calls for different kinds return different buffers, and neither overwrites the other', async () => {
+  const { data } = await open('synthetic-15d');
+  for (const f of ['z500', 'z500a', 'z500em']) await data.ensureAll(f, 'g1');
+  const a = data.patternField('z500a', 'g1', 204), copyA = Float32Array.from(a);
+  const z = data.patternField('z500', 'g1', 204);
+  assert.notEqual(a, z, 'different kinds, different buffers');
+  assert.deepEqual(Array.from(a), Array.from(copyA), 'the second call did not overwrite the first');
+  const pub = data.fieldAt('z500a', 'g1', 204);
+  assert.deepEqual(Array.from(pub), Array.from(copyA), 'the public fieldAt for z500a is the blended map');
+  assert.notEqual(data.fieldAt('z500', 'g1', 204), pub);
+  const copyZ = Float32Array.from(z);
+  data.patternField('z500a', 'g1', 210); // a later frame of one kind leaves the other kind's frame alone
+  assert.deepEqual(Array.from(z), Array.from(copyZ), 'the z500 frame survives a z500a call at another time');
+});
+
+test('blend: ensure() loads the ensemble-mean chunks a blended frame needs', async () => {
+  const data = await load('data/index.js');
+  const inner = shim(path.join(fixtures, 'synthetic-15d')), calls = [];
+  data._reset({ fetch: async (u) => { calls.push(u); return inner(u); } });
+  await data.loadManifest();
+  await data.ensure('z500a', 'g1', 100);
+  assert.ok(!calls.some((u) => u.includes('z500em')), 'before day 7 the mean is not fetched');
+  await data.ensure('z500a', 'g1', 204);
+  assert.ok(calls.some((u) => u.includes('z500em.g1')), 'at 204 h the ensemble mean is fetched');
+  assert.ok(data.patternField('z500a', 'g1', 204), 'and the blended frame is ready');
+});
+
+test('data:error is emitted for a corrupt chunk and for a missing one; the rejection stays; missing() reflects the manifest', async () => {
+  const { bus } = await load('state.js');
+  const data = await load('data/index.js');
+  const inner = shim(path.join(fixtures, 'sample-min'));
+  data._reset({ fetch: async (u) => {
+    if (u.endsWith('z500a.np05.a.bin')) { const r = await inner(u); const b = new Uint8Array(await r.arrayBuffer()).slice(); b[0] = 0; return { ok: true, status: 200, arrayBuffer: async () => b.buffer }; }
+    if (u.endsWith('z500sd.np05.a.bin')) return { ok: false, status: 404 };
+    return inner(u);
+  } });
+  await data.loadManifest();
+  assert.deepEqual(data.missing(), [], 'a manifest without a missing list reports none');
+  const seen = []; const off = bus.on('data:error', (e) => seen.push(e));
+  await assert.rejects(() => data.ensure('z500a', 'np05', 0), /gzip/);
+  await assert.rejects(() => data.ensure('z500sd', 'np05', 0), /404/);
+  off();
+  assert.equal(seen.length, 2);
+  assert.deepEqual(seen.map((e) => [e.field, e.domain, e.chunk]), [['z500a', 'np05', 'a'], ['z500sd', 'np05', 'a']]);
+  assert.match(seen[0].message, /gzip/); assert.match(seen[1].message, /404/);
+  data._reset();
+});
+
+test('kinds: no read of manifest.sample for cases; recorded (no cases) has an origin and valid times', async () => {
+  const { data, m } = await open('recorded-min');
+  assert.equal(m.sample, true); assert.equal(m.cases, undefined);
+  assert.equal(data.activeCase(), null, 'a recorded forecast has no case');
+  const o = data.caseOrigin();
+  assert.ok(o instanceof Date, 'caseOrigin works without cases');
+  assert.equal(o.toISOString(), '2026-11-17T00:00:00.000Z');
+  assert.equal(data.caseOrigin('A')?.toISOString(), '2026-11-17T00:00:00.000Z', 'a stale case id from a hash is ignored');
+  assert.equal(data.validTime(24).toISOString(), '2026-11-18T00:00:00.000Z');
+  assert.equal(data.validTime(24, 'A').toISOString(), '2026-11-18T00:00:00.000Z');
+  assert.equal(data.realValidTime('z500a', 12).toISOString(), '2026-11-17T12:00:00.000Z');
+  const multi = await open('sample-min');
+  assert.equal(multi.data.activeCase(), 'A', 'a multi-case manifest has its case A by default');
+  const live = await open('synthetic-15d');
+  assert.equal(live.data.activeCase(), 'A');
+});
+
+test('blend: a frame a caller holds is never overwritten by a later call, at or before 168 h or after (E-A6)', async () => {
+  const { data } = await open('synthetic-15d');
+  for (const f of ['z500', 'z500a', 'z500em']) await data.ensureAll(f, 'g1');
+  const same = (a, b) => a.length === b.length && a.every((v, k) => v === b[k] || (v !== v && b[k] !== b[k]));
+  for (const [first, second] of [[['z500', 100], ['z500a', 204]], [['z500a', 204], ['z500', 100]]]) {
+    const held = data.fieldAt(first[0], 'g1', first[1]), copy = Float32Array.from(held);
+    const later = data.fieldAt(second[0], 'g1', second[1]);
+    assert.ok(same(held, copy), `fieldAt(${first}) survives fieldAt(${second}) (max change ${Math.max(...held.map((v, k) => Math.abs(v - copy[k]) || 0))})`);
+    assert.ok(later && later !== held, 'a different buffer');
+  }
+  // the stored frame is not the pattern's buffer either: a pattern call at another time leaves a held storedFieldAt frame alone
+  const raw = data.storedFieldAt('z500', 'g1', 100), rawCopy = Float32Array.from(raw);
+  data.fieldAt('z500a', 'g1', 204); data.fieldAt('z500', 'g1', 204);
+  assert.ok(same(raw, rawCopy), 'storedFieldAt frame survives pattern calls');
+});
+
+const openEdited = async (name, edit) => {
+  const data = await load('data/index.js'), inner = shim(path.join(fixtures, name));
+  data._reset({ fetch: async (u) => { const r = await inner(u); if (!/manifest\.json$/.test(u) || !r.ok) return r; const m = await r.json(); edit(m); return { ok: true, status: 200, json: async () => m }; } });
+  const m = await data.loadManifest();
+  return { data, m };
+};
+
+test('blend: a mean recorded on fewer domains than z500 still draws the pattern, resampled and announced (np05 without z500em)', async () => {
+  const { data, m } = await open('synthetic-15d-em-g1only');
+  const { bus } = await load('state.js'), notes = [], off = bus.on('data:mean', (e) => notes.push(e));
+  assert.deepEqual(m.fields.z500em.domains, ['g1']);
+  assert.equal(data.hasMean(), true); assert.equal(data.hasMean('np05'), true); assert.equal(data.hasMean('g1'), true);
+  assert.equal(data.hasMean({ lat: 45, lon: -150 }), true, 'a place in the north Pacific');
+  for (const f of ['z500', 'z500a']) await data.ensureAll(f, 'np05');
+  await data.ensure('z500a', 'np05', 204); // loads the mean from g1 by itself
+  const { toGrid, bilinear, nodeLonLat } = await load('data/grid.js');
+  const g1 = m.domains.g1, np = m.domains.np05;
+  for (const t of [150, 168, 180, 204, 240, 300]) {
+    await data.ensure('z500a', 'np05', t); await data.ensure('z500', 'np05', t);
+    const pa = data.patternField('z500a', 'np05', t), pz = data.patternField('z500', 'np05', t);
+    assert.ok(pa && pz, `np05 draws at ${t} h (was null)`);
+    assert.equal(data.patternSource(t, 'np05'), t < 168 ? 'hres' : t >= 240 ? 'mean' : 'blend');
+    const w = t <= 168 ? 0 : t >= 240 ? 1 : (t - 168) / 72;
+    const za = Float32Array.from(data.storedFieldAt('z500a', 'np05', t)), z = Float32Array.from(data.storedFieldAt('z500', 'np05', t));
+    let checked = 0;
+    const emG = Float32Array.from(data.storedFieldAt('z500em', 'g1', t)), zG = data.storedFieldAt('z500', 'g1', t), dzG = emG.map((v, q) => v - zG[q]);
+    for (let j = 3; j < np.ny; j += 7) for (let i = 3; i < np.nx; i += 9) {
+      const k = j * np.nx + i; if (!(za[k] === za[k])) continue;
+      const [lo, la] = nodeLonLat(np, i, j), [gi, gj] = toGrid(g1, lo, la);
+      const dz = bilinear(dzG, g1, gi, gj, NaN);
+      if (t <= 168) assert.ok(Math.abs(pa[k] - za[k]) < 1e-3, 'single run up to 168 h');
+      else { assert.ok(Math.abs(pa[k] - (za[k] + w * dz)) < 0.5, `z500a ${t} h node ${k}: ${pa[k]} vs ${za[k] + w * dz}`); assert.ok(Math.abs(pz[k] - (z[k] + w * dz)) < 0.5, 'z500'); }
+      checked++;
+    }
+    assert.ok(checked > 30, `${checked} nodes checked`);
+  }
+  assert.equal(notes.length, 1, 'announced once: ' + JSON.stringify(notes));
+  assert.deepEqual(notes[0], { domain: 'np05', source: 'resampled', from: 'g1' });
+  // the point series for a place in np05 follows the same blend (the mean's own finest domain covers it)
+  const s = data.patternSeries('z500a', 45, -150); assert.ok(s.values[s.steps.indexOf(204)] === s.values[s.steps.indexOf(204)]);
+  off();
+});
+
+test('blend: no domain can supply the mean for a domain -> the single run, announced, never a blank frame or a silent blend', async () => {
+  const { data } = await openEdited('synthetic-15d', (m) => { const em = m.fields.z500em; em.domains = ['np05']; em.chunks.forEach((c) => { delete c.files.g1; }); });
+  const { bus } = await load('state.js'), notes = [], off = bus.on('data:mean', (e) => notes.push(e));
+  assert.equal(data.hasMean(), true, 'the run has a mean somewhere'); assert.equal(data.hasMean('np05'), true); assert.equal(data.hasMean('g1'), false, 'but not one that covers g1');
+  await data.ensureAll('z500a', 'g1'); await data.ensureAll('z500', 'g1');
+  for (const t of [204, 300]) {
+    assert.equal(data.patternSource(t, 'g1'), 'hres', `g1 at ${t} h says single run`);
+    const p = data.patternField('z500a', 'g1', t), r = data.storedFieldAt('z500a', 'g1', t);
+    assert.ok(p, `g1 draws at ${t} h`); for (let k = 0; k < p.length; k += 97) if (r[k] === r[k]) assert.ok(Math.abs(p[k] - r[k]) < 1e-6);
+  }
+  assert.deepEqual(notes, [{ domain: 'g1', source: 'none' }], 'announced once');
+  off();
+});

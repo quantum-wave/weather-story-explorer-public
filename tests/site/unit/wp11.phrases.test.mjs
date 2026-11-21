@@ -203,3 +203,16 @@ test('X1 titles and dataset notes: plural, recorded week, range, short-of-range 
   assert.equal(P.laterDaysNote(cov({ nextUpdate: new Date('2026-11-17T21:30:00Z') }), { zone: 'America/Los_Angeles' }), 'later days arrive with the next update (about 1 pm)');
   assert.ok(C.NO_CLEAR_SIGNAL === P.NO_CLEAR_SIGNAL);
 });
+
+test('T2b tripLine: recorded and sample data never promise an update; live never dates before the run', () => {
+  const trip = (start, end) => ({ start, end, label: 'T' });
+  const rec = { firstDate: '2026-11-16', lastDate: '2026-11-25', todayDate: '2026-11-16', kind: 'recorded' };
+  const smp = { firstDate: '2026-11-16', lastDate: '2026-11-18', todayDate: '2026-11-16', kind: 'multi' };
+  assert.equal(P.tripLine(trip('2026-12-05', '2026-12-09'), [], rec, { now: NOW }), 'This recording doesn’t cover these dates.');
+  assert.equal(P.tripLine(trip('2026-11-24', '2026-11-26'), [], smp, { now: NOW }), 'This sample doesn’t cover these dates.');
+  const broad = P.tripLine(trip('2026-11-24', '2026-11-25'), [], rec, { now: NOW });
+  assert.ok(!/Firmer from|starts covering/.test(broad), broad);
+  const short = { firstDate: '2026-11-16', lastDate: '2026-11-24', todayDate: '2026-11-16', kind: 'live' };
+  const far = P.tripLine(trip('2026-11-28', '2026-11-30'), [], short, { now: NOW });
+  assert.ok(!/starts covering it on Mon 9 Nov|before/.test(far) && !/ on (Tue 10|Mon 9|Sun 15) Nov/.test(far), far);
+});

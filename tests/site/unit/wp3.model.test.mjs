@@ -97,3 +97,81 @@ test('thinLabels keeps a minimum pixel gap', () => {
   assert.deepEqual(m.thinLabels(items, 0, 100, 200, 60).map((x) => x.t), [0, 50, 100]);
 });
 test('percentile', () => { assert.equal(m.percentile([1, 2, 3, 4, 100], 95), 100); assert.equal(m.percentile([], 95), null); });
+
+// ---- W3-08: the data-coloured track, honest readout, ruler, easing target (DESIGN-SPEC 7.1, 7.2)
+const pal = await import(new URL('../../../site/js/render/palette.js', import.meta.url).href);
+const conf = await import(new URL('../../../site/js/story/confidence.js', import.meta.url).href);
+const ser = (steps, dam) => ({ steps, values: Float32Array.from(dam, (d) => d * 10) }); // stored in gpm
+
+test('trackTimes: every step to 168 h, then every 12 h (6-hourly early, 12-hourly late)', () => {
+  const steps = Array.from({ length: 61 }, (_, i) => i * 6);
+  const t = m.trackTimes(steps);
+  assert.equal(t.filter((x) => x <= 168).length, 29);
+  assert.ok(t.filter((x) => x > 168).every((x) => x % 12 === 0), 'after 168 h only 12-hourly steps');
+  assert.equal(t[t.length - 1], 360); assert.equal(t.includes(174), false); assert.equal(t.includes(180), true);
+  assert.deepEqual(m.trackTimes([]), []);
+});
+
+test('trackCells: colour equals bandRGBA of the pattern value, blank inside +-2 dam, neutral where there is no clear signal', () => {
+  const steps = [0, 6, 12, 18, 24];
+  const z = ser(steps, [12, 1.5, -9, -25, 3]);
+  const sd = ser(steps, [2, 2, 2, 2, 9]); // the last step: spread 9 dam > |3 dam|: no clear signal
+  for (const ground of ['paper', 'night']) {
+    const cells = m.trackCells(steps, { z500a: z, z500sd: sd, ground });
+    assert.equal(cells.length, 5);
+    assert.deepEqual(cells[0].rgba, pal.bandRGBA('z500a', 12, ground)); assert.equal(cells[0].state, 'band');
+    assert.equal(cells[1].state, 'blank'); assert.equal(cells[1].rgba, null);
+    assert.deepEqual(cells[2].rgba, pal.bandRGBA('z500a', -9, ground));
+    assert.deepEqual(cells[3].rgba, pal.bandRGBA('z500a', -25, ground));
+    assert.equal(cells[4].state, 'none', 'no clear signal'); assert.equal(cells[4].rgba, null);
+  }
+});
+test('trackCells: cells tile [first, last] without gaps; a missing value is nodata, never a colour', () => {
+  const steps = [0, 6, 12, 24];
+  const z = { steps, values: Float32Array.from([100, NaN, -100, 50]) };
+  const c = m.trackCells(steps, { z500a: z, z500sd: null, ground: 'paper' });
+  assert.equal(c[0].from, 0); assert.equal(c[c.length - 1].to, 24);
+  for (let i = 1; i < c.length; i++) assert.equal(c[i].from, c[i - 1].to);
+  assert.equal(c[1].state, 'nodata'); assert.equal(c[1].rgba, null);
+  assert.equal(m.trackCells([], { z500a: z, ground: 'paper' }).length, 0);
+  assert.equal(m.trackCells(steps, { z500a: null, ground: 'paper' }).every((x) => x.state === 'nodata'), true);
+});
+test('blendSeries: the run to 168 h, a linear blend to the mean by 240 h, the mean after; no mean leaves the run', () => {
+  const steps = [0, 168, 204, 240, 300];
+  const run = { steps, values: Float32Array.from([100, 100, 100, 100, 100]) };
+  const mean = { steps: [168, 204, 240, 300], values: Float32Array.from([0, 0, 0, 20]) };
+  const b = m.blendSeries(run, mean);
+  assert.deepEqual([...b.values].map((v) => Math.round(v * 100) / 100), [100, 100, 50, 0, 20]);
+  assert.deepEqual([...m.blendSeries(run, null).values], [...run.values], 'no mean: the single run, honestly');
+  assert.equal(m.blendSeries(null, mean), null);
+});
+test('nearestStep and dayOf', () => {
+  assert.equal(m.nearestStep([0, 6, 12, 24], 8), 6); assert.equal(m.nearestStep([0, 6, 12, 24], 9), 12);
+  assert.equal(m.nearestStep([0, 6, 12, 24], 99), 24); assert.equal(m.nearestStep([], 5), 5);
+  assert.equal(m.isOnStep([0, 6, 12], 6.004), true); assert.equal(m.isOnStep([0, 6, 12], 7), false);
+  assert.deepEqual(m.dayOf(0, 0, 360), { n: 1, of: 15 }); assert.deepEqual(m.dayOf(144, 0, 360), { n: 7, of: 15 });
+  assert.deepEqual(m.dayOf(360, 0, 360), { n: 15, of: 15 }); assert.deepEqual(m.dayOf(30, 0, 36), { n: 2, of: 2 });
+});
+test('readoutLines: two lines, zone name on line 1, Day n of N and the run on line 2, "between model steps" off a step', () => {
+  const d = new Date(2026, 10, 24, 16, 0);
+  const a = m.readoutLines({ date: d, tz: 'PST', t: 144, lo: 0, hi: 360, run: 'ECMWF run Wed 18 Nov, 4 pm PST', between: false });
+  assert.equal(a.line1, 'Tue 24 Nov · 4 pm PST');
+  assert.equal(a.line2, 'Day 7 of 15 · ECMWF run Wed 18 Nov, 4 pm PST');
+  const b = m.readoutLines({ date: d, tz: 'PST', t: 145, lo: 0, hi: 360, run: 'ECMWF run Wed 18 Nov, 4 pm PST', between: true });
+  assert.match(b.line2, /^Day 7 of 15 · between model steps · ECMWF run/);
+  assert.equal(m.readoutLines({ date: d, tz: '', t: 0, lo: 0, hi: 36, run: '' }).line2, 'Day 1 of 2');
+  assert.ok(!/\b\d\dZ\b/.test(a.line1 + a.line2), 'no bare UTC hour beside a local date');
+});
+test('rulerLabel: "Tue 24", "Today" for the first live day, thinning is left to thinLabels', () => {
+  const d = new Date(2026, 10, 24, 0, 0);
+  assert.equal(m.rulerLabel({ date: d, weekday: 'Tue' }, { today: false }), 'Tue 24');
+  assert.equal(m.rulerLabel({ date: d, weekday: 'Tue' }, { today: true }), 'Today');
+});
+test('zoneSpans: only from zones(); no mean means no 51-forecasts caption', () => {
+  const z = m.zoneSpans(360, { hasMean: true });
+  assert.deepEqual(z.map((x) => [x.from, x.to, x.kind, x.caption]), conf.zones(360, { hasMean: true }).map((x) => [x.from, x.to, x.kind, x.caption]));
+  const n = m.zoneSpans(360, { hasMean: false });
+  assert.deepEqual(n.map((x) => [x.from, x.to, x.kind]), [[0, 168, 'hres'], [168, 360, 'hres-late']]);
+  assert.ok(!n.some((x) => /51 forecasts/.test(x.caption)));
+  assert.ok(!n.some((x) => x.kind === 'blend' || x.kind === 'mean'));
+});

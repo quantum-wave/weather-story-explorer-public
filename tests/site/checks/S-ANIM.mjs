@@ -21,14 +21,10 @@ export async function run({ page, baseUrl, assert, dataDir }) {
     window.__T.unmount = window.__T.scrub.mountScrubber(document.getElementById('timeline'));
     return true; })()`);
 
-  // range = the active case's own steps, straight from the manifest
-  const caseId = await page.eval('__wse.store.get().case');
-  // sample data groups fields into cases; live data has none, and the clock then follows z500a and z500
-  const own = manifest.cases
-    ? Object.values(manifest.fields).filter((f) => f.case === caseId).flatMap((f) => f.steps)
-    : ['z500a', 'z500'].flatMap((id) => manifest.fields[id]?.steps || []);
+  // range = the active lens's own steps (Pattern: z500a and z500), straight from the manifest; a sample case is whatever holds them
+  const own = ['z500a', 'z500'].flatMap((id) => manifest.fields[id]?.steps || []);
   const want = [Math.min(...own), Math.max(...own)];
-  assert.deepEqual(await page.eval('__T.clock.range()'), want, 'range is the active case steps');
+  assert.deepEqual(await page.eval('__T.clock.range()'), want, 'range is the active lens steps');
   const span = want[1] - want[0];
   if (span <= 60) assert.equal(await page.eval('__wse.store.get().speed'), 3, 'a short case plays at 3 h/s');
 
@@ -92,24 +88,25 @@ export async function run({ page, baseUrl, assert, dataDir }) {
   assert.equal(await page.eval('__wse.store.get().playing'), false, 'Space in a text field does not play');
   await page.eval(`document.getElementById('tmp-in').remove()`);
 
-  // scrubber structure. The ribbon is a live-forecast claim: it is checked with sample off, and shown absent in sample mode.
-  const wasSample = await page.eval('__wse.store.get().sample');
-  await page.eval(`__wse.store.set({ sample: false })`);
-  await page.waitFor(`document.querySelectorAll('#timeline .tl-word').length >= 1`, { timeout: 3000 });
+  // scrubber structure (W3-08): a two-line readout, a ruler, a data-coloured track with zone captions, a named speed menu.
+  await page.waitFor(`document.querySelectorAll('#timeline .tl-zonecap').length >= 1 && document.querySelectorAll('#timeline .tl-cell').length >= 4`, { timeout: 5000 });
   const dom = await page.eval(`(() => { const q = (s) => document.querySelectorAll('#timeline ' + s).length; const r = (s) => { const b = document.querySelector('#timeline ' + s).getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; };
-    return { track: q('.tl-track'), ticks: q('.tl-tick'), days: q('.tl-day'), words: q('.tl-word'), play: r('.tl-play'), trackBox: r('.tl-track'), step: r('.tl-step'),
-      grad: document.querySelector('#timeline .tl-ribbon').style.background.includes('linear-gradient'), ribbonH: document.querySelector('#timeline .tl-ribbon-wrap').getBoundingClientRect().height,
-      role: document.querySelector('#timeline .tl-track').getAttribute('role'), time: document.querySelector('#timeline .tl-time-main').textContent, speed: document.querySelector('#timeline .tl-speed').textContent }; })()`);
-  assert.equal(dom.track, 1); assert.ok(dom.ticks >= 1, 'day ticks: ' + dom.ticks); assert.ok(dom.days >= 1, 'day labels: ' + dom.days);
-  assert.ok(dom.words >= 1, 'ribbon words'); assert.ok(dom.grad, 'ribbon gradient'); assert.equal(dom.ribbonH, 6);
-  await page.eval(`__wse.store.set({ sample: true })`);
-  await page.waitFor(`document.querySelectorAll('#timeline .tl-word').length === 0`, { timeout: 3000 });
-  assert.equal(await page.eval(`document.querySelector('#timeline .tl-ribbon').hidden`), true, 'sample mode: no confidence ribbon');
-  await page.eval('__wse.store.set({ sample: ' + wasSample + ' })');
+    return { track: q('.tl-track'), ticks: q('.tl-tick'), days: q('.tl-day'), caps: q('.tl-zonecap'), cells: q('.tl-cell'), play: r('.tl-play'), trackBox: r('.tl-track'), step: r('.tl-step'),
+      role: document.querySelector('#timeline .tl-track').getAttribute('role'), line1: document.querySelector('#timeline .tl-line1').textContent, line2: document.querySelector('#timeline .tl-line2').textContent,
+      speed: document.querySelector('#timeline .tl-speed').textContent, ribbon: q('.tl-ribbon') }; })()`);
+  assert.equal(dom.track, 1); assert.ok(dom.ticks >= 1, 'day ticks: ' + dom.ticks); assert.ok(dom.days >= 1, 'ruler labels: ' + dom.days);
+  assert.ok(dom.caps >= 1, 'zone captions'); assert.ok(dom.cells >= 4, 'track cells'); assert.equal(dom.ribbon, 0, 'the old confidence ribbon is gone');
   assert.ok(dom.play[0] >= 44 && dom.play[1] >= 44, 'play target ' + dom.play);
   assert.ok(dom.step[0] >= 44 && dom.step[1] >= 44, 'step target ' + dom.step);
   assert.ok(dom.trackBox[1] >= 44, 'track is at least 44 px tall: ' + dom.trackBox);
-  assert.equal(dom.role, 'slider'); assert.match(dom.time, /^\w{3} \d{1,2} \w{3}, \d{1,2}(:\d\d)? (am|pm)$/); assert.match(dom.speed, /h\/s$/);
+  assert.equal(dom.role, 'slider'); assert.match(dom.line1, /^\w{3} \d{1,2} \w{3}( \d{4})? · \d{1,2}(:\d\d)? (am|pm)/); assert.match(dom.line2, /^Day \d+ of \d+/); assert.match(dom.speed, /^Speed: (Slow|Normal|Fast)$|h\/s$/);
+  // the speed menu is named: Slow, Normal, Fast
+  await page.eval(`document.querySelector('#timeline .tl-speed').click()`);
+  assert.deepEqual(await page.eval(`[...document.querySelectorAll('#timeline .tl-menu-item')].map((b) => b.textContent)`), ['Slow', 'Normal', 'Fast']);
+  await page.eval(`document.querySelectorAll('#timeline .tl-menu-item')[2].click()`);
+  assert.equal(await page.eval(`document.querySelector('#timeline .tl-menu').hidden`), true, 'the menu closes on a choice');
+  assert.equal(await page.eval('__wse.store.get().speed'), (await page.eval('__T.clock.speeds()'))[2], 'Fast sets the fast speed');
+  await page.eval('__T.clock.setSpeed(' + (await page.eval('__wse.store.get().speed')) + ')');
 
   // drag: pointerdown pauses, pointermove follows, pointerup ends
   await page.eval('__T.clock.play()');
@@ -137,7 +134,7 @@ export async function run({ page, baseUrl, assert, dataDir }) {
     const bars = [...document.querySelectorAll('#timeline .tl-trip')].map((b) => ({ title: b.title, w: b.getBoundingClientRect().width, h: b.getBoundingClientRect().height }));
     p.trips = orig; bus.emit('pins:changed'); await new Promise((r) => setTimeout(r, 120));
     return { bars, after: document.querySelectorAll('#timeline .tl-trip').length }; })()`);
-  assert.equal(trip.bars.length, 1, 'one trip span drawn'); assert.equal(trip.bars[0].title, 'Tahoe'); assert.ok(trip.bars[0].w > 4 && trip.bars[0].h === 3);
+  assert.equal(trip.bars.length, 1, 'one trip span drawn'); assert.equal(trip.bars[0].title, 'Tahoe'); assert.ok(trip.bars[0].w > 4 && trip.bars[0].h === 16, 'trip span box: ' + JSON.stringify(trip.bars[0]));
   assert.equal(trip.after, 0, 'span removed when the trip goes');
 
   // sheet hook, debug readout
@@ -150,8 +147,8 @@ export async function run({ page, baseUrl, assert, dataDir }) {
   assert.match(await page.eval(`document.getElementById('debug').textContent`), /frame p95 .*ms · .*heap/);
   await page.eval(`location.hash = ''`);
   await page.waitFor(`document.getElementById('debug').hidden === true`, { timeout: 2000 });
-  await page.eval(`(() => { const l = document.getElementById('run-label'); for (let i = 0; i < 5; i++) l.click(); })()`);
-  assert.equal(await page.eval(`document.getElementById('debug').hidden`), false, 'five taps on the run label show #debug');
+  await page.eval(`(() => { const l = document.getElementById('data-chip'); for (let i = 0; i < 5; i++) l.click(); })()`);
+  assert.equal(await page.eval(`document.getElementById('debug').hidden`), false, 'five taps on the data chip show #debug');
 
   // reduced motion: tweens jump, the opening loop stays paused
   await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });

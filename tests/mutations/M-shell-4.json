@@ -1,0 +1,11 @@
+{
+ "id": "shell-4",
+ "file": "site/css/home.css",
+ "find": "#app[data-snap=\"peek\"] .focus-card .summary { display: block; -webkit-line-clamp: unset; overflow: visible;",
+ "replace": "#app[data-snap=\"peek\"] .focus-card .summary { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;",
+ "checks": [
+  "S-SHELL"
+ ],
+ "expect": "killed",
+ "note": "Peek cuts the story sentence to two lines with an ellipsis (spec 11.1 allows three). S-SHELL's three-line peek probe (a 110-character sentence that wraps to three lines must show whole) must fail. Retargeted in rescue round 2: the peek sentence is styled by home.css (W3-06, injected after shell.css, equal specificity), so the shell's own three-line clamp was dead code and mutating it was an equivalent mutant; that clamp was removed."
+}

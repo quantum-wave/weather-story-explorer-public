@@ -1,0 +1,11 @@
+{
+  "id": "field-1",
+  "file": "site/js/render/sample.js",
+  "find": "rgb[Math.max(0, Math.min(rgb.length - 1, i))]",
+  "replace": "rgb[Math.max(0, Math.min(rgb.length - 1, i + 1))]",
+  "checks": [
+    "S-COLOR"
+  ],
+  "expect": "killed",
+  "note": "DESIGN-SPEC 4.2 and 14.3 band colour: every band shifted by one (each pixel takes the next band's hex). The palette unit tests still pass because they read palette.js; only a probe on rendered pixels sees it. S-COLOR's +6.9 dam probe (#fe9400) must fail."
+}

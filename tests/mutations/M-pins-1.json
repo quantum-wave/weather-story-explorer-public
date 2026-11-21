@@ -1,0 +1,11 @@
+{
+ "id": "pins-1",
+ "file": "site/js/pins/picker.js",
+ "find": "  if (several) return { state: 'choose', found };",
+ "replace": "  if (false) return { state: 'choose', found };",
+ "checks": [
+  "S-ADDFLOW"
+ ],
+ "expect": "killed",
+ "note": "Auto-pick the first match: a name several places answer to (Tahoe, Portland) is settled with the first row instead of waiting for a choice, in the sheet and in the inline box. S-ADDFLOW's 'Tahoe lists three places and adds nothing until one is chosen' assertions must fail (design spec 8.2, Josh point 2, UX-6)."
+}

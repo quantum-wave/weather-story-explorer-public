@@ -209,10 +209,12 @@ export async function run({ page, baseUrl, assert, fixture }) {
     }
     return out;
   })()`);
+  const GAP = await page.eval('ST.LABEL_GAP');
+  assert.ok(GAP >= 4, tag('the label gap is a real gap: ' + GAP));
   for (const r of lab) {
     const where = tag(`labels at ${r.W} px phone=${r.phone}${r.expanded ? ' expanded' : ''} range=${r.to + 1} active=${r.active}: ${r.labels}`);
     assert.ok(r.inside, where + ' inside the SVG');
-    assert.ok(r.n < 2 || r.minGap > 0, where + ` no two label boxes meet (min gap ${r.minGap})`);
+    assert.ok(r.n < 2 || r.minGap >= GAP - 0.05, where + ` no two label boxes meet: at least ${GAP} px apart (min gap ${r.minGap})`);
     assert.ok(r.hasActive, where + ' the active day keeps its label');
     assert.equal(r.noteHits, 0, where + ` zone notes (${r.notesN}) clear of labels, fill, hatch and curve ${r.noteWhy}`);
     assert.ok(r.minFont >= 12, where + ' no strip text under 12 px: ' + r.minFont);
@@ -220,6 +222,63 @@ export async function run({ page, baseUrl, assert, fixture }) {
     assert.ok(r.order, where + ' "normal" drawn after (above) the passed block');
     assert.deepEqual(r.normalHits, [], where + ' "normal" clear of the no-signal band and the curve');
   }
+  // Wider glyphs than this machine's: GitHub's Linux runner rendered "Today ... Sun 22" at 313 px with the boxes
+  // overlapping (run 44552620826, min gap -0.12). Force wider metrics here, platform-independently (letter-spacing on the
+  // strip text, then a wide fallback font for --font-ui), and hold the same rule: every label box inside the strip, at
+  // least LABEL_GAP apart (the end-cell label included), the active day named. Then the in-place refit: a strip built
+  // with plain metrics and mounted into a container that spaces its letters re-fits its labels within a few frames.
+  const WIDE = [['letter-spacing 1.5px', 'svg.strip text{letter-spacing:1.5px}'], ['letter-spacing 3px', 'svg.strip text{letter-spacing:3px}'],
+    ['wide font', ':root{--font-ui:Verdana,"DejaVu Sans",Geneva,sans-serif} svg.strip text{letter-spacing:.6px}']];
+  const wide = await page.eval(`(async () => {
+    const out = [];
+    const boxesOf = (svg, W) => {
+      const all = [...svg.querySelectorAll('text.strip-label')].map((t) => { const b = t.getBBox(); return { t: t.textContent, l: b.x, r: b.x + b.width, bold: t.getAttribute('style').includes('600') }; }).sort((a, b) => a.l - b.l);
+      let minGap = Infinity, inside = true;
+      all.forEach((b, i) => { if (b.l < -0.01 || b.r > W + 0.01) inside = false; if (i) minGap = Math.min(minGap, b.l - all[i - 1].r); });
+      return { n: all.length, minGap: +minGap.toFixed(2), inside, bold: all.some((b) => b.bold), labels: all.map((b) => b.t).join(',') };
+    };
+    for (const [name, css] of ${JSON.stringify(WIDE)}) {
+      const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+      try {
+        for (const [W, phone, to, expanded] of [[313, false, 6], [264, false, 6], [324, true, 6], [324, true, 9], [324, true, 14], [313, false, 14], [640, false, 14], [640, false, 6], [360, true, 14, true]]) {
+          const base = await S.buildDays(37.77, -122.42, 0, to);
+          if (base.length < 2) continue;
+          const days = Array.from(base);
+          for (const k of ['series', 'windows']) Object.defineProperty(days, k, { value: base[k], enumerable: false });
+          Object.defineProperty(days, 'coverage', { value: { ...base.coverage, todayDate: base[0].date, kind: 'live' }, enumerable: false });
+          days[0] = { ...base[0], today: true, passedH: base.series.windows[0].startH + 9 };
+          for (const active of [-1, 0, 1, Math.min(3, days.length - 1), Math.min(6, days.length - 1)]) {
+            const svg = ST.stripSVG(days, base.series, { width: W, phone, range: to + 1, activeDay: active, expanded: !!expanded });
+            svg.style.position = 'absolute'; svg.style.left = '-9999px'; document.body.appendChild(svg);
+            out.push({ name, W, phone, to, expanded: !!expanded, active, ...boxesOf(svg, W) });
+            svg.remove();
+          }
+        }
+      } finally { st.remove(); }
+    }
+    // the in-place refit: built with plain metrics, then mounted where the letters are spaced 3 px
+    const base = await S.buildDays(37.77, -122.42, 0, 6);
+    const host = document.createElement('div'); host.style.cssText = 'position:absolute;left:-9999px;letter-spacing:3px'; document.body.appendChild(host);
+    const svg = ST.stripSVG(base, base.series, { width: 313, activeDay: 1 });
+    const built = [...svg.querySelectorAll('text.strip-label')].length;
+    host.appendChild(svg);
+    const before = boxesOf(svg, 313);
+    for (let f = 0; f < 3; f++) await new Promise((r) => requestAnimationFrame(r));
+    const after = boxesOf(svg, 313);
+    host.remove();
+    return { out, refit: { built, before, after } };
+  })()`);
+  assert.ok(wide.out.length >= 3 * 5, tag('wide-glyph cases ran: ' + wide.out.length));
+  for (const r of wide.out) {
+    const where = tag(`${r.name}: labels at ${r.W} px phone=${r.phone}${r.expanded ? ' expanded' : ''} range=${r.to + 1} active=${r.active}: ${r.labels}`);
+    assert.ok(r.inside, where + ' inside the SVG');
+    assert.ok(r.n < 2 || r.minGap >= GAP - 0.05, where + ` at least ${GAP} px apart (min gap ${r.minGap})`);
+    assert.ok(r.n >= 1, where + ' some label drawn');
+    assert.ok(r.active < 0 || r.bold, where + ' the active day keeps its label');
+  }
+  assert.ok(wide.refit.after.inside && (wide.refit.after.n < 2 || wide.refit.after.minGap >= GAP - 0.05) && wide.refit.after.bold,
+    tag('mounted into a letter-spaced card, the strip re-fits its labels: ' + JSON.stringify(wide.refit)));
+
   // the phone end cell's mini wave is centred on the cell's own normal line: its slice rects (full wave height about the
   // wave's baseline) have the line's y as their centre, so blue is below the visible line and orange above it
   const mini = await page.eval(`(() => {

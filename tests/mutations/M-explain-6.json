@@ -1,0 +1,11 @@
+{
+  "id": "explain-6",
+  "file": "site/js/ui/readout.js",
+  "find": "clearOfPlates = (c) => !hitsAny(plates, c);",
+  "replace": "clearOfPlates = () => true;",
+  "checks": [
+    "S-EXPLAIN"
+  ],
+  "expect": "killed",
+  "note": "W4-02 acceptance 4: the pinned card treats the drawn ridge and trough plates as obstacles. Without it the card half-covers a plate; S-EXPLAIN asserts no plate box touches the card (4 px slack) at the ridge probe and in the sweep of pinned points."
+}

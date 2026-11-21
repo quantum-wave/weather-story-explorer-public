@@ -1,17 +1,15 @@
-/* timeline.css (WP3): transport, track, day bands, trip spans, confidence ribbon, #debug readout.
-   Dock hooks for the shell: #timeline[data-dock="sheet"] with [data-sheet="full"] collapses to a 44 px bar. */
+/* timeline.css (W3-08): two-line readout, ruler, data-coloured track with zone textures and captions, trip spans, #debug readout.
+   Dock hooks for the shell: #timeline[data-dock="sheet"] is 56 px at peek and full, 72 px at half (the ruler is the extra 16 px). */
 
 .tl-root {
   --tl-text: #E6E9ED;
   --tl-text2: #9AA4AF;
-  --tl-hair: #232B33;
+  --tl-hair: #3A444E;
   --tl-ring: #F4F1EA;
   --tl-rail: #2E3841;
-  --tl-ribbon-rgb: 230, 233, 237;
+  --tl-blank: #2A323A;
+  --tl-menu-bg: #151A20;
   --tl-trip: oklch(0.78 0.11 200);
-  --tl-loaded: #4A5663;
-  --tl-grey: #1A2027;
-  --tl-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
   box-sizing: border-box;
   color: var(--tl-text);
   font: 13px/15px -apple-system, "SF Pro Text", system-ui, sans-serif;
@@ -23,99 +21,144 @@
 .tl-root[data-theme="light"] {
   --tl-text: #1C2024;
   --tl-text2: #5F6670;
-  --tl-hair: #E2DED6;
+  --tl-hair: #B9B3A6;
   --tl-ring: #1C2024;
   --tl-rail: #CFCAC0;
-  --tl-ribbon-rgb: 28, 32, 36;
+  --tl-blank: #E4E0D7;
+  --tl-menu-bg: #FBF9F4;
   --tl-trip: oklch(0.52 0.12 200);
-  --tl-loaded: #A39D91;
-  --tl-grey: #E7E3DB;
 }
 .tl-root *, .tl-root *::before, .tl-root *::after { box-sizing: border-box; }
 
 /* ---- transport */
-.tl-head { display: flex; align-items: center; gap: 4px; min-height: 44px; }
+.tl-head { display: flex; align-items: center; gap: 4px; min-height: 44px; flex-wrap: nowrap; }
+/* One row on a wide timeline: the readout is the one thing that gives way (line 2 ends in an ellipsis; its title holds the whole
+   line, and "Day n of N" and "between model steps" come first). Below 720 px the head wraps deliberately: the readout takes
+   the first row and the controls the second, right-aligned. */
+.tl-head > :not(.tl-time) { flex: 0 0 auto; }
+@media (max-width: 720px) {
+  .tl-root:not([data-dock="sheet"]) .tl-head { flex-wrap: wrap; }
+  .tl-root:not([data-dock="sheet"]) .tl-spacer { flex: 1 1 0; }
+}
 .tl-spacer { flex: 1 1 auto; }
-.tl-btn, .tl-time {
+.tl-btn, .tl-time, .tl-speed, .tl-now, .tl-range-opt, .tl-menu-item {
   appearance: none; border: 0; background: transparent; color: var(--tl-text);
   font: inherit; cursor: pointer; border-radius: 10px;
   min-width: 44px; min-height: 44px; padding: 0;
   display: inline-flex; align-items: center; justify-content: center;
-  transition: background-color 200ms ease-out;
+  transition: background-color 120ms ease-out;
 }
-.tl-btn:hover, .tl-time:hover { background: color-mix(in srgb, var(--tl-text) 8%, transparent); }
-.tl-btn:active, .tl-time:active { background: color-mix(in srgb, var(--tl-text) 14%, transparent); }
+.tl-btn:hover, .tl-time:hover, .tl-speed:hover, .tl-now:hover, .tl-range-opt:hover, .tl-menu-item:hover { background: color-mix(in srgb, var(--tl-text) 8%, transparent); }
+.tl-btn:active, .tl-time:active, .tl-speed:active, .tl-now:active { background: color-mix(in srgb, var(--tl-text) 14%, transparent); }
 .tl-play { color: var(--tl-ring); }
 .tl-play svg { width: 24px; height: 24px; }
-.tl-speed { font: 12px/15px ui-monospace, "SF Mono", Menlo, monospace; font-variant-numeric: tabular-nums; color: var(--tl-text2); min-width: 56px; }
-.tl-time { flex-direction: column; align-items: flex-start; justify-content: center; padding: 0 8px; min-width: 0; text-align: left; }
-.tl-time-main { font: 13px/15px ui-monospace, "SF Mono", Menlo, monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.tl-time-sub { font: 12px/14px ui-monospace, "SF Mono", Menlo, monospace; font-variant-numeric: tabular-nums; color: var(--tl-text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.tl-time { flex-direction: column; align-items: flex-start; justify-content: center; padding: 0 8px; min-width: 0; text-align: left; flex: 0 1 auto; max-width: 100%; }
+.tl-line1 { font: 600 14px/18px -apple-system, "SF Pro Text", system-ui, sans-serif; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tl-line2 { font: 12px/16px -apple-system, "SF Pro Text", system-ui, sans-serif; color: var(--tl-text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.tl-root[data-between="1"] .tl-line2 { color: var(--tl-text); }
+.tl-range { font: 12px/16px -apple-system, "SF Pro Text", system-ui, sans-serif; color: var(--tl-text2); padding: 0 8px; white-space: nowrap; display: inline-flex; gap: 2px; }
+.tl-range-opt { min-width: 0; padding: 0 10px; font-size: 12px; color: var(--tl-text2); }
+.tl-range-opt[aria-pressed="true"] { color: var(--tl-text); background: color-mix(in srgb, var(--tl-text) 12%, transparent); }
+.tl-range-opt:disabled { opacity: 0.4; cursor: not-allowed; }
+.tl-now {
+  min-width: 0; padding: 0 12px; font: 600 12px/16px -apple-system, "SF Pro Text", system-ui, sans-serif;
+  border: 1px solid var(--tl-ring); border-radius: 999px; min-height: 32px; height: 32px;
+}
+.tl-now[hidden] { display: none; }
+.tl-speedwrap { position: relative; }
+.tl-speed { padding: 0 10px; font: 12px/16px -apple-system, "SF Pro Text", system-ui, sans-serif; color: var(--tl-text2); white-space: nowrap; }
+.tl-speed::after { content: ""; margin-left: 6px; border: 4px solid transparent; border-top-color: currentColor; border-bottom: 0; }
+.tl-menu {
+  position: absolute; right: 0; bottom: calc(100% + 4px); z-index: 20; min-width: 140px; padding: 4px;
+  background: var(--tl-menu-bg); color: var(--tl-text); border: 1px solid var(--tl-hair); border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28); display: flex; flex-direction: column;
+}
+.tl-menu[hidden] { display: none; }
+.tl-menu-item { justify-content: flex-start; padding: 0 12px; font: 13px/18px -apple-system, "SF Pro Text", system-ui, sans-serif; }
+.tl-menu-item[aria-checked="true"] { font-weight: 600; background: color-mix(in srgb, var(--tl-text) 10%, transparent); }
 .tl-root :focus { outline: none; }
 .tl-root :focus-visible { outline: 2px solid var(--tl-ring); outline-offset: -2px; }
 
-/* ---- track */
+/* ---- ruler and track */
 .tl-body { position: relative; padding: 0 14px; }
-.tl-days { position: relative; height: 14px; }
+.tl-days { position: relative; height: 16px; }
 .tl-day {
   position: absolute; top: 0; transform: translateX(-50%);
-  font: 12px/14px -apple-system, "SF Pro Text", system-ui, sans-serif; color: var(--tl-text2); white-space: nowrap;
+  font: 12px/16px -apple-system, "SF Pro Text", system-ui, sans-serif; color: var(--tl-text2); white-space: nowrap;
 }
 .tl-track {
   position: relative; height: 44px; margin: 0 -14px; padding: 0 14px;
   touch-action: none; cursor: ew-resize; border-radius: 10px;
 }
 .tl-area { position: relative; height: 100%; }
-.tl-rail { position: absolute; left: 0; right: 0; top: 50%; height: 4px; margin-top: -2px; border-radius: 2px; background: var(--tl-rail); }
-.tl-grey {
-  position: absolute; top: 50%; height: 4px; margin-top: -2px;
-  background: repeating-linear-gradient(135deg, var(--tl-grey) 0 3px, transparent 3px 6px);
-  border-radius: 2px; z-index: 1;
-}
-.tl-grey-l { left: 0; }
-.tl-grey-r { right: 0; }
-.tl-grey[hidden] { display: none; }
-.tl-loaded { position: absolute; left: 0; right: 0; top: 50%; height: 4px; margin-top: -2px; pointer-events: none; }
-.tl-loaded-seg { position: absolute; top: 0; bottom: 0; background: var(--tl-loaded); border-radius: 2px; }
+/* the strip: 10 px, one cell per time, each the band colour of the pattern at the focused place; blank inside +-2 dam;
+   neutral ink at 40% where there is no clear signal */
+.tl-cells { position: absolute; left: 0; right: 0; top: 50%; height: 10px; margin-top: -5px; border-radius: 3px; overflow: hidden; background: var(--tl-rail); }
+.tl-cell { position: absolute; top: 0; bottom: 0; background: transparent; }
+.tl-cell[data-state="none"] { background: color-mix(in srgb, var(--tl-text) 40%, transparent); }
+.tl-cell[data-state="blank"] { background: var(--tl-blank); }
+/* zone textures from zones(): solid, a dashed upper edge, diagonal hatch */
+.tl-zones { position: absolute; left: 0; right: 0; top: 50%; height: 10px; margin-top: -5px; pointer-events: none; }
+.tl-zone { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--tl-hair); }
+.tl-zone[data-texture="solid"] { border-left-color: transparent; }
+.tl-zone[data-texture="dashed"] { border-top: 2px dashed var(--tl-text); }
+.tl-zone[data-texture="hatch"] { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--tl-text) 55%, transparent) 0 1.5px, transparent 1.5px 5px); }
 .tl-ticks { position: absolute; inset: 0; pointer-events: none; }
-.tl-tick { position: absolute; top: 8px; bottom: 8px; width: 1px; background: var(--tl-hair); transform: translateX(-0.5px); }
-.tl-trips { position: absolute; left: 0; right: 0; bottom: 6px; height: 3px; pointer-events: none; }
-.tl-trip { position: absolute; top: 0; height: 3px; border-radius: 2px; background: var(--tl-trip); }
+.tl-tick { position: absolute; top: 4px; bottom: 4px; width: 1px; background: var(--tl-hair); transform: translateX(-0.5px); }
+.tl-phone-read { display: none; }
+.tl-trips { position: relative; pointer-events: none; }
+.tl-trips:not(:empty) { height: 16px; margin-top: 2px; }
+.tl-trip {
+  position: absolute; top: 0; height: 16px; border-radius: 3px; background: color-mix(in srgb, var(--tl-trip) 28%, transparent);
+  border-bottom: 3px solid var(--tl-trip); font: 12px/13px -apple-system, "SF Pro Text", system-ui, sans-serif; color: var(--tl-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4px;
+}
 
 .tl-thumb { position: absolute; left: 0; top: 0; bottom: 0; width: 0; will-change: transform; pointer-events: none; z-index: 3; }
 .tl-thumb::before { content: ""; position: absolute; left: -0.75px; top: 6px; bottom: 6px; width: 1.5px; background: var(--tl-ring); border-radius: 1px; }
 .tl-thumb-dot {
   position: absolute; left: -8px; top: 50%; width: 16px; height: 16px; margin-top: -8px; border-radius: 50%;
   background: var(--tl-ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tl-ring) 22%, transparent);
-  transition: box-shadow 200ms ease-out;
+  transition: box-shadow 120ms ease-out;
 }
 .tl-dragging .tl-thumb-dot { box-shadow: 0 0 0 8px color-mix(in srgb, var(--tl-ring) 26%, transparent); }
 .tl-track:focus-visible { outline-offset: 0; }
 
-/* ---- ribbon (domain-mean ensemble spread: bright when tight, dim when spread) */
-.tl-ribbon-wrap { position: relative; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--tl-hair) 60%, transparent); }
-.tl-ribbon { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
-.tl-ribbon[data-source="lead"] { opacity: 0.8; }
-.tl-words { position: relative; height: 16px; margin-top: 3px; }
-.tl-word {
-  position: absolute; top: 0; white-space: nowrap; transform: translateX(0);
-  font: 12px/14px -apple-system, "SF Pro Text", system-ui, sans-serif; color: var(--tl-text2);
+/* ---- zone captions (desktop): one per zone, taken from zones() */
+.tl-words { position: relative; height: 30px; margin-top: 2px; }
+.tl-zonecap {
+  position: absolute; top: 0; font: 12px/14px -apple-system, "SF Pro Text", system-ui, sans-serif; color: var(--tl-text2);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
 }
-.tl-word[data-band="pattern-only"] { font-style: italic; }
+.tl-zonecap[data-kind="mean"], .tl-zonecap[data-kind="hres-late"] { font-style: italic; }
+.tl-cap { font: 12px/16px -apple-system, "SF Pro Text", system-ui, sans-serif; color: var(--tl-text2); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* ---- sheet docking (phone): the scrubber rides the sheet's top edge; at full snap it is a 44 px bar */
-.tl-root[data-dock="sheet"] { padding-top: 0; padding-bottom: 4px; }
-.tl-root[data-dock="sheet"][data-sheet="full"] { padding: 0 12px; }
-.tl-root[data-dock="sheet"][data-sheet="full"] .tl-head,
-.tl-root[data-dock="sheet"][data-sheet="full"] .tl-days,
-.tl-root[data-dock="sheet"][data-sheet="full"] .tl-ribbon-wrap,
-.tl-root[data-dock="sheet"][data-sheet="full"] .tl-words,
-.tl-root[data-dock="sheet"][data-sheet="full"] .tl-trips { display: none; }
-.tl-root[data-dock="sheet"][data-sheet="full"] .tl-body { height: 44px; }
+/* ---- phone: docked to the sheet's top edge, 56 px at peek and full, 72 px at half. One row: play, the one-line readout
+   above the track, then the two step buttons. Speed, range, Now, zone words and trip spans are not on the phone
+   timeline; the textures carry the zones and "How sure is this?" carries the words. */
+.tl-root[data-dock="sheet"] {
+  display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px 44px; grid-template-rows: 56px; align-items: center;
+  height: 56px; padding: 0 8px;
+}
+.tl-root[data-dock="sheet"][data-sheet="half"] { grid-template-rows: 16px 56px; height: 72px; }
+.tl-root[data-dock="sheet"] .tl-head, .tl-root[data-dock="sheet"] .tl-body { display: contents; }
+.tl-root[data-dock="sheet"] .tl-time, .tl-root[data-dock="sheet"] .tl-range, .tl-root[data-dock="sheet"] .tl-now,
+.tl-root[data-dock="sheet"] .tl-speedwrap, .tl-root[data-dock="sheet"] .tl-spacer, .tl-root[data-dock="sheet"] .tl-words,
+.tl-root[data-dock="sheet"] .tl-trips, .tl-root[data-dock="sheet"] .tl-cap, .tl-root[data-dock="sheet"] .tl-days { display: none; }
+.tl-root[data-dock="sheet"][data-sheet="half"] .tl-days { display: block; grid-column: 2; grid-row: 1; margin: 0 10px; } /* the same 10 px inset as .tl-area, so a label sits over its day */
+.tl-root[data-dock="sheet"] .tl-play { grid-column: 1; grid-row: -2; align-self: center; }
+.tl-root[data-dock="sheet"] .tl-track { grid-column: 2; grid-row: -2; height: 56px; margin: 0; padding: 0; }
+.tl-root[data-dock="sheet"] .tl-prev { grid-column: 3; grid-row: -2; align-self: center; }
+.tl-root[data-dock="sheet"] .tl-next { grid-column: 4; grid-row: -2; align-self: center; }
+.tl-root[data-dock="sheet"] .tl-phone-read {
+  display: block; position: absolute; left: 10px; right: 10px; top: 5px; height: 16px;
+  font: 12px/16px -apple-system, "SF Pro Text", system-ui, sans-serif; font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--tl-text); pointer-events: none;
+}
+.tl-root[data-dock="sheet"] .tl-area { position: absolute; left: 10px; right: 10px; top: 24px; bottom: 0; height: auto; }
+.tl-root[data-dock="sheet"] .tl-cells, .tl-root[data-dock="sheet"] .tl-zones { top: 14px; margin-top: 0; }
 @media (max-width: 420px) {
-  .tl-root { padding-left: 8px; padding-right: 8px; }
-  .tl-speed { min-width: 48px; }
-  .tl-time { padding: 0 4px; }
+  .tl-root:not([data-dock="sheet"]) { padding-left: 8px; padding-right: 8px; }
 }
 
 /* ---- debug readout */
@@ -128,5 +171,5 @@
 #debug[hidden] { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
-  .tl-btn, .tl-time, .tl-thumb-dot { transition: none; }
+  .tl-btn, .tl-time, .tl-speed, .tl-now, .tl-thumb-dot { transition: none; }
 }

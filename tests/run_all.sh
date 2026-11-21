@@ -29,7 +29,8 @@ case " $* " in
   *)
     LL="$WSE_ARTIFACTS/livelike/data"
     node tests/site/lib/livelike.mjs "$LL" >/dev/null || rc=1
-    ids="$(ls tests/site/checks | sed 's/\.mjs$//' | paste -sd, -)"
+    # --only ignores tiers, so leave the network-tier checks out of the list here (they run nightly: --tier network)
+    ids="$(grep -L "^export const tier = 'network'" tests/site/checks/*.mjs | xargs -n1 basename | sed 's/\.mjs$//' | paste -sd, -)"
     echo "== site (live-like data) =="; node tests/site/run.mjs --data "$LL" --only "$ids" || rc=1
     rm -rf "$WSE_ARTIFACTS/livelike" ;;
 esac

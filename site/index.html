@@ -1,37 +1,56 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark light">
-<meta name="theme-color" content="#0C1014">
+<meta name="theme-color" content="#0E1114">
 <title>Weather Story Explorer</title>
+<link rel="stylesheet" href="css/tokens.css">
 <link rel="stylesheet" href="css/shell.css">
 <link rel="stylesheet" href="css/timeline.css">
 <link rel="stylesheet" href="css/share.css">
-<script src="vendor/d3@7.9.2/d3.min.js"></script>
-<script src="vendor/topojson-client@3.1.0/topojson-client.min.js"></script>
+<script>
+/* set the theme before first paint: the saved choice (Display menu), else the system ("Auto") */
+(function () { var t = 'dark'; try { var q = JSON.parse(localStorage.getItem('wse.v1.prefs')) || {}; var p = q.themePref === 'auto' || q.themePref === 'light' || q.themePref === 'dark' ? q.themePref : q.theme; t = p === 'light' || p === 'dark' ? p : (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); } catch (e) { try { t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'; } catch (e2) {} } document.documentElement.setAttribute('data-theme', t); })();
+</script>
+<link rel="modulepreload" href="js/main.js">
+<link rel="modulepreload" href="js/ui/status.js">
+<link rel="modulepreload" href="js/ui/prefs.js">
+<link rel="modulepreload" href="js/render/theme.js">
+<link rel="modulepreload" href="js/ui/firstpaint.js">
+<link rel="modulepreload" href="js/ui/firstpaint-geo.js">
+<link rel="modulepreload" href="js/render/chart-tokens.js">
+<script async data-lib="d3" src="vendor/d3@7.9.2/d3.min.js" onload="this.dataset.state='load'" onerror="this.dataset.state='error'"></script>
+<script async data-lib="topojson" src="vendor/topojson-client@3.1.0/topojson-client.min.js" onload="this.dataset.state='load'" onerror="this.dataset.state='error'"></script>
 </head>
 <body>
 <div id="app" data-snap="peek">
   <header id="topbar">
     <span class="brand"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Weather Story</span></span>
-    <button id="run-label" class="run-label" type="button" aria-label="Forecast run"></button>
-    <span id="sample-badge" class="badge" hidden></span>
+    <button id="data-chip" class="data-chip" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="data-popover"><span class="chip-text"></span></button>
     <span class="spacer"></span>
-    <button id="btn-share" class="icon-btn" type="button" data-share="still" aria-label="Share this view" title="Share this view"></button>
-    <button id="btn-theme" class="icon-btn" type="button" aria-label="Switch to light theme" title="Switch theme"></button>
+    <button id="btn-share" class="hbtn" type="button" data-share="still">Share</button>
+    <button id="btn-display" class="hbtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="display-menu">Display <span class="caret" aria-hidden="true">&#9662;</span></button>
+    <button id="btn-more" class="hbtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="display-menu">More</button>
   </header>
+  <div id="display-menu" class="menu" hidden></div>
+  <div id="data-popover" class="popover" role="group" aria-label="About this data" hidden></div>
 
   <main id="stage">
     <canvas id="map" width="640" height="360" role="img" aria-label="Animated map of the upper-air pattern"></canvas>
     <div id="map-tools">
-      <div id="view-switch" class="seg" role="group" aria-label="Map view">
-        <button type="button" data-view="np">Regional</button>
-        <button type="button" data-view="nh">Hemisphere</button>
-        <button type="button" data-view="gl">Global</button>
+      <div id="view-switch" class="seg glass" role="group" aria-label="Map view">
+        <button type="button" data-view="np" aria-label="Regional">Reg<span class="vw-long">ional</span></button>
+        <button type="button" data-view="nh" aria-label="Hemisphere">Hemi<span class="vw-long">sphere</span></button>
+        <button type="button" data-view="gl">Globe</button>
+        <button type="button" data-view="wm">World</button>
       </div>
-      <button id="btn-layers" class="tool-btn" type="button" aria-expanded="false" aria-controls="layers-panel"><span class="tool-label">Layers</span></button>
+      <div class="tools-end">
+        <button id="btn-reset" class="tool-btn glass" type="button" hidden>Reset<span class="tool-long"> view</span></button>
+        <button id="btn-layers" class="tool-btn glass" type="button" aria-expanded="false" aria-controls="layers-panel"><span class="tool-label">Layers</span></button>
+        <button id="btn-expand" class="tool-btn glass" type="button">Expand</button>
+      </div>
     </div>
     <div id="layers-panel" class="panel" hidden></div>
     <div id="legend" aria-label="Map legend"></div>
@@ -39,6 +58,8 @@
   </main>
 
   <div id="timeline"></div>
+
+  <div id="divider" role="separator" aria-orientation="vertical" hidden></div>
 
   <aside id="home" class="sheet" aria-label="Your plan">
     <button id="sheet-handle" class="sheet-handle" type="button" aria-label="Resize panel"><span></span></button>

@@ -35,6 +35,8 @@ const CASES = [
   ['4 clipped: a deliberate ellipsis is not flagged', data(`<div style="width:50px;height:24px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">A long line that does not fit</div>`), {}, []],
   ['4 clipped: scrolled-out text in a scroller is not flagged', data(`<div style="width:200px;height:40px;overflow:hidden"><div style="height:40px;overflow-y:auto"><p style="margin:0;height:100px">first</p><p style="margin:0">second</p></div></div>`), {}, []],
   ['5 target: a 30 px button on the phone', data(`<button id=t style="width:30px;height:30px">x</button>`), { phone: true }, [5], '#t'],
+  ['5 target: a listed allowTarget control is not an offender, an unlisted one still is', data(`<button id=ok style="width:30px;height:30px">x</button><button id=t style="width:30px;height:30px">y</button>`), { phone: true, allowTarget: ['#ok'] }, [5], '#t'],
+  ['5 target: allowTarget alone clears the stop', data(`<button id=ok style="width:30px;height:30px">x</button>`), { phone: true, allowTarget: ['#ok'] }, []],
   ['5 target: the same button on the desktop is fine', data(`<button style="width:30px;height:30px">x</button>`), { phone: false }, []],
   ['visually hidden text is not judged', data(`<span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);font-size:8px">screen reader text that is long</span><p>ok</p>`), {}, []],
   ['an open modal scopes the check to its own content', data(`<p id=a style="position:absolute;left:20px;top:40px;margin:0">under one</p><p id=b style="position:absolute;left:30px;top:44px;margin:0">under two</p><div role=dialog aria-modal=true style="position:fixed;left:0;right:0;bottom:0;height:300px;background:#eee"><button style="width:60px;height:44px">OK</button></div>`), {}, []],

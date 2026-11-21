@@ -1,0 +1,11 @@
+{
+ "id": "wiring-1",
+ "file": "site/js/state.js",
+ "find": "const DEEP = ['layers', 'overlays'];",
+ "replace": "const DEEP = ['layers'];",
+ "checks": [
+  "unit:wp16.state.test.mjs"
+ ],
+ "expect": "killed",
+ "note": "Shallow-merge overlays: store.set({overlays: {jetline: true}}) wipes the other five flags. The state unit test's deep-merge assertions must fail (design spec 15, store keys; critique C8)."
+}

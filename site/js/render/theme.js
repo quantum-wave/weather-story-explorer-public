@@ -19,3 +19,12 @@ export const theme = (name) => THEMES[name] || THEMES.dark;
 
 export const FONT_MONO = 'ui-monospace, "SF Mono", Menlo, monospace';
 export const FONT_UI = '-apple-system, "SF Pro Text", system-ui, sans-serif';
+
+/** Chart numerals (DESIGN-SPEC 10.2): UI face, weight 600, 11 px on the chart; the caller sets tabular figures and spacing where the context has them. */
+export const FONT_CHART = `600 11px ${FONT_UI}`;
+
+/**
+ * The chart ground a state draws on. The store's `ground` ('paper' | 'night') wins; until a shell sets it, a light theme draws
+ * Paper and a dark one Night, which is what the pages did before the ground was its own choice.
+ */
+export const groundFor = (s) => (s?.ground === 'paper' || s?.ground === 'night' ? s.ground : s?.theme === 'light' ? 'paper' : 'night');

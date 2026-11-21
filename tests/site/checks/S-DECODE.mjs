@@ -16,12 +16,12 @@ export async function run({ page, baseUrl, assert }) {
     const { data } = window.__wp2, m = data.getManifest(), out = { probes: [], ranges: [] };
     for (const [f, meta] of Object.entries(m.fields)) for (const d of meta.domains) await data.ensureAll(f, d);
     for (const p of m.probes) {
-      const meta = m.fields[p.field], d = m.domains[p.domain], arr = data.fieldAt(p.field, p.domain, p.step);
+      const meta = m.fields[p.field], d = m.domains[p.domain], arr = data.storedFieldAt(p.field, p.domain, p.step); // as stored: fieldAt blends z500 and z500a toward the ensemble mean after day 7
       const i = Math.round(((((p.lon - d.lon0) % 360) + 360) % 360) / d.dlon), j = Math.round((p.lat - d.lat0) / d.dlat);
       out.probes.push({ name: p.name, field: p.field, domain: p.domain, step: p.step, want: p.value, got: arr ? arr[j * d.nx + i] : null, scale: meta.scale });
     }
     for (const f of ['z500', 'z500a']) if (m.fields[f]) {
-      const d0 = m.fields[f].domains[0], a = data.fieldAt(f, d0, m.fields[f].steps[0]);
+      const d0 = m.fields[f].domains[0], a = data.storedFieldAt(f, d0, m.fields[f].steps[0]);
       let lo = Infinity, hi = -Infinity; for (const v of a) if (v === v) { if (v < lo) lo = v; if (v > hi) hi = v; }
       out.ranges.push({ f, lo, hi });
     }

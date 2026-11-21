@@ -1,0 +1,2269 @@
+{
+ "schema": 1,
+ "sample": true,
+ "sample_note": "synthetic test data: every field, every state; not a forecast",
+ "model": "Synthetic test fixture (15-day)",
+ "run": "2026-11-17T00:00Z",
+ "generated": "2026-11-17T23:50Z",
+ "attribution": "synthetic test data, no source",
+ "climatology": {
+  "label": "synthetic",
+  "source": "analytic",
+  "method": "analytic"
+ },
+ "cases": {
+  "A": {
+   "label": "Synthetic states",
+   "fields": [
+    "z500",
+    "z500a",
+    "z500sd",
+    "z500em",
+    "ws250",
+    "msl",
+    "tp6",
+    "t850a",
+    "t2m",
+    "pr1",
+    "pr10",
+    "ivt"
+   ]
+  }
+ },
+ "domains": {
+  "g1": {
+   "lon0": -180,
+   "lat0": 90,
+   "dlon": 2,
+   "dlat": -2,
+   "nx": 181,
+   "ny": 91
+  },
+  "np05": {
+   "lon0": 150,
+   "lat0": 75,
+   "dlon": 1,
+   "dlat": -1,
+   "nx": 161,
+   "ny": 66
+  }
+ },
+ "fields": {
+  "z500": {
+   "units": "gpm",
+   "scale": 1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48,
+    54,
+    60,
+    66,
+    72,
+    78,
+    84,
+    90,
+    96,
+    102,
+    108,
+    114,
+    120,
+    126,
+    132,
+    138,
+    144,
+    150,
+    156,
+    162,
+    168,
+    174,
+    180,
+    186,
+    192,
+    198,
+    204,
+    210,
+    216,
+    222,
+    228,
+    234,
+    240,
+    246,
+    252,
+    258,
+    264,
+    270,
+    276,
+    282,
+    288,
+    294,
+    300,
+    306,
+    312,
+    318,
+    324,
+    330,
+    336,
+    342,
+    348,
+    354,
+    360
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      21
+     ],
+     "files": {
+      "g1": {
+       "path": "z500.g1.a.bin",
+       "bytes": 105551,
+       "sha256": "8332601778536d9b3fba19ec4112d6726c412106c07bba4c0c74fbe3bca3a223"
+      },
+      "np05": {
+       "path": "z500.np05.a.bin",
+       "bytes": 101527,
+       "sha256": "921f2581e01d6ac95750df80a1064fc9a177ebfd899fdf81e0ee3eb752223fc1"
+      }
+     }
+    },
+    {
+     "id": "b",
+     "steps": [
+      21,
+      41
+     ],
+     "files": {
+      "g1": {
+       "path": "z500.g1.b.bin",
+       "bytes": 100132,
+       "sha256": "6a79d5000ff7f89bb9d74ef64207a8dfa42440da2a667cc490a8ec5b3c87e1b0"
+      },
+      "np05": {
+       "path": "z500.np05.b.bin",
+       "bytes": 94237,
+       "sha256": "781a16e325234ea8e30c94e426e12c08536f5994a833d905d02ee7953603bcbe"
+      }
+     }
+    },
+    {
+     "id": "c",
+     "steps": [
+      41,
+      61
+     ],
+     "files": {
+      "g1": {
+       "path": "z500.g1.c.bin",
+       "bytes": 98266,
+       "sha256": "3fe295b30ba4771ce59bbe0105d630c2299e2e4373febf72d3cfb4a1b556234a"
+      },
+      "np05": {
+       "path": "z500.np05.c.bin",
+       "bytes": 93092,
+       "sha256": "c3f00522056157cdc9fdbd1c88216d901e51bf566beaf524d1f502b05edd6d32"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "synthetic 15-day fixture (W1-02), analytic",
+    "valid": null
+   }
+  },
+  "z500a": {
+   "units": "gpm",
+   "scale": 1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48,
+    54,
+    60,
+    66,
+    72,
+    78,
+    84,
+    90,
+    96,
+    102,
+    108,
+    114,
+    120,
+    126,
+    132,
+    138,
+    144,
+    150,
+    156,
+    162,
+    168,
+    174,
+    180,
+    186,
+    192,
+    198,
+    204,
+    210,
+    216,
+    222,
+    228,
+    234,
+    240,
+    246,
+    252,
+    258,
+    264,
+    270,
+    276,
+    282,
+    288,
+    294,
+    300,
+    306,
+    312,
+    318,
+    324,
+    330,
+    336,
+    342,
+    348,
+    354,
+    360
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      21
+     ],
+     "files": {
+      "g1": {
+       "path": "z500a.g1.a.bin",
+       "bytes": 83386,
+       "sha256": "aafd2cb17df513f39f6944de6fc33a70eb31ca3e479bb3ec1ef127dbe3396b71"
+      },
+      "np05": {
+       "path": "z500a.np05.a.bin",
+       "bytes": 99972,
+       "sha256": "5e81646de7ee5ae17812cc3d90389e87de7598285421d17623cd686506aced0f"
+      }
+     }
+    },
+    {
+     "id": "b",
+     "steps": [
+      21,
+      41
+     ],
+     "files": {
+      "g1": {
+       "path": "z500a.g1.b.bin",
+       "bytes": 79054,
+       "sha256": "0367663ad92548d65d698edb11dd4a5469cd4859c1460e1d5a410e45b5232507"
+      },
+      "np05": {
+       "path": "z500a.np05.b.bin",
+       "bytes": 93105,
+       "sha256": "69d2b3a31ecb4a6eb0d4df70785c1c377f7c0891738befc66bc68fe75ef81c05"
+      }
+     }
+    },
+    {
+     "id": "c",
+     "steps": [
+      41,
+      61
+     ],
+     "files": {
+      "g1": {
+       "path": "z500a.g1.c.bin",
+       "bytes": 77342,
+       "sha256": "cb9efa4834062353b173943cbf2f36324bdb9dc41ebbf91525e661eb8f6a0fd0"
+      },
+      "np05": {
+       "path": "z500a.np05.c.bin",
+       "bytes": 91427,
+       "sha256": "fc4274496a4d4201222e3dd3b5030687986c4a9670c437318e360d7c3fb5e744"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "synthetic 15-day fixture (W1-02), analytic",
+    "valid": null
+   }
+  },
+  "z500sd": {
+   "units": "gpm",
+   "scale": 0.1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48,
+    54,
+    60,
+    66,
+    72,
+    78,
+    84,
+    90,
+    96,
+    102,
+    108,
+    114,
+    120,
+    126,
+    132,
+    138,
+    144,
+    150,
+    156,
+    162,
+    168,
+    174,
+    180,
+    186,
+    192,
+    198,
+    204,
+    210,
+    216,
+    222,
+    228,
+    234,
+    240,
+    246,
+    252,
+    258,
+    264,
+    270,
+    276,
+    282,
+    288,
+    294,
+    300,
+    306,
+    312,
+    318,
+    324,
+    330,
+    336,
+    342,
+    348,
+    354,
+    360
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      21
+     ],
+     "files": {
+      "g1": {
+       "path": "z500sd.g1.a.bin",
+       "bytes": 17419,
+       "sha256": "03034330adaba9be8434d965f197a1b20e20be0aa6d26846282d22f001871be6"
+      },
+      "np05": {
+       "path": "z500sd.np05.a.bin",
+       "bytes": 10805,
+       "sha256": "47c8862f6cbcad66cad4151c445c51bf38a19a2c87f83bb1d796d6e48208410f"
+      }
+     }
+    },
+    {
+     "id": "b",
+     "steps": [
+      21,
+      41
+     ],
+     "files": {
+      "g1": {
+       "path": "z500sd.g1.b.bin",
+       "bytes": 25799,
+       "sha256": "5497df3683e4ca314570314d34ce0c617c1498fd6937694681f47d7d8705457c"
+      },
+      "np05": {
+       "path": "z500sd.np05.b.bin",
+       "bytes": 15138,
+       "sha256": "3d0610fd26da54309f8f5aa402915c5e7e76c536bc589e63fae2f95d508c1b7b"
+      }
+     }
+    },
+    {
+     "id": "c",
+     "steps": [
+      41,
+      61
+     ],
+     "files": {
+      "g1": {
+       "path": "z500sd.g1.c.bin",
+       "bytes": 30283,
+       "sha256": "c1448bd5b5fddcd9bf629a3c49079d02b1a7e5f620ba0b25754671073cd15f13"
+      },
+      "np05": {
+       "path": "z500sd.np05.c.bin",
+       "bytes": 17831,
+       "sha256": "ce8600def2bc0d26b862367c2ca4486f037c86f9a25529091593f2dc4eebcb55"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "synthetic 15-day fixture (W1-02), analytic",
+    "valid": null
+   }
+  },
+  "z500em": {
+   "units": "gpm",
+   "scale": 1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    144,
+    150,
+    156,
+    162,
+    168,
+    174,
+    180,
+    186,
+    192,
+    198,
+    204,
+    210,
+    216,
+    222,
+    228,
+    234,
+    240,
+    246,
+    252,
+    258,
+    264,
+    270,
+    276,
+    282,
+    288,
+    294,
+    300,
+    306,
+    312,
+    318,
+    324,
+    330,
+    336,
+    342,
+    348,
+    354,
+    360
+   ],
+   "domains": [
+    "g1"
+   ],
+   "chunks": [
+    {
+     "id": "b",
+     "steps": [
+      0,
+      17
+     ],
+     "files": {
+      "g1": {
+       "path": "z500em.g1.b.bin",
+       "bytes": 62063,
+       "sha256": "4dd20b3a2644870e433e3488e81f35287de22bff75b6f695a232c5ac203df65f"
+      }
+     }
+    },
+    {
+     "id": "c",
+     "steps": [
+      17,
+      37
+     ],
+     "files": {
+      "g1": {
+       "path": "z500em.g1.c.bin",
+       "bytes": 63236,
+       "sha256": "712e1049fd271e3e1acb9096191a1301f7e94e31442bdc63c1d5fa3a45cfae4f"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "synthetic 15-day fixture (W1-02), analytic",
+    "valid": null
+   }
+  },
+  "ws250": {
+   "units": "m/s",
+   "scale": 0.1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48,
+    54,
+    60,
+    66,
+    72,
+    78,
+    84,
+    90,
+    96,
+    102,
+    108,
+    114,
+    120,
+    126,
+    132,
+    138,
+    144,
+    150,
+    156,
+    162,
+    168,
+    174,
+    180,
+    186,
+    192,
+    198,
+    204,
+    210,
+    216,
+    222,
+    228,
+    234,
+    240,
+    246,
+    252,
+    258,
+    264,
+    270,
+    276,
+    282,
+    288,
+    294,
+    300,
+    306,
+    312,
+    318,
+    324,
+    330,
+    336,
+    342,
+    348,
+    354,
+    360
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      21
+     ],
+     "files": {
+      "g1": {
+       "path": "ws250.g1.a.bin",
+       "bytes": 13237,
+       "sha256": "79744ed549fcec20d774ce6cf8cd0fe4a640f60b81ac37a28a7efde303ebfd98"
+      },
+      "np05": {
+       "path": "ws250.np05.a.bin",
+       "bytes": 25503,
+       "sha256": "09019e8761b122f9cb094823ae8ee3f81aed36f59e6af34964c2435c04287942"
+      }
+     }
+    },
+    {
+     "id": "b",
+     "steps": [
+      21,
+      41
+     ],
+     "files": {
+      "g1": {
+       "path": "ws250.g1.b.bin",
+       "bytes": 12558,
+       "sha256": "aa70c7b6741c6355747450c82dae42a47abed475007d74240ae2087659a90c0f"
+      },
+      "np05": {
+       "path": "ws250.np05.b.bin",
+       "bytes": 23375,
+       "sha256": "3c29c2b7c83fcf60e1fa1fbecbbd6b4d1eb3f8a08ed48a724f755ab8a2b06237"
+      }
+     }
+    },
+    {
+     "id": "c",
+     "steps": [
+      41,
+      61
+     ],
+     "files": {
+      "g1": {
+       "path": "ws250.g1.c.bin",
+       "bytes": 12474,
+       "sha256": "dd93993d00d453484baf83f081f61410b3ce7fc88ae45cdc69b13896ea609fbf"
+      },
+      "np05": {
+       "path": "ws250.np05.c.bin",
+       "bytes": 24229,
+       "sha256": "0288bfab742247dde48b8c034d5760a35235ddd6ff547ad8de883d82158d82bb"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "synthetic 15-day fixture (W1-02), analytic",
+    "valid": null
+   }
+  },
+  "msl": {
+   "units": "Pa",
+   "scale": 10,
+   "offset": 101325,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48,
+    54,
+    60,
+    66,
+    72,
+    78,
+    84,
+    90,
+    96,
+    102,
+    108,
+    114,
+    120,
+    126,
+    132,
+    138,
+    144,
+    150,
+    156,
+    162,
+    168,
+    174,
+    180,
+    186,
+    192,
+    198,
+    204,
+    210,
+    216,
+    222,
+    228,
+    234,
+    240,
+    246,
+    252,
+    258,
+    264,
+    270,
+    276,
+    282,
+    288,
+    294,
+    300,
+    306,
+    312,
+    318,
+    324,
+    330,
+    336,
+    342,
+    348,
+    354,
+    360
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      21
+     ],
+     "files": {
+      "g1": {
+       "path": "msl.g1.a.bin",
+       "bytes": 42219,
+       "sha256": "6016fdd585f7fbc46f748dd8341715b5ce17de77cc43fb0cdf25c2ff74b8b4df"
+      },
+      "np05": {
+       "path": "msl.np05.a.bin",
+       "bytes": 51464,
+       "sha256": "ecdb199f8dce64d4f87fd77bdcfa474ec88218f264ae0869a543483173dbba0a"
+      }
+     }
+    },
+    {
+     "id": "b",
+     "steps": [
+      21,
+      41
+     ],
+     "files": {
+      "g1": {
+       "path": "msl.g1.b.bin",
+       "bytes": 40765,
+       "sha256": "63390f43f1ed3f46364505cf10c81892ce7e20cb438be940b72fc3997dc975ef"
+      },
+      "np05": {
+       "path": "msl.np05.b.bin",
+       "bytes": 49242,
+       "sha256": "83b1f1c9b531b0a5d37739164393e0e03378d45e9ac29c9b1b7718a4fb47fc7f"
+      }
+     }
+    },
+    {
+     "id": "c",
+     "steps": [
+      41,
+      61
+     ],
+     "files": {
+      "g1": {
+       "path": "msl.g1.c.bin",
+       "bytes": 40767,
+       "sha256": "c1fdc7c77bee1f4c25e324093bbba85149947c0473dd3736382e31c506d4e94f"
+      },
+      "np05": {
+       "path": "msl.np05.c.bin",
+       "bytes": 50833,
+       "sha256": "804d89dbad449953b55525f8747c86cf88171c03a4becb5f8839d89a7fea9a4c"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "synthetic 15-day fixture (W1-02), analytic",
+    "valid": null
+   }
+  },
+  "tp6": {
+   "units": "mm",
+   "scale": 0.01,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48,
+    54,
+    60,
+    66,
+    72,
+    78,
+    84,
+    90,
+    96,
+    102,
+    108,
+    114,
+    120,
+    126,
+    132,
+    138,
+    144,
+    150,
+    156,
+    162,
+    168,
+    174,
+    180,
+    186,
+    192,
+    198,
+    204,
+    210,
+    216,
+    222,
+    228,
+    234,
+    240,
+    246,
+    252,
+    258,
+    264,
+    270,
+    276,
+    282,
+    288,
+    294,
+    300,
+    306,
+    312,
+    318,
+    324,
+    330,
+    336,
+    342,
+    348,
+    354,
+    360
+   ],
+   "domains": [
+    "g1"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      20
+     ],
+     "files": {
+      "g1": {
+       "path": "tp6.g1.a.bin",
+       "bytes": 27802,
+       "sha256": "fc43cd21ae16e9c7874ac93afb0ebce43652987566af58857f280e9e0dcf315d"
+      }
+     }
+    },
+    {
+     "id": "b",
+     "steps": [
+      20,
+      40
+     ],
+     "files": {
+      "g1": {
+       "path": "tp6.g1.b.bin",
+       "bytes": 28331,
+       "sha256": "2c439f773ffe34775e5d3e6bd019e9481d45aa577e366656e41c3a2654d6a75e"
+      }
+     }
+    },
+    {
+     "id": "c",
+     "steps": [
+      40,
+      60
+     ],
+     "files": {
+      "g1": {
+       "path": "tp6.g1.c.bin",
+       "bytes": 28607,
+       "sha256": "8ad35b30a92c1fb1530d0626cc1ca076b1f2b461539968336bcd5689b9810ecb"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "synthetic 15-day fixture (W1-02), analytic",
+    "valid": null
+   }
+  },
+  "t850a": {
+   "units": "K",
+   "scale": 0.1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48,
+    54,
+    60,
+    66,
+    72,
+    78,
+    84,
+    90,
+    96,
+    102,
+    108,
+    114,
+    120,
+    126,
+    132,
+    138,
+    144,
+    150,
+    156,
+    162,
+    168
+   ],
+   "domains": [
+    "g1"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      21
+     ],
+     "files": {
+      "g1": {
+       "path": "t850a.g1.a.bin",
+       "bytes": 39773,
+       "sha256": "0b0ac2655b7d069509e41bea1d5bc328c553699f2fde1a0f8d54d31418944e30"
+      }
+     }
+    },
+    {
+     "id": "b",
+     "steps": [
+      21,
+      29
+     ],
+     "files": {
+      "g1": {
+       "path": "t850a.g1.b.bin",
+       "bytes": 15373,
+       "sha256": "f4213a88f0ac383388f8358b56ad29704a7481e2e8181c49b75f54d92898c68f"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "synthetic 15-day fixture (W1-02), analytic",
+    "valid": null
+   }
+  },
+  "t2m": {
+   "units": "K",
+   "scale": 0.1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48,
+    54,
+    60,
+    66,
+    72,
+    78,
+    84,
+    90,
+    96,
+    102,
+    108,
+    114,
+    120,
+    126,
+    132,
+    138,
+    144,
+    150,
+    156,
+    162,
+    168
+   ],
+   "domains": [
+    "g1"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      21
+     ],
+     "files": {
+      "g1": {
+       "path": "t2m.g1.a.bin",
+       "bytes": 54624,
+       "sha256": "80d5492e17f28e640cb8674e7a4ce6772a74de36ff415e2a89579e5a013ad184"
+      }
+     }
+    },
+    {
+     "id": "b",
+     "steps": [
+      21,
+      29
+     ],
+     "files": {
+      "g1": {
+       "path": "t2m.g1.b.bin",
+       "bytes": 20676,
+       "sha256": "d62c49773727344c1381fad0ae6bc26a0a835a8e0425173e362601bca9bbc489"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "synthetic 15-day fixture (W1-02), analytic",
+    "valid": null
+   }
+  },
+  "pr1": {
+   "units": "%",
+   "scale": 1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    24,
+    36,
+    48,
+    60,
+    72,
+    84,
+    96,
+    108,
+    120,
+    132,
+    144,
+    156,
+    168,
+    180,
+    192,
+    204,
+    216,
+    228,
+    240,
+    252,
+    264,
+    276,
+    288,
+    300,
+    312,
+    324,
+    336,
+    348,
+    360
+   ],
+   "domains": [
+    "g1"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      9
+     ],
+     "files": {
+      "g1": {
+       "path": "pr1.g1.a.bin",
+       "bytes": 12879,
+       "sha256": "cc54ecdf371dbe3a6802ef7dda8c9f2f73d000bab92f4f59bfc3383e2a641f1d"
+      }
+     }
+    },
+    {
+     "id": "b",
+     "steps": [
+      9,
+      19
+     ],
+     "files": {
+      "g1": {
+       "path": "pr1.g1.b.bin",
+       "bytes": 12469,
+       "sha256": "c7e46888339e5c630bc3285ec75cb9e92815b2324360c05ecccf7da0b86130bb"
+      }
+     }
+    },
+    {
+     "id": "c",
+     "steps": [
+      19,
+      29
+     ],
+     "files": {
+      "g1": {
+       "path": "pr1.g1.c.bin",
+       "bytes": 9972,
+       "sha256": "7df5d47d2e27ec1e0c5ec0d35278ef847d94d5470ad8691e59a73f54b70b1aa1"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "synthetic 15-day fixture (W1-02), analytic",
+    "valid": null
+   }
+  },
+  "pr10": {
+   "units": "%",
+   "scale": 1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    24,
+    36,
+    48,
+    60,
+    72,
+    84,
+    96,
+    108,
+    120,
+    132,
+    144,
+    156,
+    168,
+    180,
+    192,
+    204,
+    216,
+    228,
+    240,
+    252,
+    264,
+    276,
+    288,
+    300,
+    312,
+    324,
+    336,
+    348,
+    360
+   ],
+   "domains": [
+    "g1"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      9
+     ],
+     "files": {
+      "g1": {
+       "path": "pr10.g1.a.bin",
+       "bytes": 10577,
+       "sha256": "1f0074c105d1aafd6dac510bf1cf2844923ac6856ceea6b1c89ff2ee54a638ec"
+      }
+     }
+    },
+    {
+     "id": "b",
+     "steps": [
+      9,
+      19
+     ],
+     "files": {
+      "g1": {
+       "path": "pr10.g1.b.bin",
+       "bytes": 9739,
+       "sha256": "7a596ffec37d61635bdf5103dcfabbe7c52cca8644c3bd434fc32bdd35a1ebbb"
+      }
+     }
+    },
+    {
+     "id": "c",
+     "steps": [
+      19,
+      29
+     ],
+     "files": {
+      "g1": {
+       "path": "pr10.g1.c.bin",
+       "bytes": 7087,
+       "sha256": "bd1c363000a7c97031819d4d2216080e9936b9eed0593af8f9a22b922b59d222"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "synthetic 15-day fixture (W1-02), analytic",
+    "valid": null
+   }
+  },
+  "ivt": {
+   "units": "kg/m/s",
+   "scale": 1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48,
+    54,
+    60,
+    66,
+    72,
+    78,
+    84,
+    90,
+    96,
+    102,
+    108,
+    114,
+    120,
+    126,
+    132,
+    138,
+    144,
+    150,
+    156,
+    162,
+    168
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      21
+     ],
+     "files": {
+      "g1": {
+       "path": "ivt.g1.a.bin",
+       "bytes": 27294,
+       "sha256": "66811102b42ff74524dd5f041eb6ee7565702b2989ffa9fc4ebd5026db146266"
+      },
+      "np05": {
+       "path": "ivt.np05.a.bin",
+       "bytes": 54137,
+       "sha256": "fa8a481762f5ad6dfddf3f74e8e6e1a0f52949eef2cc3ef3d3451627447bbc14"
+      }
+     }
+    },
+    {
+     "id": "b",
+     "steps": [
+      21,
+      29
+     ],
+     "files": {
+      "g1": {
+       "path": "ivt.g1.b.bin",
+       "bytes": 10452,
+       "sha256": "29900cb64a18aff6696abbd9dbe796fdbfb3e365f0fd1fec7ad3bea01034d013"
+      },
+      "np05": {
+       "path": "ivt.np05.b.bin",
+       "bytes": 20393,
+       "sha256": "081958391409a85eace35d6001a6d96914ce63859cbaef6ea8bba1f156698094"
+      }
+     }
+    }
+   ],
+   "case": "A",
+   "source": {
+    "dataset": "synthetic 15-day fixture (W1-02), analytic",
+    "valid": null
+   }
+  }
+ },
+ "probes": [
+  {
+   "name": "band+6.9dam",
+   "lat": 60,
+   "lon": -170,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": 69
+  },
+  {
+   "name": "band+6.9dam",
+   "lat": 60,
+   "lon": -170,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": 69
+  },
+  {
+   "name": "band-13dam",
+   "lat": 36,
+   "lon": -150,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": -130
+  },
+  {
+   "name": "band-13dam",
+   "lat": 36,
+   "lon": -150,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": -130
+  },
+  {
+   "name": "band+1dam",
+   "lat": 24,
+   "lon": -100,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": 10
+  },
+  {
+   "name": "band+1dam",
+   "lat": 24,
+   "lon": -100,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": 10
+  },
+  {
+   "name": "band+11dam",
+   "lat": 56,
+   "lon": -80,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": 110
+  },
+  {
+   "name": "band+11dam",
+   "lat": 56,
+   "lon": -80,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 300,
+   "value": 110
+  },
+  {
+   "name": "band+11dam",
+   "lat": 56,
+   "lon": -80,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": 110
+  },
+  {
+   "name": "band+11dam",
+   "lat": 56,
+   "lon": -80,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 300,
+   "value": 110
+  },
+  {
+   "name": "no-signal",
+   "lat": 30,
+   "lon": -56,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 300,
+   "value": 10
+  },
+  {
+   "name": "no-signal.spread",
+   "lat": 30,
+   "lon": -56,
+   "field": "z500sd",
+   "domain": "g1",
+   "step": 300,
+   "value": 59.6
+  },
+  {
+   "name": "no-signal.mean",
+   "lat": 30,
+   "lon": -56,
+   "field": "z500em",
+   "domain": "g1",
+   "step": 300,
+   "value": 5627
+  },
+  {
+   "name": "no-signal.clim",
+   "lat": 30,
+   "lon": -56,
+   "field": "z500",
+   "domain": "g1",
+   "step": 300,
+   "value": 5632
+  },
+  {
+   "name": "no-signal",
+   "lat": 30,
+   "lon": -56,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 300,
+   "value": 10
+  },
+  {
+   "name": "no-signal.spread",
+   "lat": 30,
+   "lon": -56,
+   "field": "z500sd",
+   "domain": "np05",
+   "step": 300,
+   "value": 59.6
+  },
+  {
+   "name": "no-signal.mean",
+   "lat": 30,
+   "lon": -56,
+   "field": "z500em",
+   "domain": "np05",
+   "step": 300,
+   "value": 5627
+  },
+  {
+   "name": "no-signal.clim",
+   "lat": 30,
+   "lon": -56,
+   "field": "z500",
+   "domain": "np05",
+   "step": 300,
+   "value": 5632
+  },
+  {
+   "name": "clear-signal",
+   "lat": 70,
+   "lon": -120,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 300,
+   "value": 135
+  },
+  {
+   "name": "clear-signal.spread",
+   "lat": 70,
+   "lon": -120,
+   "field": "z500sd",
+   "domain": "g1",
+   "step": 300,
+   "value": 51.7
+  },
+  {
+   "name": "clear-signal.mean",
+   "lat": 70,
+   "lon": -120,
+   "field": "z500em",
+   "domain": "g1",
+   "step": 300,
+   "value": 5643
+  },
+  {
+   "name": "clear-signal.clim",
+   "lat": 70,
+   "lon": -120,
+   "field": "z500",
+   "domain": "g1",
+   "step": 300,
+   "value": 5653
+  },
+  {
+   "name": "clear-signal",
+   "lat": 70,
+   "lon": -120,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 300,
+   "value": 135
+  },
+  {
+   "name": "clear-signal.spread",
+   "lat": 70,
+   "lon": -120,
+   "field": "z500sd",
+   "domain": "np05",
+   "step": 300,
+   "value": 51.7
+  },
+  {
+   "name": "clear-signal.mean",
+   "lat": 70,
+   "lon": -120,
+   "field": "z500em",
+   "domain": "np05",
+   "step": 300,
+   "value": 5643
+  },
+  {
+   "name": "clear-signal.clim",
+   "lat": 70,
+   "lon": -120,
+   "field": "z500",
+   "domain": "np05",
+   "step": 300,
+   "value": 5653
+  },
+  {
+   "name": "sf-day9",
+   "lat": 38,
+   "lon": -122,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 216,
+   "value": -60
+  },
+  {
+   "name": "sf-day9",
+   "lat": 38,
+   "lon": -122,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 216,
+   "value": -60
+  },
+  {
+   "name": "blend-bands",
+   "lat": 50,
+   "lon": 160,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 168,
+   "value": 170
+  },
+  {
+   "name": "blend-bands.mean",
+   "lat": 50,
+   "lon": 160,
+   "field": "z500em",
+   "domain": "g1",
+   "step": 168,
+   "value": 5620
+  },
+  {
+   "name": "blend-bands.z500",
+   "lat": 50,
+   "lon": 160,
+   "field": "z500",
+   "domain": "g1",
+   "step": 168,
+   "value": 5740
+  },
+  {
+   "name": "blend-bands",
+   "lat": 50,
+   "lon": 160,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 204,
+   "value": 170
+  },
+  {
+   "name": "blend-bands.mean",
+   "lat": 50,
+   "lon": 160,
+   "field": "z500em",
+   "domain": "g1",
+   "step": 204,
+   "value": 5620
+  },
+  {
+   "name": "blend-bands.z500",
+   "lat": 50,
+   "lon": 160,
+   "field": "z500",
+   "domain": "g1",
+   "step": 204,
+   "value": 5740
+  },
+  {
+   "name": "blend-bands",
+   "lat": 50,
+   "lon": 160,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 240,
+   "value": 170
+  },
+  {
+   "name": "blend-bands.mean",
+   "lat": 50,
+   "lon": 160,
+   "field": "z500em",
+   "domain": "g1",
+   "step": 240,
+   "value": 5620
+  },
+  {
+   "name": "blend-bands.z500",
+   "lat": 50,
+   "lon": 160,
+   "field": "z500",
+   "domain": "g1",
+   "step": 240,
+   "value": 5740
+  },
+  {
+   "name": "blend-bands",
+   "lat": 50,
+   "lon": 160,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 168,
+   "value": 170
+  },
+  {
+   "name": "blend-bands.mean",
+   "lat": 50,
+   "lon": 160,
+   "field": "z500em",
+   "domain": "np05",
+   "step": 168,
+   "value": 5620
+  },
+  {
+   "name": "blend-bands.z500",
+   "lat": 50,
+   "lon": 160,
+   "field": "z500",
+   "domain": "np05",
+   "step": 168,
+   "value": 5740
+  },
+  {
+   "name": "blend-bands",
+   "lat": 50,
+   "lon": 160,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 204,
+   "value": 170
+  },
+  {
+   "name": "blend-bands.mean",
+   "lat": 50,
+   "lon": 160,
+   "field": "z500em",
+   "domain": "np05",
+   "step": 204,
+   "value": 5620
+  },
+  {
+   "name": "blend-bands.z500",
+   "lat": 50,
+   "lon": 160,
+   "field": "z500",
+   "domain": "np05",
+   "step": 204,
+   "value": 5740
+  },
+  {
+   "name": "blend-bands",
+   "lat": 50,
+   "lon": 160,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 240,
+   "value": 170
+  },
+  {
+   "name": "blend-bands.mean",
+   "lat": 50,
+   "lon": 160,
+   "field": "z500em",
+   "domain": "np05",
+   "step": 240,
+   "value": 5620
+  },
+  {
+   "name": "blend-bands.z500",
+   "lat": 50,
+   "lon": 160,
+   "field": "z500",
+   "domain": "np05",
+   "step": 240,
+   "value": 5740
+  },
+  {
+   "name": "home-rain-d1",
+   "lat": 48,
+   "lon": 0,
+   "field": "pr1",
+   "domain": "g1",
+   "step": 24,
+   "value": 3
+  },
+  {
+   "name": "home-rain-d1.pr10",
+   "lat": 48,
+   "lon": 0,
+   "field": "pr10",
+   "domain": "g1",
+   "step": 24,
+   "value": 1
+  },
+  {
+   "name": "home-tp6-d1",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 6,
+   "value": 0.1
+  },
+  {
+   "name": "home-tp6-d1",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 12,
+   "value": 0.1
+  },
+  {
+   "name": "home-tp6-d1",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 18,
+   "value": 0.1
+  },
+  {
+   "name": "home-tp6-d1",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 24,
+   "value": 0.1
+  },
+  {
+   "name": "home-rain-d2",
+   "lat": 48,
+   "lon": 0,
+   "field": "pr1",
+   "domain": "g1",
+   "step": 48,
+   "value": 3
+  },
+  {
+   "name": "home-rain-d2.pr10",
+   "lat": 48,
+   "lon": 0,
+   "field": "pr10",
+   "domain": "g1",
+   "step": 48,
+   "value": 1
+  },
+  {
+   "name": "home-tp6-d2",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 30,
+   "value": 0.1
+  },
+  {
+   "name": "home-tp6-d2",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 36,
+   "value": 0.1
+  },
+  {
+   "name": "home-tp6-d2",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 42,
+   "value": 0.1
+  },
+  {
+   "name": "home-tp6-d2",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 48,
+   "value": 0.1
+  },
+  {
+   "name": "home-rain-d3",
+   "lat": 48,
+   "lon": 0,
+   "field": "pr1",
+   "domain": "g1",
+   "step": 72,
+   "value": 3
+  },
+  {
+   "name": "home-rain-d3.pr10",
+   "lat": 48,
+   "lon": 0,
+   "field": "pr10",
+   "domain": "g1",
+   "step": 72,
+   "value": 1
+  },
+  {
+   "name": "home-tp6-d3",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 54,
+   "value": 0.1
+  },
+  {
+   "name": "home-tp6-d3",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 60,
+   "value": 0.1
+  },
+  {
+   "name": "home-tp6-d3",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 66,
+   "value": 0.1
+  },
+  {
+   "name": "home-tp6-d3",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 72,
+   "value": 0.1
+  },
+  {
+   "name": "home-rain-d4",
+   "lat": 48,
+   "lon": 0,
+   "field": "pr1",
+   "domain": "g1",
+   "step": 96,
+   "value": 75
+  },
+  {
+   "name": "home-rain-d4.pr10",
+   "lat": 48,
+   "lon": 0,
+   "field": "pr10",
+   "domain": "g1",
+   "step": 96,
+   "value": 30
+  },
+  {
+   "name": "home-tp6-d4",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 78,
+   "value": 4.0
+  },
+  {
+   "name": "home-tp6-d4",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 84,
+   "value": 4.0
+  },
+  {
+   "name": "home-tp6-d4",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 90,
+   "value": 4.0
+  },
+  {
+   "name": "home-tp6-d4",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 96,
+   "value": 4.0
+  },
+  {
+   "name": "home-rain-d5",
+   "lat": 48,
+   "lon": 0,
+   "field": "pr1",
+   "domain": "g1",
+   "step": 120,
+   "value": 75
+  },
+  {
+   "name": "home-rain-d5.pr10",
+   "lat": 48,
+   "lon": 0,
+   "field": "pr10",
+   "domain": "g1",
+   "step": 120,
+   "value": 30
+  },
+  {
+   "name": "home-tp6-d5",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 102,
+   "value": 4.0
+  },
+  {
+   "name": "home-tp6-d5",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 108,
+   "value": 4.0
+  },
+  {
+   "name": "home-tp6-d5",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 114,
+   "value": 4.0
+  },
+  {
+   "name": "home-tp6-d5",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 120,
+   "value": 4.0
+  },
+  {
+   "name": "home-rain-d6",
+   "lat": 48,
+   "lon": 0,
+   "field": "pr1",
+   "domain": "g1",
+   "step": 144,
+   "value": 75
+  },
+  {
+   "name": "home-rain-d6.pr10",
+   "lat": 48,
+   "lon": 0,
+   "field": "pr10",
+   "domain": "g1",
+   "step": 144,
+   "value": 30
+  },
+  {
+   "name": "home-tp6-d6",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 126,
+   "value": 4.0
+  },
+  {
+   "name": "home-tp6-d6",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 132,
+   "value": 4.0
+  },
+  {
+   "name": "home-tp6-d6",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 138,
+   "value": 4.0
+  },
+  {
+   "name": "home-tp6-d6",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 144,
+   "value": 4.0
+  },
+  {
+   "name": "home-rain-d7",
+   "lat": 48,
+   "lon": 0,
+   "field": "pr1",
+   "domain": "g1",
+   "step": 168,
+   "value": 75
+  },
+  {
+   "name": "home-rain-d7.pr10",
+   "lat": 48,
+   "lon": 0,
+   "field": "pr10",
+   "domain": "g1",
+   "step": 168,
+   "value": 30
+  },
+  {
+   "name": "home-tp6-d7",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 150,
+   "value": 4.0
+  },
+  {
+   "name": "home-tp6-d7",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 156,
+   "value": 4.0
+  },
+  {
+   "name": "home-tp6-d7",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 162,
+   "value": 4.0
+  },
+  {
+   "name": "home-tp6-d7",
+   "lat": 48,
+   "lon": 0,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 168,
+   "value": 4.0
+  },
+  {
+   "name": "ivt-filament",
+   "lat": 40,
+   "lon": -130,
+   "field": "ivt",
+   "domain": "g1",
+   "step": 0,
+   "value": 1134
+  },
+  {
+   "name": "closed-low",
+   "lat": 50,
+   "lon": -140,
+   "field": "msl",
+   "domain": "g1",
+   "step": 0,
+   "value": 98505
+  },
+  {
+   "name": "ivt-filament",
+   "lat": 40,
+   "lon": -130,
+   "field": "ivt",
+   "domain": "g1",
+   "step": 72,
+   "value": 1026
+  },
+  {
+   "name": "closed-low",
+   "lat": 50,
+   "lon": -140,
+   "field": "msl",
+   "domain": "g1",
+   "step": 72,
+   "value": 98505
+  },
+  {
+   "name": "ivt-filament",
+   "lat": 40,
+   "lon": -130,
+   "field": "ivt",
+   "domain": "np05",
+   "step": 0,
+   "value": 1134
+  },
+  {
+   "name": "closed-low",
+   "lat": 50,
+   "lon": -140,
+   "field": "msl",
+   "domain": "np05",
+   "step": 0,
+   "value": 98505
+  },
+  {
+   "name": "ivt-filament",
+   "lat": 40,
+   "lon": -130,
+   "field": "ivt",
+   "domain": "np05",
+   "step": 72,
+   "value": 1026
+  },
+  {
+   "name": "closed-low",
+   "lat": 50,
+   "lon": -140,
+   "field": "msl",
+   "domain": "np05",
+   "step": 72,
+   "value": 98505
+  },
+  {
+   "name": "t850a-nodata",
+   "lat": 40,
+   "lon": -110,
+   "field": "t850a",
+   "domain": "g1",
+   "step": 0,
+   "value": null
+  },
+  {
+   "name": "t850a-valid",
+   "lat": 40,
+   "lon": -90,
+   "field": "t850a",
+   "domain": "g1",
+   "step": 0,
+   "value": 1.1
+  },
+  {
+   "name": "t850a-nodata",
+   "lat": 40,
+   "lon": -110,
+   "field": "t850a",
+   "domain": "g1",
+   "step": 72,
+   "value": null
+  },
+  {
+   "name": "t850a-valid",
+   "lat": 40,
+   "lon": -90,
+   "field": "t850a",
+   "domain": "g1",
+   "step": 72,
+   "value": 13.3
+  }
+ ]
+}

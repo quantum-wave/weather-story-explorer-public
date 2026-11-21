@@ -26,7 +26,8 @@ const DPR = 2;
 const VIEWS = [['np', 1000, 600], ['nh', 800, 800], ['gl', 1800, 1000]];
 const GROUNDS = [['paper', 'light'], ['night', 'dark']];
 const NEED = { coast: 4.5, border: 3 };
-const FIELDS = [['off', { z: false, j: false, c: false, t: false }], ['on', { z: true, j: false, c: false, t: false }]];
+// 'off': a lens whose field this fixture lacks (rivers: ivt) draws no fill, just the ground; 'on': the Pattern lens
+const FIELDS = [['off', { lens: 'r' }], ['on', { lens: 'z' }]];
 
 const lin = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
 const lum = ([r, g, b]) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
@@ -208,8 +209,8 @@ export async function run({ page, baseUrl, assert }) {
     // the 50 m files swap in when idle: wait for them (a build without the tier hook has nothing to wait for)
     await page.eval(`(async () => { const b = window.__wp2.basemap; if (b.basemapFull) await b.basemapFull(); })()`);
     for (const [gname, theme] of GROUNDS) {
-      for (const [fname, layers] of FIELDS) {
-        const patch = { view, layers, case: 'A', theme, t };
+      for (const [fname, lensPatch] of FIELDS) {
+        const patch = { view, ...lensPatch, theme, t };
         if (await page.eval(`'ground' in window.__wp2.store.get()`)) patch.ground = gname;
         const img = await shoot(page, patch, `lineart-${view}-${gname}-${fname}`);
         analyse(img, await page.eval(PICK), `${view}/${gname}/field ${fname}`, gname);

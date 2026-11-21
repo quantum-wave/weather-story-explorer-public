@@ -1,0 +1,11 @@
+{
+  "id": "explain-1",
+  "file": "site/js/ui/guide.js",
+  "find": "const text = typeof hm?.dayLine === 'function' ? hm.dayLine() : '';",
+  "replace": "const text = typeof hm?.dayLine === 'function' ? (hm.stories.get(hm.focusKey())?.summary || '') : '';",
+  "checks": [
+    "S-EXPLAIN"
+  ],
+  "expect": "killed",
+  "note": "DESIGN-SPEC 5.2 item 4, W4-02 acceptance 2: 'For you' built by a different function (the card's summary sentence instead of its day line). The guide's 'For you' must be string-equal to the focus card's day line, so S-EXPLAIN's equality assertion must fail."
+}

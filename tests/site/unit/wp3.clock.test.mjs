@@ -101,15 +101,17 @@ test('seek clamps and does not change play state', () => {
   reset(); clock.play(); clock.seek(-4); assert.equal(store.get().t, 0); clock.seek(99); assert.equal(store.get().t, 36);
   assert.equal(store.get().playing, true);
 });
-test('a user-chosen speed survives a case switch; a new case changes range and clamps t', () => {
+test('a user-chosen speed survives a lens switch; a lens with a longer run changes range and clamps t', () => {
   reset(); clock.setSpeed(6);
-  store.set({ t: 30 }); store.set({ case: 'C' });
+  STEPS.ws250 = Array.from({ length: 61 }, (_, i) => i * 6);
+  store.set({ t: 30 }); store.set({ lens: 'j' });
   assert.deepEqual(clock.range(), [0, 360]);
   assert.equal(store.get().speed, 6);
   assert.deepEqual(clock.speeds(), [6, 12, 24]);
-  store.set({ case: 'A' }); assert.equal(store.get().t, 30);
-  store.set({ t: 100, case: 'C' }); store.set({ case: 'A' });
+  store.set({ lens: 'z' }); assert.equal(store.get().t, 30);
+  store.set({ t: 100, lens: 'j' }); store.set({ lens: 'z' });
   assert.equal(store.get().t, 36, 't clamped into the new range');
+  delete STEPS.ws250;
 });
 test('frame hooks receive interval and work time', () => {
   reset(); const got = []; const off = clock.onFrame((i, w) => got.push([i, w]));
@@ -120,4 +122,39 @@ test('data:manifest refreshes the range', () => {
   reset(); STEPS.z500a = [0, 12, 24, 36, 48]; STEPS.z500 = STEPS.z500a;
   bus.emit('data:manifest', {}); assert.deepEqual(clock.range(), [0, 48]);
   STEPS.z500a = STEPS.z500 = [0, 12, 24, 36];
+});
+
+// ---- W3-08: the loop follows the active lens's field steps (store.lens), falling back to the case's fields
+test('the clock loops over the active lens\'s steps; no lens is the pattern', () => {
+  reset();
+  STEPS.ws250 = [0, 6, 12, 18]; STEPS.t850a = Array.from({ length: 29 }, (_, i) => i * 6); CASE.ws250 = 'A'; CASE.t850a = 'A';
+  store.set({ lens: 'j' }); clock.refresh();
+  assert.deepEqual(clock.range(), [0, 18], 'jet lens: ws250 steps');
+  assert.deepEqual(clock.steps(), [0, 6, 12, 18]);
+  store.set({ lens: 'a' });
+  assert.deepEqual(clock.range(), [0, 168], 'air-mass lens: t850a steps');
+  store.set({ lens: 'z' });
+  assert.deepEqual(clock.range(), [0, 36], 'pattern lens: z500a steps');
+  store._reset(); clock.refresh();
+  assert.deepEqual(clock.range(), [0, 36], 'no lens: the pattern, the default lens');
+  delete STEPS.ws250; delete STEPS.t850a; delete CASE.ws250; delete CASE.t850a; clock.refresh();
+});
+test('a lens with no steps in this run falls back to the pattern range, never an empty loop', () => {
+  reset(); store.set({ lens: 'r' }); clock.refresh();
+  assert.deepEqual(clock.range(), [0, 36]);
+});
+test('speed names: Slow, Normal, Fast by position', () => {
+  reset();
+  assert.deepEqual(clock.speedChoices().map((c) => c.name), ['Slow', 'Normal', 'Fast']);
+  assert.deepEqual(clock.speedChoices().map((c) => c.value), clock.speeds());
+});
+test('stepDay moves 24 h to the nearest step', async () => {
+  reset(); reduced = true; STEPS.z500a = Array.from({ length: 13 }, (_, i) => i * 6); STEPS.z500 = STEPS.z500a; clock.refresh();
+  await clock.stepDay(1); assert.equal(store.get().t, 24); await clock.stepDay(1); assert.equal(store.get().t, 48);
+  await clock.stepDay(-1); assert.equal(store.get().t, 24); reduced = false;
+  STEPS.z500a = [0, 12, 24, 36]; STEPS.z500 = STEPS.z500a; clock.refresh();
+});
+test('easeToStep: a release between steps eases to the nearest step', async () => {
+  reset(); reduced = true; await clock.seek(14); const v = await clock.easeToStep(); reduced = false;
+  assert.equal(v, true); assert.equal(store.get().t, 12);
 });

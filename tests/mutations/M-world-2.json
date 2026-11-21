@@ -1,0 +1,11 @@
+{
+  "id": "M-world-2",
+  "file": "site/js/render/index.js",
+  "find": "return wl ? clampXf(x, W, H, wl.box, wl.frame) : clampXf(x, W, H, boxFor(viewId));",
+  "replace": "return wl ? clampXf(x, W, H) : clampXf(x, W, H, boxFor(viewId));",
+  "checks": [
+    "S-PROJ"
+  ],
+  "expect": "killed",
+  "note": "World pan is clamped to the canvas, not the Equal Earth outline: a zoomed drag leaves the screen blank, so S-PROJ's off-the-map fraction fails"
+}

@@ -1,9 +1,13 @@
-// What a share says about the current view (SPEC section 7): headline, valid time, run, confidence, footer.
+// What a share says about the current view (DESIGN-SPEC sections 7 and 9): headline, valid time, the one provenance label, the
+// confidence phrase, footer and the legend, all taken from the same places the screen takes them from: the lens (store.lens), the ground, the legend model, runLine() / sampleLabel(), confidenceAt() and the pattern blend.
 // Reads the store and the data facade; the text rules themselves live in format.js (pure, unit-tested).
 import { store, bus } from '../state.js';
 import * as data from '../data/index.js';
-import { LAYER_CODES } from '../contract.js';
-import { formatValid, defaultHeadline, confidenceFor, footerLine, sampleBanner, legendWords, valueAt, regionName } from './format.js';
+import { LENS_CODES, LENS_FILL } from '../contract.js';
+import { isMultiCase, caseForLens } from '../data/kind.js';
+import { confidenceAt, signalAt, NO_CLEAR_SIGNAL } from '../story/confidence.js';
+import { legendModel, groundOf, runLine } from '../ui/maplegend.js';
+import { formatValid, defaultHeadline, footerLine, valueAt, regionName, confidencePhrase } from './format.js';
 
 let manifest = null;
 bus.on('data:manifest', (m) => { manifest = m; });
@@ -21,12 +25,13 @@ export async function primeManifest() {
 }
 export const cachedManifest = () => manifest;
 
-export const LAYER_ORDER = ['z', 'j', 'c', 't'];
-/** The layer a share is about: the first enabled one (z, j, c, t), else z. */
-export function activeLayer(state) {
-  return LAYER_ORDER.find((k) => state.layers && state.layers[k]) || 'z';
+/** The lens a share is about, read the way the map reads it: store.lens, Pattern when it has none or an unknown one. */
+export function shareLens(state) {
+  return LENS_CODES.includes(state.lens) ? state.lens : 'z';
 }
-export const activeField = (state) => LAYER_CODES[activeLayer(state)];
+/** The field a state's fill draws. */
+export const fillField = (state) => { const l = shareLens(state); return LENS_FILL[l] || LENS_FILL.z; };
+export const activeField = (state) => fillField(state);
 
 export function nearestStep(field, t) {
   const steps = data.fieldSteps(field) || [];
@@ -46,43 +51,67 @@ export function validDateFor(t, state = store.get(), field = activeField(state))
   return data.validTime(t);
 }
 
-function sdAt(state) {
+/** The pattern at the focus (or the domain's spread when there is no focus) at forecast hour t, in dam, plus whether a spread exists. */
+function patternAt(state) {
   const f = state.focus;
-  const series = f ? data.sampleSeries('z500sd', f.lat, f.lon) : data.sampleDomainSpread();
-  const v = valueAt(series, state.t);
-  return v == null ? null : v / 10; // gpm -> dam
+  let spread = null, anom = null;
+  try {
+    const sd = f ? data.sampleSeries('z500sd', f.lat, f.lon) : data.sampleDomainSpread();
+    const v = valueAt(sd, state.t);
+    spread = { has: !!(sd && sd.steps?.length), dam: v == null ? NaN : v / 10 };
+    if (f) {
+      const z = (data.patternSeries?.('z500a', f.lat, f.lon)) || data.sampleSeries('z500a', f.lat, f.lon);
+      const a = valueAt(z, state.t);
+      anom = a == null || !Number.isFinite(a) ? NaN : a / 10;
+    }
+  } catch { /* a field the run lacks: no spread, no anomaly */ }
+  return { hasSpread: !!spread?.has, spreadDam: spread ? spread.dam : NaN, anomDam: anom == null ? NaN : anom };
+}
+
+/** The confidence line a share carries: confidenceAt(), or no claim for unrelated sample cases (their spread is not a forecast's). */
+export function confidenceFor(state, manifest) {
+  if (isMultiCase(manifest) && state.sample) return { level: 'none', text: 'Pattern confidence: not meaningful for sample data' };
+  const p = patternAt(state);
+  const c = confidenceAt(state.t, { spreadDam: p.spreadDam, hasSpread: p.hasSpread });
+  if (c.level !== 'none' && signalAt({ anomDam: p.anomDam, spreadDam: p.spreadDam, hasSpread: p.hasSpread }) === 'none') return { level: 'none', text: NO_CLEAR_SIGNAL };
+  return { level: c.level, text: confidencePhrase(c) };
 }
 
 export function shareMeta(state = store.get()) {
-  const layer = activeLayer(state);
-  const field = LAYER_CODES[layer];
+  const lens = shareLens(state);
+  const field = fillField(state);
   const date = validDateFor(state.t, state, field);
   const v = formatValid(date, { year: !!state.sample }); // sample dates are real past dates: show the year
-  const m = manifest || {};
+  const m = manifest || data.getManifest?.() || {};
   const f = state.focus;
   const placeLabel = f ? String(f.label || '') : '';
-  const conf = confidenceFor({ sd: sdAt(state), leadHours: state.t });
   const sample = !!state.sample;
-  const caseLabel = sample ? (m.cases?.[state.case]?.label || m.sample_note || '') : '';
-  // A sample is real past data, not a model run: say which case instead of printing a rebased run time.
-  const runText = sample ? `Sample case: ${caseLabel}` : m.run ? `Model run ${String(m.run).replace('T', ' ').replace(/:00Z$/, 'Z')}${m.model ? ' · ' + m.model : ''}` : '';
+  // The legend as the screen draws it (palette.legendSpec through legendModel).
+  const model = legendModel({ ...state, lens }, Object.keys(m).length ? m : null);
+  const conf = confidenceFor(state, m);
+  const label = model ? model.run : runLine(state, Object.keys(m).length ? m : null);
+  const caseLabel = sample ? (m.cases?.[caseForLens(m, lens)]?.label || m.sample_note || '') : '';
   return {
     headline: defaultHeadline({ placeLabel, view: state.view, dayLabel: v.dayLabel }),
     placeLabel,
     region: regionName(state.view),
-    layer,
+    layer: lens, lens, field,
+    ground: groundOf(state),
+    legend: model,
     validTime: v.local,
     validShort: v.short,
     validDayLabel: v.dayLabel,
     validUtc: v.utc,
-    run: runText,
-    // Sample spreads are not forecast spreads (SPEC section 11): never print a confidence word as if it meant something.
-    confidence: sample ? 'Pattern confidence: not meaningful for sample data' : conf.phrase,
-    confidenceLevel: sample ? 'none' : conf.level,
+    // The one provenance label: runLine(), the sentence the legend, the badge and the card carry. The picture draws it once: a
+    // sample as its banner, a live run as its run line.
+    provenance: label,
+    run: label,
+    confidence: conf.text,
+    confidenceLevel: conf.level,
     footer: footerLine({ attribution: m.attribution, climatologyLabel: m.climatology?.label }),
-    legendWords: legendWords(layer),
+    legendWords: model ? model.spec.subtitle : '',
     sample,
-    sampleBanner: sample ? sampleBanner(caseLabel) : '',
+    sampleBanner: sample ? label : '',
     caseLabel,
     t: state.t,
   };

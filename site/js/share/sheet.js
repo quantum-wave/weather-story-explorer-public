@@ -1,12 +1,16 @@
-// The share sheet: opened by bus 'share:open' ({kind: 'still'|'loop'|'link'}) or any element with data-share="<kind>".
-// Text from the app is set with textContent only.
+// The share sheet, on the one sheet (ui/sheet.js, DESIGN-SPEC 8.1 and 8.5): opened by bus 'share:open' ({kind: 'still' | 'loop' |
+// 'link'}) or any element with data-share="<kind>". Image, loop and link are tabs of one sheet that keeps its place when you switch.
+// Honest by construction: "Copied" is said only after navigator.clipboard.writeText has resolved; when the clipboard is blocked the
+// link is shown selected, in a read-only field, with "Select and copy". The app never starts a download (deliver.js): a file goes to
+// the host's save, to Web Share, or onto the page to press and hold. Text from the app is set with textContent only.
 import { bus, store } from '../state.js';
+import { openSheet } from '../ui/sheet.js';
 import { exportStill, exportLoop, defaultRange } from './export.js';
-import { deliver, copyImage, canCopyImage } from './deliver.js';
+import { deliver, canCopyImage } from './deliver.js';
 import { shareMeta, primeManifest, activeField } from './meta.js';
-import { copyLink, linkText } from '../links.js';
+import { linkText } from '../links.js';
 
-let dlg = null, ctl = null, previewUrl = null;
+let sheet = null, ctl = null, previewUrl = null, host = null, watcher = null;
 
 function el(tag, props = {}, ...kids) {
   const n = document.createElement(tag);
@@ -16,23 +20,40 @@ function el(tag, props = {}, ...kids) {
   n.append(...kids);
   return n;
 }
-const btn = (text, onClick, cls = '') => { const b = el('button', { type: 'button', class: 'share-btn ' + cls, text }); b.addEventListener('click', onClick); return b; };
 
-export function closeShare() {
-  ctl?.abort(); ctl = null;
-  if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null; }
-  dlg?.remove(); dlg = null;
-  document.removeEventListener('keydown', onKey);
+const TITLES = { still: 'Share an image', loop: 'Share a loop', link: 'Share a link' };
+const SAYS = { saved: 'Saved.', shared: 'Shared.', declined: 'Not saved.', inline: '' };
+export const LINK_PEOPLE_NOTE = 'Links never include people or their places: a link opens the same map at the same time, nothing more.';
+
+/** Write text to the clipboard. True only once the browser's promise resolves; false when it is missing or refuses. */
+export async function copyText(text) {
+  try {
+    if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') return false;
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch { return false; }
 }
-function onKey(e) { if (e.key === 'Escape') closeShare(); }
+/** Copy a PNG to the clipboard; true only after the write resolved. */
+async function copyPng(blob) {
+  try { await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]); return true; } catch { return false; }
+}
 
-const SAYS = { saved: 'Saved.', shared: 'Shared.', downloaded: 'Downloaded.', inline: 'Press and hold the image to save it.', declined: 'Not saved.' };
+function cleanup() {
+  ctl?.abort(); ctl = null;
+  watcher?.disconnect(); watcher = null;
+  host?._release?.(); host = null;
+  if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null; }
+}
+export function closeShare() {
+  const s = sheet; sheet = null;
+  cleanup();
+  if (s) s.close('close');
+}
 
 /** Suggest the one-sentence summary as a headline (J4): best effort, never blocks. */
 async function suggestion(state) {
   const f = state.focus;
   if (!f) return null;
-  if (state.sample && state.case !== 'A') return null; // the story reads case A only
   try {
     const story = await import('../story/index.js');
     const days = await story.buildDays(f.lat, f.lon, 0, 7);
@@ -42,61 +63,81 @@ async function suggestion(state) {
 }
 
 export async function openShare(kind = 'still') {
-  closeShare();
   await primeManifest();
   if (store.get().playing) store.set({ playing: false }); // the share is of the moment the user tapped
+  const mine = {}; // this sheet's own state, so a late result from a closed sheet changes nothing
+  cleanup();
+  const content = el('div', { class: 'share-body' });
+  const api = openSheet({ title: TITLES[kind] || TITLES.still, content, actions: null, onClose: () => { if (sheet === api) sheet = null; cleanup(); mine.gone = true; } });
+  sheet = api;
+  render(api, kind, mine);
+  return api;
+}
+
+function render(api, kind, mine) {
+  cleanup();
   const state = store.get();
   const meta = shareMeta(state);
-  dlg = el('div', { class: 'share-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Share this view' });
-  const card = el('div', { class: 'share-card' });
-  const title = el('h2', { class: 'share-title', text: kind === 'loop' ? 'Share a loop' : kind === 'link' ? 'Share a link' : 'Share an image' });
+  api.setTitle(TITLES[kind] || TITLES.still);
+  const body = el('div', { class: 'share-body' });
   const status = el('p', { class: 'share-status', role: 'status', 'aria-live': 'polite' });
   const preview = el('div', { class: 'share-preview' });
-  const actions = el('div', { class: 'share-actions' });
-  const closeBtn = btn('Close', closeShare, 'share-close');
-  card.append(title);
+  const say = (t) => { status.textContent = t; };
+  const alive = () => !mine.gone && sheet === api;
+
   // Image, loop and link are one sheet: the header's Share button opens it, the tabs switch the kind.
   const tabs = el('div', { class: 'share-tabs', role: 'group', 'aria-label': 'What to share' });
   for (const [k, label] of [['still', 'Image'], ['loop', 'Loop'], ['link', 'Link']]) {
     const b = el('button', { type: 'button', class: 'share-tab', 'data-kind': k, 'aria-pressed': k === kind ? 'true' : 'false', text: label });
-    b.addEventListener('click', () => { if (k !== kind) openShare(k); });
+    b.addEventListener('click', () => { if (k !== kind) render(api, k, mine); });
     tabs.append(b);
   }
-  card.append(tabs);
+  body.append(tabs);
+  const bar = el('progress', { class: 'share-progress', max: '1', value: '0' }); bar.hidden = true;
+  body.append(preview, bar, status);
 
   let headlineInput = null;
   if (kind === 'still') {
-    headlineInput = el('input', { class: 'share-headline', type: 'text', maxlength: '140', 'aria-label': 'Headline', value: meta.headline });
+    headlineInput = el('input', { class: 'share-headline', id: 'share-headline', type: 'text', maxlength: '140', value: meta.headline });
     const chips = el('div', { class: 'share-chips' });
-    card.append(el('label', { class: 'share-label', text: 'Headline' }), headlineInput, chips);
+    body.append(el('label', { class: 'share-label', for: 'share-headline', text: 'Headline' }), headlineInput, chips);
     suggestion(state).then((s) => {
-      if (!s || !dlg) return;
-      chips.append(btn('Use the summary sentence', () => { headlineInput.value = s.slice(0, 140); }, 'share-chip'));
+      if (!s || !alive() || !headlineInput.isConnected) return;
+      const b = el('button', { type: 'button', class: 'share-chip', text: 'Use the summary sentence' });
+      b.addEventListener('click', () => { headlineInput.value = s.slice(0, 140); });
+      chips.append(b);
     });
   }
   if (kind === 'loop') {
     const r = defaultRange(state, activeField(state));
-    card.append(el('p', { class: 'share-note', text: `Loop of ${Math.round((r.to - r.from) / 24 * 10) / 10} days, with a pause on the day you are looking at.` }));
+    body.append(el('p', { class: 'share-note', text: `Loop of ${Math.round((r.to - r.from) / 24 * 10) / 10} days, with a pause on the day you are looking at.` }));
   }
-  const bar = el('progress', { class: 'share-progress', max: '1', value: '0' }); bar.hidden = true;
-  card.append(preview, bar, status, actions, closeBtn);
-  dlg.append(card);
-  document.body.append(dlg);
-  document.addEventListener('keydown', onKey);
+  api.setContent(body).then(() => {});
+  // The sheet is as tall as its content. The content changes after setContent (the link tab swaps the preview for the field and adds
+  // its note and hint; every status line adds text), so the sheet re-measures whenever the body's own height changes.
+  if (typeof ResizeObserver === 'function') {
+    watcher = new ResizeObserver(() => { if (alive()) api.resize(); });
+    watcher.observe(body);
+  }
 
-  const say = (t) => { status.textContent = t; };
+  const actions = (list) => { if (alive()) api.setActions(list); };
   let current = null; // { blob, filename }
 
   const showPreview = (blob) => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     previewUrl = URL.createObjectURL(blob);
     const img = el('img', { src: previewUrl, alt: kind === 'loop' ? 'Preview of the loop' : 'Preview of the image' });
+    img.addEventListener('load', () => { if (alive()) api.resize(); });
     preview.replaceChildren(img);
+    api.resize();
   };
   const stamp = () => new Date().toISOString().slice(0, 10);
-  const doDeliver = async () => {
+  const save = async () => {
+    if (!current) return;
     try {
-      const out = await deliver(current.blob, current.filename);
+      const out = await deliver(current.blob, current.filename, { host: preview }); // 'inline' puts the picture in the sheet
+      if (!alive()) return;
+      if (out === 'inline') { host = preview; api.resize(); }
       say(SAYS[out] || '');
     } catch (e) {
       say(e && e.code === 'too_large' ? 'That file is too large to save here. Try the image instead.' : 'Could not save that file.');
@@ -105,50 +146,78 @@ export async function openShare(kind = 'still') {
   const afterMake = (blob, filename) => {
     current = { blob, filename };
     showPreview(blob);
-    actions.replaceChildren(btn('Save', doDeliver, 'share-primary'));
+    const list = [{ id: 'save', label: 'Save', kind: 'primary', onClick: save }];
     if (blob.type === 'image/png' && canCopyImage()) {
-      actions.append(btn('Copy image', async (ev) => {
-        const ok = await copyImage(blob);
-        if (ok) say('Image copied.'); else { ev.target.remove(); say('Copying images is not available here.'); }
-      }));
+      list.push({ id: 'copy-image', label: 'Copy image', kind: 'secondary', onClick: async () => {
+        say('Copying…');
+        const ok = await copyPng(blob);
+        if (!alive()) return;
+        say(ok ? 'Copied. Paste the image where you want it.' : 'Copying images is not available here. Use Save, or press and hold the image.');
+      } });
     }
-    actions.append(btn('Copy link', async () => { say((await copyLink()) ? 'Link copied.' : 'Could not copy. Link: ' + (await linkText())); }));
+    actions(list);
   };
 
   if (kind === 'link') {
-    const input = el('input', { class: 'share-headline', type: 'text', readonly: '', 'aria-label': 'Link' });
-    linkText().then((t) => { if (input.isConnected) input.value = t; });
-    card.insertBefore(input, preview);
-    actions.append(btn('Copy link', async () => { say((await copyLink()) ? 'Link copied.' : 'Select the link above and copy it.'); }, 'share-primary'));
-    return dlg;
+    const input = el('input', { class: 'share-headline share-link', type: 'text', readonly: '', 'aria-label': 'Link', 'data-testid': 'share-link' });
+    const note = el('p', { class: 'share-note share-people', text: LINK_PEOPLE_NOTE });
+    const hint = el('p', { class: 'share-note share-select', hidden: '' });
+    preview.replaceWith(input); // the link field sits where a picture would
+    status.before(note); status.after(hint);
+    const person = state.focus?.kind === 'person';
+    let text = '';
+    linkText().then((t) => { text = t; if (input.isConnected) input.value = t; });
+    const copy = async () => {
+      if (!text) text = await linkText();
+      input.value = text;
+      say('Copying…'); hint.hidden = true;
+      const ok = await copyText(text); // says "Copied" only once the clipboard has taken it
+      if (!alive()) return;
+      if (ok) say(person ? 'Copied. This link leaves out the person you are looking at: links never include people.' : 'Copied.');
+      else {
+        say('Could not copy automatically.');
+        hint.hidden = false; hint.textContent = 'Select and copy the link above.';
+        input.focus(); input.select(); input.scrollLeft = 0;
+        api.resize();
+      }
+    };
+    actions([{ id: 'copy-link', label: 'Copy link', kind: 'primary', onClick: copy }]);
+    api.resize(); // the link layout is complete: measure it now rather than waiting for the observer
+    return;
   }
   if (kind === 'still') {
-    actions.append(btn('Make image', async (ev) => {
-      ev.target.disabled = true; say('Drawing…');
+    const make = async () => {
+      actions([{ id: 'make', label: 'Make image', kind: 'primary', disabled: true }]); say('Drawing…');
       try {
         const blob = await exportStill({ headline: headlineInput.value });
+        if (!alive()) return;
         say(''); afterMake(blob, `weather-story-${stamp()}.png`);
-      } catch { say('Could not draw the image.'); ev.target.disabled = false; }
-    }, 'share-primary'));
-    actions.firstChild.click();
+      } catch { if (alive()) { say('Could not draw the image.'); actions([{ id: 'make', label: 'Make image', kind: 'primary', onClick: make }]); } }
+    };
+    actions([{ id: 'make', label: 'Make image', kind: 'primary', onClick: make }]);
+    make();
+    // an edited headline redraws the picture (after a pause in typing), so what is saved is what the field says
+    let typing = null;
+    headlineInput.addEventListener('input', () => { clearTimeout(typing); typing = setTimeout(() => { if (alive()) make(); }, 450); });
   } else {
-    const make = btn('Make loop', async (ev) => {
-      ev.target.disabled = true; bar.hidden = false; say('Encoding…');
+    const make = async () => {
+      bar.hidden = false; say('Encoding…');
       ctl = new AbortController();
-      const cancel = btn('Cancel', () => ctl?.abort());
-      actions.append(cancel);
+      const signal = ctl.signal;
+      actions([{ id: 'cancel', label: 'Cancel', kind: 'secondary', onClick: () => ctl?.abort() }]);
       try {
-        const blob = await exportLoop({ onProgress: (f) => { bar.value = f; }, signal: ctl.signal });
+        const blob = await exportLoop({ onProgress: (f) => { bar.value = f; }, signal });
+        if (!alive()) return;
         bar.hidden = true; say(''); afterMake(blob, `weather-story-${stamp()}.gif`);
       } catch (e) {
+        if (!alive()) return;
         bar.hidden = true;
         say(e && e.name === 'AbortError' ? 'Cancelled.' : 'Could not make the loop.');
-        actions.replaceChildren(make); make.disabled = false;
+        actions([{ id: 'make', label: 'Make loop', kind: 'primary', onClick: make }]);
       }
-    }, 'share-primary');
-    actions.append(make);
+    };
+    actions([{ id: 'make', label: 'Make loop', kind: 'primary', onClick: make }]);
   }
-  return dlg;
 }
 
 let installed = false;

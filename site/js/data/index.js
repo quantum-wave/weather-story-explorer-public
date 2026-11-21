@@ -1,10 +1,13 @@
 // Data facade: manifest, chunk loading and decoding, temporal blending, point sampling.
-// Frames are kept as Int16 (as stored); fieldAt blends the two bracketing steps into one reused Float32 frame
-// per (field, domain), with no-data as NaN.
-import { store, bus } from '../state.js';
+// Frames are kept as Int16 (as stored); rawFieldAt blends the two bracketing steps into one reused Float32 frame
+// per (field, domain), with no-data as NaN. The pattern fields (z500, z500a) go through patternField, which moves from
+// the single high-resolution run to the ensemble mean between 168 h and 240 h (DESIGN-SPEC 7.2); the map and the story
+// (patternSeries) share one weight, so a card at day 9 describes what the map at day 9 shows.
+import { store, bus, choice } from '../state.js';
 import { NODATA } from '../contract.js';
 import { decodeChunk } from './decode.js';
 import { toGrid, nodeLonLat, bilinear } from './grid.js';
+import { isLive, isMultiCase, caseForLens } from './kind.js';
 
 let manifest = null;
 let base = 'data/';
@@ -12,21 +15,25 @@ let fetchImpl = (u) => fetch(u);
 let version = 0; // bumps whenever a chunk lands
 const frames = new Map(); // `${field}|${domain}` -> Int16Array[] indexed like the field's steps (undefined = not loaded)
 const pending = new Map(); // `${field}|${domain}|${chunk}` -> Promise
-const blended = new Map(); // `${field}|${domain}` -> {buf, t, ver}
+const blended = new Map(); // `${field}|${domain}` -> {buf, t, ver}: the buffers behind storedFieldAt (the public raw frame)
+const inner = new Map(); // same key: patternField's private reads of z500 / z500a / z500em, so no caller's frame is ever overwritten
+const patterned = new Map(); // `${kind}|${domain}` -> {buf, t, ver}: patternField's own output buffers (what fieldAt returns)
+const deltas = new Map(); // `${domain}` -> {buf, t, ver}: (mean - z500) on a source domain, shared by both kinds
+const announced = new Set(); // mean-source notices already sent for this manifest
 const spreadCache = new Map(); // `${domain}|${stepIndex}` -> number
 
 /** Test hook: replace fetch (bytes loaded from a directory in Node) and forget everything. */
 export function _reset({ fetch: f } = {}) {
   manifest = null; base = 'data/'; version = 0;
   fetchImpl = f || ((u) => fetch(u));
-  frames.clear(); pending.clear(); blended.clear(); spreadCache.clear();
+  frames.clear(); pending.clear(); blended.clear(); inner.clear(); patterned.clear(); deltas.clear(); announced.clear(); spreadCache.clear();
 }
 
 export async function loadManifest(url = 'data/manifest.json') {
   const res = await fetchImpl(url);
   if (!res.ok) throw new Error(`manifest ${res.status}`);
   const m = await res.json();
-  frames.clear(); pending.clear(); blended.clear(); spreadCache.clear();
+  frames.clear(); pending.clear(); blended.clear(); inner.clear(); patterned.clear(); deltas.clear(); announced.clear(); spreadCache.clear();
   manifest = m;
   base = url.slice(0, url.lastIndexOf('/') + 1);
   store.set({ sample: !!m.sample });
@@ -56,33 +63,42 @@ function bracket(steps, t) {
 
 const chunkOf = (meta, idx) => meta.chunks.find((c) => idx >= c.steps[0] && idx < c.steps[1]);
 
+/** A chunk that could not be had (missing file, bad status, corrupt bytes) is announced once per attempt, then rejects. */
 function loadChunk(fieldId, domain, chunk) {
   const key = `${fieldId}|${domain}|${chunk.id}`;
   if (pending.has(key)) return pending.get(key);
   const meta = fieldMeta(fieldId), file = chunk.files?.[domain], dom = manifest.domains[domain];
-  if (!file) return Promise.resolve();
+  const fail = (e) => bus.emit('data:error', { field: fieldId, domain, chunk: chunk.id, message: String(e?.message ?? e) });
+  if (!file) { // the field lists the domain but the manifest has no file for this chunk: say so once, then stay quiet
+    fail(new Error(`${fieldId} ${domain} chunk ${chunk.id} is not in the manifest`));
+    const p = Promise.resolve(); pending.set(key, p); return p;
+  }
   const mf = manifest;
   const p = (async () => {
-    const res = await fetchImpl(base + file.path);
-    if (!res.ok) throw new Error(`${file.path} ${res.status}`);
-    const bytes = new Uint8Array(await res.arrayBuffer());
-    const nFrames = chunk.steps[1] - chunk.steps[0];
-    const decoded = await decodeChunk(bytes, { nx: dom.nx, ny: dom.ny, nFrames, filter: meta.filter });
-    if (mf !== manifest) return; // manifest replaced while loading
-    const fk = `${fieldId}|${domain}`;
-    let arr = frames.get(fk);
-    if (!arr) { arr = new Array(meta.steps.length); frames.set(fk, arr); }
-    decoded.forEach((f, i) => { arr[chunk.steps[0] + i] = f; });
-    version++;
-    bus.emit('data:chunk', { field: fieldId, domain, chunk: chunk.id });
+    try {
+      const res = await fetchImpl(base + file.path);
+      if (!res.ok) throw new Error(`${file.path} ${res.status}`);
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      const nFrames = chunk.steps[1] - chunk.steps[0];
+      const decoded = await decodeChunk(bytes, { nx: dom.nx, ny: dom.ny, nFrames, filter: meta.filter });
+      if (mf !== manifest) return; // manifest replaced while loading
+      const fk = `${fieldId}|${domain}`;
+      let arr = frames.get(fk);
+      if (!arr) { arr = new Array(meta.steps.length); frames.set(fk, arr); }
+      decoded.forEach((f, i) => { arr[chunk.steps[0] + i] = f; });
+      version++;
+      bus.emit('data:chunk', { field: fieldId, domain, chunk: chunk.id });
+    } catch (e) {
+      if (mf === manifest) fail(e);
+      throw e;
+    }
   })();
   pending.set(key, p);
   p.catch(() => { if (pending.get(key) === p) pending.delete(key); });
   return p;
 }
 
-/** Load the chunks that hold the two steps around t. Resolves quietly for unknown fields, domains or times. */
-export async function ensure(fieldId, domain, tHours) {
+async function ensureRaw(fieldId, domain, tHours) {
   const meta = fieldMeta(fieldId);
   if (!meta || !meta.domains.includes(domain)) return;
   const b = bracket(meta.steps, tHours);
@@ -92,19 +108,43 @@ export async function ensure(fieldId, domain, tHours) {
   await Promise.all([...need.values()].map((c) => loadChunk(fieldId, domain, c)));
 }
 
-/** Load every chunk of a field in a domain. */
-export async function ensureAll(fieldId, domain) {
+async function ensureAllRaw(fieldId, domain) {
   const meta = fieldMeta(fieldId);
   if (!meta || !meta.domains.includes(domain)) return;
   await Promise.all(meta.chunks.map((c) => loadChunk(fieldId, domain, c)));
 }
 
 /**
+ * Load the chunks that hold the two steps around t. Resolves quietly for unknown fields, domains or times.
+ * For z500 and z500a it also loads what a blended frame at t needs (z500 and the ensemble mean) once t is past 168 h.
+ */
+export async function ensure(fieldId, domain, tHours) {
+  const jobs = [ensureRaw(fieldId, domain, tHours)];
+  if (isPatternKind(fieldId) && tHours > BLEND_START_H) {
+    const src = meanSource(domain);
+    if (fieldId !== 'z500') jobs.push(ensureRaw('z500', domain, tHours));
+    if (src) { jobs.push(ensureRaw('z500', src.from, tHours), ensureRaw(MEAN_FIELD, src.from, tHours)); }
+  }
+  await Promise.all(jobs);
+}
+
+/** Load every chunk of a field in a domain (for z500 and z500a, the ensemble mean's and z500's too when the run has a mean). */
+export async function ensureAll(fieldId, domain) {
+  const jobs = [ensureAllRaw(fieldId, domain)];
+  if (isPatternKind(fieldId)) {
+    const src = meanSource(domain);
+    if (src) { if (fieldId !== 'z500') jobs.push(ensureAllRaw('z500', domain)); jobs.push(ensureAllRaw('z500', src.from), ensureAllRaw(MEAN_FIELD, src.from)); }
+  }
+  await Promise.all(jobs);
+}
+
+/**
  * The field at forecast hour t on a domain: a Float32Array (ny*nx, NaN = no data) blending the field's own two
  * adjacent steps. The array is reused: it stays valid until the next call for the same field and domain.
  * Null when t is outside the field's steps or a needed frame is not loaded yet.
+ * Private: what the file holds, with no ensemble blending. Callers use fieldAt / patternField.
  */
-export function fieldAt(fieldId, domain, tHours) {
+function rawFieldAt(fieldId, domain, tHours, slots = blended) {
   const meta = fieldMeta(fieldId);
   if (!meta) return null;
   const arr = frames.get(`${fieldId}|${domain}`);
@@ -115,8 +155,8 @@ export function fieldAt(fieldId, domain, tHours) {
   if (!A || !B) return null;
   const dom = manifest.domains[domain], n = dom.nx * dom.ny;
   const key = `${fieldId}|${domain}`;
-  let slot = blended.get(key);
-  if (!slot) { slot = { buf: new Float32Array(n), t: NaN, ver: -1 }; blended.set(key, slot); }
+  let slot = slots.get(key);
+  if (!slot) { slot = { buf: new Float32Array(n), t: NaN, ver: -1 }; slots.set(key, slot); }
   if (slot.t === tHours && slot.ver === version) return slot.buf;
   const out = slot.buf, { scale, offset } = meta, nd = meta.nodata ?? NODATA;
   if (b.w === 0) {
@@ -130,6 +170,122 @@ export function fieldAt(fieldId, domain, tHours) {
   }
   slot.t = tHours; slot.ver = version;
   return out;
+}
+
+/** The stored field exactly as the build wrote it (no blending), for the decode check against the manifest probes. */
+export const storedFieldAt = rawFieldAt;
+
+const MEAN_FIELD = 'z500em';
+const BLEND_START_H = 168, BLEND_END_H = 240; // DESIGN-SPEC 7.2 zones: the single run to 168 h, the mean from 240 h
+const isPatternKind = (f) => f === 'z500' || f === 'z500a';
+
+const meanListed = () => {
+  const meta = fieldMeta(MEAN_FIELD);
+  return !!meta && meta.steps?.length > 0 && !(manifest?.missing || []).some((x) => x?.field === MEAN_FIELD);
+};
+
+/**
+ * Where the ensemble mean for a pattern frame on `domain` comes from, so the map never goes blank when the mean was
+ * recorded on fewer domains than z500 (the build gives z500 and z500a an extra domain, np05, that z500em may lack):
+ *  { from: domain }            the mean and z500 are both on the domain itself;
+ *  { from: other, resample }  the finest other domain that has both and covers the whole of this one (bilinear);
+ *  null                       no usable mean for this domain: the single run is shown, and says so (data:mean).
+ */
+function meanSource(domain) {
+  if (!meanListed() || !manifest.domains?.[domain]) return null;
+  const em = fieldMeta(MEAN_FIELD), z = fieldMeta('z500');
+  const both = (d) => em.domains.includes(d) && z?.domains.includes(d) && manifest.domains[d];
+  if (both(domain)) return { from: domain, resample: false };
+  const dom = manifest.domains[domain];
+  const corners = [[0, 0], [dom.nx - 1, 0], [0, dom.ny - 1], [dom.nx - 1, dom.ny - 1], [(dom.nx - 1) / 2, (dom.ny - 1) / 2]].map(([i, j]) => nodeLonLat(dom, i, j));
+  const cands = em.domains.filter((d) => d !== domain && both(d) && corners.every(([lo, la]) => toGrid(manifest.domains[d], lo, la)));
+  cands.sort((a, b) => Math.abs(manifest.domains[a].dlon) - Math.abs(manifest.domains[b].dlon));
+  return cands.length ? { from: cands[0], resample: true } : null;
+}
+
+/**
+ * True when the run carries the ensemble mean (z500em) and does not list it as missing. With a domain (a string) or a
+ * place ({lat, lon}) it answers for that one: true only when the pattern there really can move to the mean.
+ */
+export function hasMean(where) {
+  if (where == null) return meanListed();
+  if (typeof where === 'string') return meanSource(where) !== null;
+  return meanListed() && candidateDomains(MEAN_FIELD, where.lat, where.lon).length > 0;
+}
+
+/** Weight of the ensemble mean at forecast hour t, 0 to 1 (0 at 168 h, 0.5 at 204 h, 1 at 240 h); 0 at every t without a mean. */
+function weightAt(t, where) {
+  if (!hasMean(where) || !(t > BLEND_START_H)) return 0;
+  return t >= BLEND_END_H ? 1 : (t - BLEND_START_H) / (BLEND_END_H - BLEND_START_H);
+}
+
+/** Which source the pattern shows at t, as the zones table names them: 'hres' | 'blend' | 'mean'. Domain or place aware. */
+export function patternSource(t, where) {
+  if (!hasMean(where) || !(t >= BLEND_START_H)) return 'hres';
+  return t >= BLEND_END_H ? 'mean' : 'blend';
+}
+
+/** (mean - z500) at t on the source domain, in a buffer of its own; null while a frame is not loaded. */
+function deltaAt(from, tHours) {
+  const z = rawFieldAt('z500', from, tHours, inner), em = rawFieldAt(MEAN_FIELD, from, tHours, inner);
+  if (!z || !em) return null;
+  let slot = deltas.get(from);
+  if (!slot) { slot = { buf: new Float32Array(z.length), t: NaN, ver: -1 }; deltas.set(from, slot); }
+  if (slot.t === tHours && slot.ver === version) return slot.buf;
+  for (let k = 0; k < z.length; k++) slot.buf[k] = em[k] - z[k];
+  slot.t = tHours; slot.ver = version;
+  return slot.buf;
+}
+
+/**
+ * The pattern field at forecast hour t on a domain, kind 'z500' or 'z500a' (Float32Array, NaN = no data): the single run
+ * before 168 h, a linear blend to the ensemble mean by 240 h, the mean after, and the single run at every t when the
+ * domain has no mean. The anomaly of the mean is z500em - (z500 - z500a) at the same step, so the blended anomaly is
+ * z500a + w * (z500em - z500). The frame is always the kind's own buffer (a copy even when w is 0), valid until the next
+ * call for the same kind and domain; it reads private slots, so no frame a caller holds (fieldAt, storedFieldAt) is
+ * ever overwritten. When the mean is not on this domain it is resampled from another that covers it (announced once as
+ * data:mean). Null only when a needed frame is not loaded.
+ */
+export function patternField(kind, domain, tHours) {
+  if (!isPatternKind(kind)) return null;
+  const base = rawFieldAt(kind, domain, tHours, inner);
+  if (!base) return null;
+  const src = tHours > BLEND_START_H ? meanSource(domain) : null;
+  const w = src ? weightAt(tHours, domain) : 0;
+  if (tHours > BLEND_START_H && meanListed()) {
+    const key = `${domain}|${src ? src.from : '-'}`;
+    if ((!src || src.resample) && !announced.has(key)) {
+      announced.add(key);
+      bus.emit('data:mean', src ? { domain, source: 'resampled', from: src.from } : { domain, source: 'none' });
+    }
+  }
+  let delta = null;
+  if (w > 0) { delta = deltaAt(src.from, tHours); if (!delta) return null; }
+  const key = `${kind}|${domain}`;
+  let slot = patterned.get(key);
+  if (!slot) { slot = { buf: new Float32Array(base.length), t: NaN, ver: -1 }; patterned.set(key, slot); }
+  if (slot.t === tHours && slot.ver === version) return slot.buf;
+  const out = slot.buf;
+  if (!delta) out.set(base);
+  else if (!src.resample) for (let k = 0; k < out.length; k++) out[k] = base[k] + w * delta[k];
+  else {
+    const dom = manifest.domains[domain], sd = manifest.domains[src.from];
+    for (let j = 0, k = 0; j < dom.ny; j++) for (let i = 0; i < dom.nx; i++, k++) {
+      const [lo, la] = nodeLonLat(dom, i, j), g = toGrid(sd, lo, la);
+      out[k] = g ? base[k] + w * bilinear(delta, sd, g[0], g[1], NaN) : NaN;
+    }
+  }
+  slot.t = tHours; slot.ver = version;
+  return out;
+}
+
+/**
+ * The field at forecast hour t on a domain: a Float32Array (ny*nx, NaN = no data). z500 and z500a are the pattern
+ * (patternField, so the map moves to the ensemble mean after day 7); every other field blends its own two adjacent steps.
+ * The array is reused: it stays valid until the next call for the same field and domain.
+ */
+export function fieldAt(fieldId, domain, tHours) {
+  return isPatternKind(fieldId) ? patternField(fieldId, domain, tHours) : rawFieldAt(fieldId, domain, tHours);
 }
 
 export function fieldSteps(fieldId) { return fieldMeta(fieldId)?.steps ?? []; }
@@ -174,6 +330,33 @@ export function sampleSeries(fieldId, lat, lon) {
     values[s] = v === v ? v * meta.scale + meta.offset : NaN;
   }
   return { steps: steps.slice(), values };
+}
+
+/** Linear value of a series {steps, values} at hour t (NaN outside it or across a gap longer than the blend gap). */
+function seriesAt(S, t) {
+  const b = S && bracket(S.steps, t);
+  if (!b) return NaN;
+  const a = S.values[b.i0], c = S.values[b.i1];
+  return b.w === 0 ? a : a + (c - a) * b.w;
+}
+
+/**
+ * sampleSeries for the pattern ('z500' | 'z500a') with the same weights as patternField, so a story built from the series
+ * describes the map: each step's value moves from the single run to the ensemble mean between 168 h and 240 h; without a
+ * mean it is the single run. Null when the kind is not a pattern field or the place is outside every domain.
+ */
+export function patternSeries(kind, lat, lon) {
+  if (!isPatternKind(kind)) return null;
+  const own = sampleSeries(kind, lat, lon);
+  if (!own || !hasMean({ lat, lon })) return own;
+  const z = kind === 'z500' ? own : sampleSeries('z500', lat, lon), em = sampleSeries(MEAN_FIELD, lat, lon);
+  const values = Float32Array.from(own.values);
+  own.steps.forEach((t, i) => {
+    const w = weightAt(t, { lat, lon });
+    if (w === 0) return;
+    values[i] = own.values[i] + w * (seriesAt(em, t) - seriesAt(z, t)); // NaN when the mean is not there yet
+  });
+  return { steps: own.steps, values };
 }
 
 /** Largest value of the field within `km` of a place at step index `stepIndex`, or null when unavailable. */
@@ -247,17 +430,31 @@ const MS_H = 3600e3;
 const parseUTC = (s) => Date.parse(s.length === 17 ? s.replace(/Z$/, ':00Z') : s);
 
 /**
- * Real-world time of the origin (forecast hour 0) of a sample case, from the case's first field's source.valid.
- * Null when the manifest is not a sample or the case has no dated field.
+ * Real-world time of the origin (forecast hour 0) of a sample dataset, from the first dated field's source.valid: the
+ * named case's fields for a multi-case manifest (default the active case), the whole manifest otherwise (a recorded
+ * forecast has no cases; a case id from an old link is ignored). A recorded forecast without dates is its run.
+ * Null for live data (its origin is the run, which validTime reads) and for an undated multi-case sample.
  */
 export function caseOrigin(caseId) {
-  if (!manifest?.sample) return null;
-  const id = caseId ?? store.get().case;
-  for (const f of manifest.cases?.[id]?.fields || []) {
+  if (!manifest || isLive(manifest)) return null;
+  const multi = isMultiCase(manifest);
+  const names = multi ? manifest.cases[caseId ?? activeCase()]?.fields || [] : Object.keys(manifest.fields || {});
+  for (const f of names) {
     const meta = fieldMeta(f), v = meta?.source?.valid?.[0];
     if (v) return new Date(parseUTC(v) - (meta.steps?.[0] ?? 0) * MS_H);
   }
-  return null;
+  const run = manifest.run ? parseUTC(manifest.run) : NaN;
+  return !multi && run === run ? new Date(run) : null;
+}
+
+/** The case the map shows: the one that holds the active lens' field in a multi-case manifest, else null. */
+export function activeCase() {
+  return caseForLens(manifest, choice(store.get(), 'lens'));
+}
+
+/** Fields the manifest says this run lacks, [{field, reason}], so each consumer can degrade in words. */
+export function missing() {
+  return (manifest?.missing || []).filter((x) => x && x.field).map((x) => ({ field: x.field, reason: x.reason || '' }));
 }
 
 /**

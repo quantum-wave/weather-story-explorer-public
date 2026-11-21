@@ -1,0 +1,11 @@
+{
+ "id": "home-1",
+ "file": "site/js/ui/home.js",
+ "find": "if (isPhone() && !keepSheet && layout.snap() === 'full') layout.setSnap('half');",
+ "replace": "if (isPhone() && !keepSheet) layout.setSnap('peek');",
+ "checks": [
+  "S-HOME"
+ ],
+ "expect": "killed",
+ "note": "UX-4 (Josh point 5): a day tap drops the sheet to peek and takes the panel away. Killed by the real taps on every strip day at half and full in S-HOME (the sheet must be at half afterwards)."
+}

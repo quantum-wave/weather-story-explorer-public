@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>How the Weather Story works</title>
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/guide.css">
+<style>
+  html { background: var(--bg); }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 400 15px/22px var(--font-ui); -webkit-text-size-adjust: 100%; }
+  a { color: inherit; }
+  a:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; border-radius: 4px; }
+  .how .gd { max-width: 62ch; }
+</style>
+<script>
+/* the same theme choice as the map page: the saved choice (Display menu), else the system */
+(function () { var t = 'dark'; try { var q = JSON.parse(localStorage.getItem('wse.v1.prefs')) || {}; var p = q.themePref === 'auto' || q.themePref === 'light' || q.themePref === 'dark' ? q.themePref : q.theme; t = p === 'light' || p === 'dark' ? p : (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); } catch (e) { try { t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'; } catch (e2) {} } document.documentElement.setAttribute('data-theme', t); })();
+</script>
+<script async data-lib="d3" src="vendor/d3@7.9.2/d3.min.js"></script>
+<script async data-lib="topojson" src="vendor/topojson-client@3.1.0/topojson-client.min.js"></script>
+</head>
+<body>
+<main class="how" id="how">
+  <p><a class="how-back" href="./">&#9664; Back to the map</a></p>
+  <h1 class="how-h1">How the Weather Story works</h1>
+  <p class="how-lede">What each view of the map shows and how to read it. Each section below is the same text the map's &ldquo;What is this?&rdquo; button opens.</p>
+  <ul class="how-nav" id="how-nav" aria-label="Views"></ul>
+  <div id="how-lenses"></div>
+  <noscript><p>This page builds its sections from the app's own guide text, so it needs JavaScript.</p></noscript>
+</main>
+<script type="module">
+import { listed } from './js/lenses/index.js';
+import { buildLensGuide } from './js/ui/guide.js';
+const nav = document.getElementById('how-nav'), host = document.getElementById('how-lenses');
+for (const L of listed()) {
+  const sec = document.createElement('section');
+  sec.className = 'how-lens'; sec.id = L.id;
+  const h2 = document.createElement('h2'); h2.textContent = L.name;
+  const blurb = document.createElement('p'); blurb.className = 'how-blurb'; blurb.textContent = L.blurb;
+  sec.append(h2, blurb, buildLensGuide(L));
+  host.append(sec);
+  const li = document.createElement('li'), a = document.createElement('a');
+  a.href = '#' + L.id; a.textContent = L.name; li.append(a); nav.append(li);
+}
+document.documentElement.dataset.howReady = String(host.children.length);
+</script>
+</body>
+</html>

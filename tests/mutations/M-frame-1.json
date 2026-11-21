@@ -1,0 +1,11 @@
+{
+ "id": "frame-1",
+ "file": "site/js/ui/fullscreen.js",
+ "find": "document.addEventListener('fullscreenchange', onFullscreenChange);",
+ "replace": "document.addEventListener('fullscreenchange-ignored', onFullscreenChange);",
+ "checks": [
+  "S-FRAME"
+ ],
+ "expect": "killed",
+ "note": "Ignore fullscreenchange: leaving native fullscreen with Escape (which the page never sees) leaves #app[data-expanded] set and the Expand button saying Exit. S-FRAME's native run leaves fullscreen the same way and must see expanded cleared (design spec 4.7, E-B5)."
+}

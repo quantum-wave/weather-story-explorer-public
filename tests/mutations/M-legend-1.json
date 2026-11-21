@@ -1,0 +1,11 @@
+{
+ "id": "legend-1",
+ "file": "site/js/ui/maplegend.js",
+ "find": "let ticks = spec.ticks.map((t) => ({",
+ "replace": "let ticks = spec.stops.map((st) => ({ value: st.from, label: String(st.from), major: false })).map((t) => ({",
+ "checks": [
+  "S-LEGEND"
+ ],
+ "expect": "killed",
+ "note": "Label every band edge: the legend labels all 2 dam edges instead of +-2 and the major edges. S-LEGEND's tick-set assertion (exactly -40,-30,-20,-10,-2,2,10,20,30,40) and its no-overlap assertion must fail (design spec 4.2, 5.1: countable ticks, REF-45)."
+}

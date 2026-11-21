@@ -1,0 +1,44 @@
+/* status.css: the toast region and the map status line (design spec 8.5). Loaded by ui/status.js.
+   Bounded refinement of the existing shell grammar: ink-on-paper toast, scrim pill for the map status, same tokens. */
+
+/* the region: phone and expanded = top of the map stage under the map tools; desktop = foot of the story panel, in reserved space */
+#app #toasts {
+  position: absolute; left: var(--s3, 12px); right: var(--s3, 12px); top: 64px; transform: none; width: auto; max-width: 420px;
+  z-index: 7; display: flex; flex-direction: column; gap: var(--s2, 8px); align-items: stretch; pointer-events: none;
+}
+#app #toasts:empty { display: none; }
+#app #toasts:not(:has(.wse-toast, .pn-toast)) { display: none; }
+#app #home > #toasts { position: static; flex: none; max-width: none; padding: 0 var(--s4, 16px) var(--s3, 12px); }
+
+.wse-toast {
+  pointer-events: auto; display: flex; align-items: center; justify-content: space-between; gap: var(--s3, 12px);
+  min-height: 52px; padding: var(--s1, 4px) var(--s1, 4px) var(--s1, 4px) var(--s4, 16px);
+  background: var(--ink); color: var(--bg); border-radius: var(--r-card, 10px); box-shadow: 0 8px 28px rgba(0, 0, 0, .35);
+  animation: rise 200ms var(--ease, ease);
+}
+.wse-toast-text { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.wse-toast-action { background: none; border: 0; color: inherit; text-decoration: underline; text-underline-offset: 3px; min-height: 44px; padding: 0 var(--s3, 12px); font-weight: 600; flex: none; }
+
+/* the status line: top centre of the map under the tools, one short line; Retry is a real button. The toast region drops below it. */
+#map-status {
+  top: 64px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: var(--s3, 12px); max-width: min(420px, calc(100% - 32px)); width: max-content;
+  padding: var(--s1, 4px) var(--s1, 4px) var(--s1, 4px) var(--s4, 16px); border-radius: 26px; text-align: center; min-height: 44px;
+  background: var(--scrim); border: 1px solid var(--hairline); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  color: var(--ink-2); z-index: 6;
+}
+#map-status:empty { display: none; }
+#map-status[data-kind="error"] { color: var(--ink); border-color: color-mix(in srgb, var(--danger) 55%, var(--hairline)); }
+.wse-status-retry { min-height: 44px; min-width: 44px; padding: 0 var(--s4, 16px); border-radius: 22px; border: 0; background: var(--ink); color: var(--bg); font-weight: 600; flex: none; pointer-events: auto; }
+.wse-status-text { min-width: 0; }
+
+/* the pins toast (Added Maya, Undo): its host is moved into #toasts, so it takes part in the region instead of floating over the timeline */
+#toasts .pn-toast-host { position: static; padding: 0; justify-content: stretch; pointer-events: none; }
+#toasts .pn-toast-host:empty { display: none; }
+#toasts .pn-toast { width: 100%; pointer-events: auto; }
+
+/* skeleton cards while the first load runs */
+.wse-skel-card { gap: var(--s3, 12px); }
+.wse-skel-card .skeleton.line { margin-bottom: 0; }
+#stage:has(#map-status:not(:empty)) #toasts { top: 124px; }
+#map-status:not(:has(button)) { padding-right: var(--s4, 16px); }

@@ -1,0 +1,11 @@
+{
+  "id": "lens-c-5",
+  "file": "site/js/lenses/surface.js",
+  "find": "              if (w < c.w) return null; // a deeper node inside the same closed isobar is the system's centre\n",
+  "replace": "",
+  "checks": [
+    "unit:wp15.lenses-c.test.mjs"
+  ],
+  "expect": "killed",
+  "note": "W4-05 review round 2: one L per closed isobar. The mutant deletes the dedupe; the unit test's grid D has a second, shallower low (1001.1 hPa) whose 1004 hPa isobar also closes round the 990 hPa low (saddle 1002.4, premise asserted), so a second L appears."
+}

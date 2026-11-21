@@ -1,0 +1,11 @@
+{
+  "id": "explain-5",
+  "file": "site/js/ui/guide.js",
+  "find": "if (g >= REF_CLEAR) return { x: bx, y: by, anchor: 'start', lines };",
+  "replace": "return { x: L + 8, y: yRef + 16, anchor: 'start', lines };",
+  "checks": [
+    "S-EXPLAIN"
+  ],
+  "expect": "killed",
+  "note": "W4-02 acceptance 1: the spread chart's reference label is pinned at the left, 16 units under the 6 dam line, wherever the curve runs. S-EXPLAIN measures the label's box against the plotted path with 4 px of slack."
+}

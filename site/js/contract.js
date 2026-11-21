@@ -1,12 +1,15 @@
 // Frozen data contract (PLAN Interfaces, SPEC sections 3, 7, 9, 11). Ids and conventions only:
 // the manifest is authoritative for grid sizes, scales and offsets. Changing this file is a Departure.
 
-export const FIELD_IDS = ['z500', 'z500a', 'z500sd', 'ws250', 'tp6', 't850a', 'msl', 'ivt', 't2a'];
+export const FIELD_IDS = ['z500', 'z500a', 'z500sd', 'z500em', 'ws250', 'tp6', 'pr1', 'pr10', 't850a', 't2m', 'msl', 'ivt', 't2a'];
 export const DOMAIN_IDS = ['g1', 'np05'];
 /** View id -> the domain it draws. */
-export const VIEWS = { np: 'np05', nh: 'g1', gl: 'g1' };
-/** Layer code (hash and store.layers key) -> field id. */
+export const VIEWS = { np: 'np05', nh: 'g1', gl: 'g1', wm: 'g1' };
+/** The retired layer letters of old hashes -> field id (the store no longer has a layers key; the lens decides what is drawn). */
 export const LAYER_CODES = { z: 'z500a', j: 'ws250', c: 'z500sd', t: 't2a' };
+/** Lens code (store.lens and the hash) -> the field its fill draws. Pattern, Jet stream, Storms and rain, Air mass, Atmospheric rivers, Confidence. */
+export const LENS_CODES = ['z', 'j', 's', 'a', 'r', 'c'];
+export const LENS_FILL = { z: 'z500a', j: 'ws250', s: 'tp6', a: 't850a', r: 'ivt', c: 'z500sd' };
 export const NODATA = -32768;
 export const STORE_KEY = 'wse.v1.store';
 export const HASH_RE = /^[a-z0-9-]{0,64}$/;

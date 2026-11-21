@@ -1,7 +1,8 @@
 // S-LINK: hash round trip, snap notice, no reserved name, throttled mirroring, canonical link.
 export const id = 'S-LINK';
 export const freshProfile = false;
-export async function run({ page, baseUrl, assert, newPage }) {
+export const data = ['synthetic', 'sample-min'];
+export async function run({ page, baseUrl, assert, newPage, fixture }) {
   await page.goto(baseUrl);
   await page.waitFor('window.__wse && window.__wse.ready === true', { timeout: 15000 });
   await page.eval(`(async () => { window.L = await import('./js/links.js'); window.C = await import('./js/contract.js'); return true; })()`);
@@ -16,16 +17,16 @@ export async function run({ page, baseUrl, assert, newPage }) {
   // format + round trip
   const out = await page.eval(`(async () => {
     const { store } = __wse;
-    store.set({ view: 'nh', layers: { z: true, j: true, c: false, t: false }, t: ${s2}, focus: null });
+    store.set({ view: 'nh', lens: 'z', overlays: { jetline: true }, t: ${s2}, focus: null });
     const h = L.formatHash(store.get());
-    store.set({ view: 'np', layers: { z: true, j: false, c: false, t: false }, t: ${s0} });
+    store.set({ view: 'np', lens: 'j', overlays: { jetline: false }, t: ${s0} });
     const r = await L.applyHash(h);
     const s = store.get();
-    return { h, r, view: s.view, layers: s.layers, t: s.t };
+    return { h, r, view: s.view, lens: s.lens, jetline: s.overlays.jetline, t: s.t };
   })()`);
   assert.equal(out.h, '#nh-zj-' + (await stamp(s2)));
   assert.equal(out.view, 'nh');
-  assert.deepEqual(out.layers, { z: true, j: true, c: false, t: false });
+  assert.equal(out.lens, 'z'); assert.equal(out.jetline, true, 'the link restores the lens and the Jet outline');
   assert.equal(out.t, s2);
   assert.equal(out.r.snapped, false);
 
@@ -58,6 +59,15 @@ export async function run({ page, baseUrl, assert, newPage }) {
   assert.equal(gz.label, 'Seattle'); assert.equal(gz.kind, 'place');
   assert.ok(gz.hash.endsWith('-c5809844'), 'the place survives a round trip: ' + gz.hash);
 
+  // World (W4-10): #wm-... opens the World view and formatHash writes it back
+  const wm = await page.eval(`(async () => {
+    const { store } = __wse; store.set({ view: 'np', lens: 'z', overlays: { jetline: false }, focus: null });
+    const r = await L.applyHash('#wm-z-' + G.utcStamp(__wse.data.validTime(${s0})));
+    return { r, view: store.get().view, hash: L.formatHash(store.get()) };
+  })()`);
+  assert.equal(wm.view, 'wm', 'a #wm link opens World: ' + JSON.stringify(wm));
+  assert.ok(wm.hash.startsWith('#wm-z-'), 'World writes back as #wm-: ' + wm.hash);
+
   // snapping: an hour that is not a forecast step snaps to the nearest step and says so
   const snap = await page.eval(`(async () => {
     const { store } = __wse;
@@ -76,14 +86,36 @@ export async function run({ page, baseUrl, assert, newPage }) {
   // formatHash always lands on a real step, and never on a reserved name
   const sweep = await page.eval(`(async () => {
     const { store } = __wse; const bad = [];
-    for (const view of ['np','nh','gl']) for (let m = 0; m < 16; m++) for (const t of [0, 5.3, 17, 47.9, 359]) {
-      store.set({ view, layers: { z: !!(m&1), j: !!(m&2), c: !!(m&4), t: !!(m&8) }, t, focus: null });
+    for (const view of ['np','nh','gl','wm']) for (let m = 0; m < 12; m++) for (const t of [0, 5.3, 17, 47.9, 359]) {
+      store.set({ view, lens: 'zjsarc'[m % 6], overlays: { jetline: m >= 6 }, t, focus: null });
       const h = L.formatHash(store.get());
       if (!C.HASH_RE.test(h.slice(1)) || C.isReservedHash(h.slice(1)) || !L.parseHash(h)) bad.push(h);
     }
     return bad;
   })()`);
   assert.deepEqual(sweep, []);
+
+  // MET-11: a deep link is read against the dataset it opens on. On the sample, #np-j-2017090600 is Irma (case B): no snap
+  // notice and t = 12, not a snap against case A's January 2017 times.
+  if (fixture === 'sample-min') {
+    const irma = await page.eval(`(async () => {
+      const { store } = __wse; store.set({ lens: 'z', t: 0 });
+      document.getElementById('share-notice')?.setAttribute('hidden', '');
+      const r = await L.applyHash('#np-j-2017090600'); const el = document.getElementById('share-notice');
+      return { r, t: store.get().t, case: __wse.data.activeCase(), notice: el && !el.hidden ? el.textContent : null };
+    })()`);
+    assert.equal(irma.r.snapped, false, 'no snap: ' + JSON.stringify(irma));
+    assert.equal(irma.notice, null, 'no snap notice');
+    assert.equal(irma.t, 12); assert.equal(irma.case, 'B');
+  }
+  // old hashes still open: #np-zj-... is the pattern with the Jet outline overlay
+  const old = await page.eval(`(async () => {
+    const { store } = __wse; const t0 = __wse.data.fieldSteps('z500a')[0];
+    const r = await L.applyHash('#np-zj-' + G.utcStamp(__wse.data.validTime(t0)));
+    const s = store.get(); return { applied: r.applied, lens: s.lens ?? null, jet: s.overlays?.jetline ?? null };
+  })()`);
+  assert.equal(old.applied, true);
+  assert.equal(old.lens, 'z'); assert.equal(old.jet, true);
 
   // reserved and foreign hashes are ignored and change nothing
   const reserved = await page.eval(`(async () => {
@@ -99,7 +131,7 @@ export async function run({ page, baseUrl, assert, newPage }) {
   const mirror = await page.eval(`(async () => {
     const calls = []; const orig = history.replaceState.bind(history);
     history.replaceState = (a, b, u) => { calls.push([performance.now(), String(u)]); return orig(a, b, u); };
-    const { store } = __wse; store.set({ view: 'np', layers: { z: true, j: false, c: false, t: false }, t: ${s0}, playing: false, focus: null });
+    const { store } = __wse; store.set({ view: 'np', lens: 'z', overlays: { jetline: false }, t: ${s0}, playing: false, focus: null });
     await L.installLinks();
     // a distinct state before and after the burst makes at least two writes certain whatever the timer phase
     store.set({ view: 'gl' }); await new Promise(r => setTimeout(r, 600));
@@ -124,7 +156,7 @@ export async function run({ page, baseUrl, assert, newPage }) {
         ? Promise.resolve(new Response(JSON.stringify({ canonicalUrl: 'https://example.test/app/' }), { headers: { 'content-type': 'application/json' } }))
         : real(u, ...r);
       const L2 = await import('./js/links.js');
-      __wse.store.set({ view: 'gl', t: ${s1}, focus: null, layers: { z: true, j: false, c: false, t: false } });
+      __wse.store.set({ view: 'gl', t: ${s1}, focus: null, lens: 'z', overlays: { jetline: false } });
       return L2.linkText();
     })()`);
     assert.equal(link, 'https://example.test/app/#gl-z-' + await stamp(s1));

@@ -1,0 +1,11 @@
+{
+  "id": "lens-c-4",
+  "file": "site/js/lenses/surface.js",
+  "find": "          if (j === 0 || j === ny - 1 || (!ring && (i === 0 || i === nx - 1))) return null; // the region reaches the grid edge: no closed isobar\n",
+  "replace": "",
+  "checks": [
+    "unit:wp15.lenses-c.test.mjs"
+  ],
+  "expect": "killed",
+  "note": "W4-05 review round 2: an isobar that runs off a regional grid's edge does not close. The mutant deletes the edge rule; the unit test's trough open to the west (a true interior minimum, 1009.5 hPa two nodes in from the edge, premise asserted) then gets an L. Before round 2 this mutant survived every check: the old 'shallow dip' was not a local minimum."
+}

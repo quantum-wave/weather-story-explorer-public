@@ -1,0 +1,11 @@
+{
+ "id": "layers-1",
+ "file": "site/js/ui/layers.js",
+ "find": "import { listed } from '../lenses/index.js';",
+ "replace": "import { LENSES as everyLens } from '../lenses/index.js';\nconst listed = () => everyLens;",
+ "checks": [
+  "S-LAYERS"
+ ],
+ "expect": "killed",
+ "note": "List unimplemented lenses: the panel offers every registered lens, finished or not, instead of listed(). S-LAYERS marks one lens implemented:false and requires that it has no row (design spec 6.1: a lens is listed only when its code is complete)."
+}

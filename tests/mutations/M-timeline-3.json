@@ -1,0 +1,11 @@
+{
+  "id": "timeline-3",
+  "file": "site/js/data/index.js",
+  "find": "values[i] = own.values[i] + w * (seriesAt(em, t) - seriesAt(z, t));",
+  "replace": "values[i] = own.values[i] + w * (seriesAt(em, t) - own.values[i]);",
+  "checks": [
+    "S-TIMELINE"
+  ],
+  "expect": "killed",
+  "note": "Round 1 review defect: z500em is an absolute height (gpm), not an anomaly. Blending it into the z500a anomaly paints every cell after day 8 in the deepest band (275 dam). S-TIMELINE checks every late cell against the spec-correct mean anomaly, |anomaly| < 60 dam, and the track/map sign at day 9. Integration (W3-09 merged): the scrubber fallback is dead once data.patternSeries exists; retargeted to the same mistake in patternSeries (z500em, an absolute height, blended straight into the z500a anomaly), which is where the track's blend now comes from."
+}

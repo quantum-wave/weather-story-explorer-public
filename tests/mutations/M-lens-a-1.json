@@ -1,0 +1,11 @@
+{
+  "id": "lens-a-1",
+  "file": "site/js/render/palette.js",
+  "find": "edges: [30, 40, 50, 60, 70, 80, 90],",
+  "replace": "edges: [20, 40, 50, 60, 70, 80, 90],",
+  "checks": [
+    "S-LENS-A"
+  ],
+  "expect": "killed",
+  "note": "DESIGN-SPEC 6.1 and 4.2 no fade-in: the jet starts filling at 20 m/s instead of 30 (the MVP faded it in from 20; 25 m/s becomes the first yellow band). The palette unit tests read the real table and the Jet descriptor test reads edges, but only S-LENS-A sees that a 25 m/s pixel of the rendered map is the ground: its 25 m/s windows must all be unfilled."
+}

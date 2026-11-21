@@ -13,6 +13,18 @@ export const isLive = (m) => !!m && !m.sample;
 export const isMultiCase = (m) => !!m && !!m.cases;
 export const isRecorded = (m) => !!m && !!m.sample && !m.cases;
 
+// The field each lens fills (contract.js LENS_FILL, repeated here so this file stays free of imports).
+const FILL_OF = { z: 'z500a', j: 'ws250', s: 'tp6', a: 't850a', r: 'ivt', c: 'z500sd' };
+/**
+ * The sample case a lens shows: for a multi-case manifest, the case that holds the lens' fill field (an unknown lens or a field no
+ * case holds gives the first case); null for a live or recorded run, which has no cases.
+ */
+export function caseForLens(m, lens) {
+  if (!isMultiCase(m)) return null;
+  const c = m.fields?.[FILL_OF[lens] || FILL_OF.z]?.case;
+  return m.cases[c] ? c : Object.keys(m.cases)[0] ?? null;
+}
+
 /** Hours of age at which a live run counts as one missed cycle, and as old (a normal cycle is 10-22 h old). */
 export const STALE_AFTER_H = 26;
 export const VERY_STALE_AFTER_H = 48;

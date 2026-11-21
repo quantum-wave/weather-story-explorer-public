@@ -24,10 +24,11 @@ test('arrows step one data step', async () => {
   handleKey(ev('ArrowLeft')); await Promise.resolve(); await Promise.resolve();
   assert.equal(store.get().t, 0);
 });
-test('1 2 3 switch the view', () => {
+test('1 2 3 4 switch the view', () => {
   store._reset();
   handleKey(ev('2')); assert.equal(store.get().view, 'nh');
   handleKey(ev('3')); assert.equal(store.get().view, 'gl');
+  handleKey(ev('4')); assert.equal(store.get().view, 'wm');
   handleKey(ev('1')); assert.equal(store.get().view, 'np');
 });
 test('nothing fires while typing, with modifiers, or for other keys', () => {
@@ -50,4 +51,21 @@ test('installKeys adds one listener and returns an uninstall', () => {
   const off = installKeys(target); off();
   assert.deepEqual(calls.map((c) => c.slice(0, 2)), [['add', 'keydown'], ['rm', 'keydown']]);
   assert.equal(calls[0][2], calls[1][2]);
+});
+
+// ---- W3-08
+test('an event another handler already consumed (defaultPrevented) is ignored', () => {
+  store._reset(); clock.refresh();
+  assert.equal(handleKey(ev(' ', { tagName: 'BODY' }, { defaultPrevented: true })), false);
+  assert.equal(handleKey(ev('ArrowRight', { tagName: 'BODY' }, { defaultPrevented: true })), false);
+  assert.equal(store.get().playing, false);
+});
+test('Shift+arrows move one day (24 h to the nearest step), plain arrows one step', async () => {
+  store._reset(); clock.refresh(); clock.seek(0);
+  const e = ev('ArrowRight', undefined, { shiftKey: true });
+  assert.equal(handleKey(e), true); assert.equal(e.prevented, true);
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(store.get().t, 18, 'steps 0,6,12,18: a day clamps at the last step');
+  clock.seek(18); handleKey(ev('ArrowLeft', undefined, { shiftKey: true })); await Promise.resolve(); await Promise.resolve();
+  assert.equal(store.get().t, 0);
 });

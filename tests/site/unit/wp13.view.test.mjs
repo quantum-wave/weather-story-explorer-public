@@ -143,3 +143,59 @@ test('xf.rot is [lambda, phi, gamma]; view keys differ with the roll', async () 
   const pa = a.project([-100, 20]), pb = b.project([-100, 20]);
   assert.ok(Math.hypot(pa[0] - pb[0], pa[1] - pb[1]) > 5, 'roll moves the map');
 });
+
+test('World (wm): Equal Earth fitted to the sphere, lon 0 / 180 / -180 and lat +-80 inside the canvas, inverts within 0.5 degrees, SF and the date line on screen', async () => {
+  const { baseProjection, MapView, VIEW_IDS, clampXf, IDENTITY } = await load('render/view.js');
+  assert.deepEqual(VIEW_IDS, ['np', 'nh', 'gl', 'wm']);
+  const lonDiff = (a, b) => Math.abs(((a - b + 540) % 360) - 180);
+  for (const [W, H] of [[1440, 900], [390, 844], [800, 800]]) {
+    const mv = new MapView(baseProjection('wm', W, H));
+    assert.equal(mv.base.proj.invert([W / 2, H / 2]) !== null, true);
+    for (const lon of [0, 180, -180, -150, 90, -90]) for (const lat of [-80, 0, 80]) {
+      const q = mv.project([lon, lat]);
+      assert.ok(q && q[0] >= 0 && q[0] <= W && q[1] >= 0 && q[1] <= H, `${W}x${H}: ${[lon, lat]} -> ${q} is outside the canvas`);
+      const back = mv.invert(q);
+      assert.ok(back && lonDiff(back[0], lon) < 0.5 && Math.abs(back[1] - lat) < 0.5, `${W}x${H}: ${[lon, lat]} -> ${q} -> ${back}`);
+    }
+    const sf = mv.project(SF), dl = mv.project([180, 0]);
+    assert.ok(sf && dl && sf[0] > 0 && sf[0] < W && dl[0] > 0 && dl[0] < W, 'San Francisco and the date line are on screen');
+    assert.ok(Math.abs(mv.project([-150, 0])[0] - W / 2) < 2, 'the Pacific (150W) is centred');
+    // the whole world at once: the sphere fills the frame's width or height
+    const left = mv.project([-150 - 179.9, 0]), right = mv.project([-150 + 179.9, 0]);
+    assert.ok(right[0] - left[0] > 0.9 * Math.min(W, 2 * H) - 4, `${W}x${H}: the world is ${(right[0] - left[0]).toFixed(0)} px wide`);
+    // off the sphere (corner of a wide canvas) there is no longitude
+    if (W > 1.2 * 2 * H / 2 && W / H > 2.1) assert.equal(mv.invert([1, 1]), null);
+  }
+  const wide = new MapView(baseProjection('wm', 1440, 400));
+  assert.equal(wide.invert([2, 2]), null, 'a canvas corner outside the Equal Earth outline has no longitude');
+  assert.equal(clampXf({ ...IDENTITY(), tx: 500 }, 1440, 900).tx, 0, 'pan clamps at 1x: no blank band');
+  const c = clampXf({ k: 4, tx: 9999, ty: 0, rot: [0, 0, 0] }, 1440, 900);
+  assert.equal(c.tx, 0);
+});
+
+test('World (wm) differs from the globe projection: the antipode of the centre still projects', async () => {
+  const { baseProjection, MapView } = await load('render/view.js');
+  const mv = new MapView(baseProjection('wm', 1000, 600));
+  assert.ok(mv.project([30, 0]) && mv.project([30, 60]), 'no far side on a flat map');
+});
+
+test('World (wm) pan holds the Equal Earth outline against the free frame: no blank band, centred where the map is smaller', async () => {
+  const { baseProjection, MapView, clampXf, worldLimits, IDENTITY } = await load('render/view.js');
+  for (const [W, H] of [[390, 844], [1440, 900], [800, 800]]) {
+    const base = baseProjection('wm', W, H), { box, frame } = worldLimits(base);
+    assert.equal(frame.length, 4);
+    assert.ok(box[0] >= frame[0] - 1 && box[2] <= frame[2] + 1 && box[1] >= frame[1] - 1 && box[3] <= frame[3] + 1, `${W}x${H}: the map ${box} sits inside its frame ${frame}`);
+    for (const k of [1, 1.5, 4.2, 8]) for (const [tx, ty] of [[9999, 9999], [-9999, -9999], [9999, -9999], [0, 0]]) {
+      const c = clampXf({ k, tx, ty, rot: [0, 0, 0] }, W, H, box, frame);
+      for (const [lo, hi, f0, f1, ax] of [[c.tx + k * box[0], c.tx + k * box[2], frame[0], frame[2], 'x'], [c.ty + k * box[1], c.ty + k * box[3], frame[1], frame[3], 'y']]) {
+        if (hi - lo >= f1 - f0 - 1e-6) assert.ok(lo <= f0 + 1e-6 && hi >= f1 - 1e-6, `${W}x${H} k=${k} ${[tx, ty]}: ${ax} edges ${lo}..${hi} leave a band inside ${f0}..${f1}`);
+        else assert.ok(Math.abs((lo + hi) / 2 - (f0 + f1) / 2) < 1e-6, `${W}x${H} k=${k}: the ${ax} axis should be centred`);
+      }
+    }
+    // after a drag far down at k=4.2 the middle of the frame is still on the map
+    const now = clampXf({ k: 4.2, tx: 0, ty: 9999, rot: [0, 0, 0] }, W, H, box, frame);
+    const mv = new MapView(base, { ...IDENTITY(), k: 4.2, tx: now.tx, ty: now.ty });
+    const onMap = [...Array(20)].filter((_, i) => mv.invert([frame[0] + (i + 0.5) * (frame[2] - frame[0]) / 20, (frame[1] + frame[3]) / 2])).length;
+    assert.ok(onMap >= 10, `${W}x${H}: after a drag down the middle of the frame is on the map (${onMap}/20)`);
+  }
+});

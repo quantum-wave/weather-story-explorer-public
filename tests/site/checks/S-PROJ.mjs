@@ -5,15 +5,14 @@ export const id = 'S-PROJ';
 export const freshProfile = false;
 export const timeoutMs = 90000;
 const OCEAN = [12, 16, 20];
-const LAYERS = { z: true, j: false, c: false, t: false };
 
 export async function run({ page, baseUrl, assert }) {
   await page.goto(baseUrl);
   await page.waitFor('window.__wse && window.__wse.ready === true', { timeout: 45000 });
   const t = await page.eval('window.__wse.data.getManifest().fields.z500a.steps[1]');
-  for (const [view, w, h, dpr] of [['np', 1000, 600, 1], ['nh', 800, 800, 1], ['gl', 1100, 620, 1], ['np', 390, 844, 2], ['np', 1000, 1300, 1]]) {
+  for (const [view, w, h, dpr] of [['np', 1000, 600, 1], ['nh', 800, 800, 1], ['gl', 1100, 620, 1], ['wm', 1100, 620, 1], ['np', 390, 844, 2], ['np', 1000, 1300, 1]]) {
     await mount(page, { width: w, height: h, dpr });
-    const img = await shoot(page, { view, layers: LAYERS, case: 'A', theme: 'dark', t }, `proj-${view}-${w}x${h}`);
+    const img = await shoot(page, { view, lens: 'z', theme: 'dark', t }, `proj-${view}-${w}x${h}`);
     assert.equal(img.w, w * dpr, `${view} ${w}x${h}@${dpr} screenshot width`);
     const legendTop = Math.round(h * dpr * 0.62);
     const field = stats(img, [0, 0, img.w, legendTop], OCEAN);
@@ -44,11 +43,17 @@ export async function run({ page, baseUrl, assert }) {
       assert.equal(far.anti, null, `${label}: the antipode of the view centre ${far.c} has no pixel`);
       assert.equal(far.corner, null, `${label}: a corner is off the disc`);
     }
+    if (view === 'wm') { // World: the flat Equal Earth map shows the whole world at once, so no point is on a far side
+      const all = await page.eval(`(() => { const r = window.__wp2.renderer, c = r.invert([${w / 2}, ${h / 2}]); return { c, anti: r.project([c[0] + 180, -c[1]]), dl: r.project([180, 0]), east: r.project([-179.9, 60]), west: r.project([179.9, 60]), s: r.project([0, -80]) }; })()`);
+      assert.ok(all.anti, `${label}: the antipode of the view centre ${all.c} projects on a flat map`);
+      for (const k of ['dl', 'east', 'west', 's']) assert.ok(all[k] && all[k][0] > 0 && all[k][0] < w && all[k][1] > 0 && all[k][1] < h, `${label}: ${k} on screen: ${all[k]}`);
+      assert.ok(Math.abs(sf[0] - w / 2) < w / 2 && all.dl[0] < sf[0] + w, `${label}: SF and the date line both on screen`);
+    }
     if (view === 'nh') assert.ok(sf[1] > h / 2 && Math.abs(sf[0] - w / 2) < 2, `nh: SF's meridian points down, SF at ${sf}`);
   }
   // pan and zoom: wheel zooms about the pointer, reset returns, nh drag spins
   await mount(page, { width: 1000, height: 600 });
-  await shoot(page, { view: 'np', layers: LAYERS, case: 'A', t });
+  await shoot(page, { view: 'np', lens: 'z', t });
   const before = await page.eval('window.__wp2.renderer.project([-122.42, 37.77])');
   await page.eval(`(() => { const c = window.__wp2.canvas; c.dispatchEvent(new WheelEvent('wheel', { deltaY: -400, clientX: 500, clientY: 300, bubbles: true, cancelable: true })); })()`);
   const k1 = await page.eval('window.__wp2.renderer.getTransform().k');
@@ -75,12 +80,44 @@ export async function run({ page, baseUrl, assert }) {
   assert.ok(Math.abs(k2 - 3) < 0.05, `pinch from 100 to 300 px apart zooms 3x: ${k2}`);
   await page.eval('window.__wp2.renderer.resetView(0)');
   await mount(page, { width: 800, height: 800 });
-  await shoot(page, { view: 'nh', layers: LAYERS, case: 'A', t });
+  await shoot(page, { view: 'nh', lens: 'z', t });
   const under = await page.eval('window.__wp2.renderer.invert([600, 400])');
   await page.eval(`${ptr('pointerdown', 1, 600, 400)}; ${ptr('pointermove', 1, 565, 565)}; ${ptr('pointermove', 1, 400, 600)}; ${ptr('pointerup', 1, 400, 600)}`);
   const back = await page.eval('window.__wp2.renderer.invert([400, 600])');
   assert.ok(back && Math.abs(((back[0] - under[0] + 540) % 360) - 180) < 1.5 && Math.abs(back[1] - under[1]) < 1.5, `the point under the finger follows it: ${under} -> ${back}`);
   assert.ok(Math.abs((await page.eval('window.__wp2.renderer.getTransform().rot[0]')) + 90) < 1, 'a quarter turn about the pole');
+  // World (W4-10): the wheel zooms about the pointer, a drag pans and stops at the map's outline (no blank band), the view never rotates
+  const blank = (w, h) => page.eval(`(() => { const r = window.__wp2.renderer; let n = 0, off = 0; const m = ${Math.round(Math.min(w, h) * 0.01) + 1};
+    for (let y = m; y <= ${h} - m; y += 12) for (let x = m; x <= ${w} - m; x += 12) { n++; if (!r.invert([x, y])) off++; } return off / n; })()`);
+  for (const [w, h] of [[390, 844], [1440, 900]]) {
+    await mount(page, { width: w, height: h });
+    await shoot(page, { view: 'wm', lens: 'z', t });
+    const cx = Math.round(w * 0.4), cy = Math.round(h / 2);
+    const wUnder = await page.eval(`window.__wp2.renderer.invert([${cx}, ${cy}])`);
+    await page.eval(`(() => { window.__wp2.canvas.dispatchEvent(new WheelEvent('wheel', { deltaY: -700, clientX: ${cx}, clientY: ${cy}, bubbles: true, cancelable: true })); })()`);
+    await new Promise((r) => setTimeout(r, 400));
+    const wz = await page.eval('window.__wp2.renderer.getTransform()');
+    assert.ok(wz.k > 2 && wz.k <= 8, `World ${w}x${h} zooms: k=${wz.k}`);
+    const wBack = await page.eval(`window.__wp2.renderer.invert([${cx}, ${cy}])`);
+    assert.ok(wUnder && wBack && Math.abs(wBack[0] - wUnder[0]) < 0.8 && Math.abs(wBack[1] - wUnder[1]) < 0.8, `zoom is about the pointer: ${wUnder} -> ${wBack}`);
+    // a drag far past the edge in each direction: the free chart stays on the map (the outline is held against the frame)
+    const mx = Math.round(w / 2), my = Math.round(h / 2);
+    for (const [dx, dy, name] of [[0, 9000, 'down'], [0, -9000, 'up'], [9000, 0, 'right'], [-9000, 0, 'left'], [9000, 9000, 'down-right']]) {
+      await page.eval(`${ptr('pointerdown', 1, mx, my)}; ${ptr('pointermove', 1, mx + Math.sign(dx) * 30, my + Math.sign(dy) * 30)}; ${ptr('pointermove', 1, mx + dx, my + dy)}; ${ptr('pointerup', 1, mx + dx, my + dy)}`);
+      await new Promise((r) => setTimeout(r, 600));
+      const f = await blank(w, h), tf = await page.eval('window.__wp2.renderer.getTransform()');
+      // the outline's own extent on screen (equator edges, poles), against the free frame (the canvas less its 1 % margin)
+      const o = await page.eval(`(() => { const r = window.__wp2.renderer, a = r.project([-150 - 179.99, 0]), b = r.project([-150 + 179.99, 0]), n = r.project([-150, 90]), s = r.project([-150, -90]); return { x0: Math.min(a[0], b[0]), x1: Math.max(a[0], b[0]), y0: n[1], y1: s[1] }; })()`);
+      const m = Math.round(Math.min(w, h) * 0.01), fw = w - 2 * m, fh = h - 2 * m;
+      const covW = Math.min(1, (o.x1 - o.x0) / fw), covH = Math.min(1, (o.y1 - o.y0) / fh);
+      const edge = (lo, hi, f0, f1, ax) => (hi - lo >= f1 - f0 - 0.5
+        ? assert.ok(lo <= f0 + 1 && hi >= f1 - 1, `World ${w}x${h} dragged ${name}: the map's ${ax} edges ${lo.toFixed(1)}..${hi.toFixed(1)} leave a blank band inside the frame ${f0}..${f1}`)
+        : assert.ok(Math.abs((lo + hi) / 2 - (f0 + f1) / 2) <= 1.5, `World ${w}x${h} dragged ${name}: the map is smaller than the frame on ${ax} and should sit centred: ${lo.toFixed(1)}..${hi.toFixed(1)} in ${f0}..${f1}`));
+      edge(o.x0, o.x1, m, w - m, 'x'); edge(o.y0, o.y1, m, h - m, 'y');
+      assert.ok(f <= 1 - 0.6 * covW * covH, `World ${w}x${h} dragged ${name} at k=${tf.k.toFixed(2)}: ${(f * 100).toFixed(1)}% of the free chart is off the map, more than the zoom forces (${((1 - 0.6 * covW * covH) * 100).toFixed(0)}%)`);
+      assert.deepEqual([tf.rot[0], tf.rot[1]], [0, 0], 'World never rotates');
+    }
+  }
   await page.eval(`window.__wp2.store.set({ view: 'np' })`);
   assert.equal(await page.eval('window.__wp2.renderer.getTransform().k + window.__wp2.renderer.getTransform().rot[0]'), 1, 'changing view resets pan, zoom and spin');
   assert.deepEqual(page.errors(), [], 'console errors: ' + JSON.stringify(page.errors()));
