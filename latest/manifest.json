@@ -1,0 +1,3031 @@
+{
+ "schema": 1,
+ "sample": false,
+ "model": "ECMWF IFS HRES",
+ "run": "2026-11-20T12:00Z",
+ "generated": "2026-11-21T02:45Z",
+ "attribution": "ECMWF open data CC-BY-4.0",
+ "climatology": {
+  "label": "ERA5 1990-2019",
+  "source": "WeatherBench2",
+  "method": "annual mean + 3 harmonics"
+ },
+ "checks": {
+  "mean_anomaly_gpm": {
+   "global": 24.7,
+   "nh": 19.7,
+   "tropics": 38.3
+  },
+  "grib_compare": {
+   "status": "pass",
+   "max_abs_gpm": 0.398,
+   "points": 5,
+   "tolerance_gpm": 1.0
+  }
+ },
+ "domains": {
+  "g1": {
+   "lon0": -180.0,
+   "lat0": 90.0,
+   "dlon": 1.0,
+   "dlat": -1.0,
+   "nx": 361,
+   "ny": 181
+  },
+  "np05": {
+   "lon0": 150.0,
+   "lat0": 75.0,
+   "dlon": 0.5,
+   "dlat": -0.5,
+   "nx": 321,
+   "ny": 131
+  }
+ },
+ "fields": {
+  "z500": {
+   "units": "gpm",
+   "scale": 1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48,
+    54,
+    60,
+    66,
+    72,
+    78,
+    84,
+    90,
+    96,
+    102,
+    108,
+    114,
+    120,
+    126,
+    132,
+    138,
+    144,
+    150,
+    156,
+    162,
+    168,
+    174,
+    180,
+    186,
+    192,
+    198,
+    204,
+    210,
+    216,
+    222,
+    228,
+    234,
+    240,
+    246,
+    252,
+    258,
+    264,
+    270,
+    276,
+    282,
+    288,
+    294,
+    300,
+    306,
+    312,
+    318,
+    324,
+    330,
+    336,
+    342,
+    348,
+    354,
+    360
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      21
+     ],
+     "files": {
+      "g1": {
+       "path": "z500.g1.a.bin",
+       "bytes": 712254,
+       "sha256": "98c17b2cd342ed6ec0ce6e55a29e4c8cf261cf61e912d870c29fa3f7133f4bf2"
+      },
+      "np05": {
+       "path": "z500.np05.a.bin",
+       "bytes": 370525,
+       "sha256": "46185a8d6ec1a6d57ec1cdbd854af3f7c5264684793f756412c162f3e5bfdd48"
+      }
+     }
+    },
+    {
+     "id": "b",
+     "steps": [
+      21,
+      41
+     ],
+     "files": {
+      "g1": {
+       "path": "z500.g1.b.bin",
+       "bytes": 665757,
+       "sha256": "ef415b2d1bf42678dca7ea3dea2cdb0642470c4d305b83ef50c06bf6632cd0f9"
+      },
+      "np05": {
+       "path": "z500.np05.b.bin",
+       "bytes": 350083,
+       "sha256": "2c52f70e7f14d7d481ebdebc818064e4099c2444ea6ad4859348b75b12ea74d1"
+      }
+     }
+    },
+    {
+     "id": "c",
+     "steps": [
+      41,
+      61
+     ],
+     "files": {
+      "g1": {
+       "path": "z500.g1.c.bin",
+       "bytes": 671971,
+       "sha256": "0a96c7eb34ce31a111092a7bd6889e5f2226881b4b19f5897ab28c00bab6388a"
+      },
+      "np05": {
+       "path": "z500.np05.c.bin",
+       "bytes": 357232,
+       "sha256": "8ea97d4e7b9d0efe03bf07c104f89e6554f52235f814ead5a31295ecd2f82d2d"
+      }
+     }
+    }
+   ],
+   "source": {
+    "dataset": "ECMWF IFS HRES 0.25 deg open data: gh 500 hPa",
+    "valid": null
+   }
+  },
+  "z500a": {
+   "units": "gpm",
+   "scale": 1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48,
+    54,
+    60,
+    66,
+    72,
+    78,
+    84,
+    90,
+    96,
+    102,
+    108,
+    114,
+    120,
+    126,
+    132,
+    138,
+    144,
+    150,
+    156,
+    162,
+    168,
+    174,
+    180,
+    186,
+    192,
+    198,
+    204,
+    210,
+    216,
+    222,
+    228,
+    234,
+    240,
+    246,
+    252,
+    258,
+    264,
+    270,
+    276,
+    282,
+    288,
+    294,
+    300,
+    306,
+    312,
+    318,
+    324,
+    330,
+    336,
+    342,
+    348,
+    354,
+    360
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      21
+     ],
+     "files": {
+      "g1": {
+       "path": "z500a.g1.a.bin",
+       "bytes": 709724,
+       "sha256": "7069c5e4052681344b6ee2b2e0a857d6b673875cb06960e073137a68c192b18d"
+      },
+      "np05": {
+       "path": "z500a.np05.a.bin",
+       "bytes": 369115,
+       "sha256": "86fbec65127eeedf7775aac87eec2814633400be393fd962286525dfe5813a6a"
+      }
+     }
+    },
+    {
+     "id": "b",
+     "steps": [
+      21,
+      41
+     ],
+     "files": {
+      "g1": {
+       "path": "z500a.g1.b.bin",
+       "bytes": 663091,
+       "sha256": "d58ef51724669ea32644a737531d7fda891df32949f3b4f6179064f79f31b80e"
+      },
+      "np05": {
+       "path": "z500a.np05.b.bin",
+       "bytes": 349244,
+       "sha256": "c313c62dc02ae69ec3efe6f50a255d7b011c7055112a23bfd8f8a92cc90d144c"
+      }
+     }
+    },
+    {
+     "id": "c",
+     "steps": [
+      41,
+      61
+     ],
+     "files": {
+      "g1": {
+       "path": "z500a.g1.c.bin",
+       "bytes": 668848,
+       "sha256": "66a98684d4e0613bf3a1715c7ba040427e8e2e3fa2eee78613a1b07c2ad4b1e1"
+      },
+      "np05": {
+       "path": "z500a.np05.c.bin",
+       "bytes": 356267,
+       "sha256": "e4d95b106d19a13facb3cc3341d0567b64a4fe6ce1bce18d0a5323ce69e45cfd"
+      }
+     }
+    }
+   ],
+   "source": {
+    "dataset": "ECMWF IFS HRES 0.25 deg open data: gh 500 hPa minus climatology",
+    "valid": null
+   }
+  },
+  "tp6": {
+   "units": "mm",
+   "scale": 0.1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48,
+    54,
+    60,
+    66,
+    72,
+    78,
+    84,
+    90,
+    96,
+    102,
+    108,
+    114,
+    120,
+    126,
+    132,
+    138,
+    144,
+    150,
+    156,
+    162,
+    168,
+    174,
+    180,
+    186,
+    192,
+    198,
+    204,
+    210,
+    216,
+    222,
+    228,
+    234,
+    240,
+    246,
+    252,
+    258,
+    264,
+    270,
+    276,
+    282,
+    288,
+    294,
+    300,
+    306,
+    312,
+    318,
+    324,
+    330,
+    336,
+    342,
+    348,
+    354,
+    360
+   ],
+   "domains": [
+    "g1"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      20
+     ],
+     "files": {
+      "g1": {
+       "path": "tp6.g1.a.bin",
+       "bytes": 665223,
+       "sha256": "cb4d630939ba419aaa59f00be1f82229eea7e91df3e50f0902348c03e18de5a4"
+      }
+     }
+    },
+    {
+     "id": "b",
+     "steps": [
+      20,
+      40
+     ],
+     "files": {
+      "g1": {
+       "path": "tp6.g1.b.bin",
+       "bytes": 660165,
+       "sha256": "d66e59aa0a0fefc2ad4665b02c6c49ac83a82f2f07baf4709a8b4f61f69579f3"
+      }
+     }
+    },
+    {
+     "id": "c",
+     "steps": [
+      40,
+      60
+     ],
+     "files": {
+      "g1": {
+       "path": "tp6.g1.c.bin",
+       "bytes": 673780,
+       "sha256": "1c258a599c941bcf90485ad37339d78970968a29e60a4cc60f701e8ea8da3d86"
+      }
+     }
+    }
+   ],
+   "source": {
+    "dataset": "ECMWF IFS HRES 0.25 deg open data: tp, 6 h difference of the accumulation",
+    "valid": null
+   }
+  },
+  "z500sd": {
+   "units": "gpm",
+   "scale": 0.1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48,
+    54,
+    60,
+    66,
+    72,
+    78,
+    84,
+    90,
+    96,
+    102,
+    108,
+    114,
+    120,
+    126,
+    132,
+    138,
+    144,
+    150,
+    156,
+    162,
+    168,
+    174,
+    180,
+    186,
+    192,
+    198,
+    204,
+    210,
+    216,
+    222,
+    228,
+    234,
+    240,
+    246,
+    252,
+    258,
+    264,
+    270,
+    276,
+    282,
+    288,
+    294,
+    300,
+    306,
+    312,
+    318,
+    324,
+    330,
+    336,
+    342,
+    348,
+    354,
+    360
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      21
+     ],
+     "files": {
+      "g1": {
+       "path": "z500sd.g1.a.bin",
+       "bytes": 845810,
+       "sha256": "3eaf4ba550294400a80fc857ea672d41b14c8a617680ffe04110bf70fd0c1bd7"
+      },
+      "np05": {
+       "path": "z500sd.np05.a.bin",
+       "bytes": 473980,
+       "sha256": "791e6eac1eee374e25e51f5ada9bc4a222f9e8d7a65c41c42119d42fcf0d7665"
+      }
+     }
+    },
+    {
+     "id": "b",
+     "steps": [
+      21,
+      41
+     ],
+     "files": {
+      "g1": {
+       "path": "z500sd.g1.b.bin",
+       "bytes": 874223,
+       "sha256": "5b04cabf9b7d9339107ea4a38818d10a6668d3a7753a10d4b0fc331dd25c1ae6"
+      },
+      "np05": {
+       "path": "z500sd.np05.b.bin",
+       "bytes": 472297,
+       "sha256": "d4c945fe703e813a23753be07d24a1b2ca57f51ab416902e3ed85df5a3042e40"
+      }
+     }
+    },
+    {
+     "id": "c",
+     "steps": [
+      41,
+      61
+     ],
+     "files": {
+      "g1": {
+       "path": "z500sd.g1.c.bin",
+       "bytes": 869304,
+       "sha256": "fb498a62549d1b9862e01b834bd4b7da2102f22efdbb5a57110a3ec08dfc7d99"
+      },
+      "np05": {
+       "path": "z500sd.np05.c.bin",
+       "bytes": 474340,
+       "sha256": "1e7e6fc4355f61580055d05cdebb2a76486e1b4b14ec14ffa0e2d5adafe45eae"
+      }
+     }
+    }
+   ],
+   "source": {
+    "dataset": "ECMWF IFS HRES 0.25 deg open data: IFS ENS gh 500 hPa spread (es)",
+    "valid": null
+   }
+  },
+  "z500em": {
+   "units": "gpm",
+   "scale": 1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    144,
+    150,
+    156,
+    162,
+    168,
+    174,
+    180,
+    186,
+    192,
+    198,
+    204,
+    210,
+    216,
+    222,
+    228,
+    234,
+    240,
+    246,
+    252,
+    258,
+    264,
+    270,
+    276,
+    282,
+    288,
+    294,
+    300,
+    306,
+    312,
+    318,
+    324,
+    330,
+    336,
+    342,
+    348,
+    354,
+    360
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "b",
+     "steps": [
+      0,
+      17
+     ],
+     "files": {
+      "g1": {
+       "path": "z500em.g1.b.bin",
+       "bytes": 399550,
+       "sha256": "8e68a7339c6bb1f33c435f1f952a4b7ba2cdd760667e3706b9045e788ccbee74"
+      },
+      "np05": {
+       "path": "z500em.np05.b.bin",
+       "bytes": 203669,
+       "sha256": "8a9cfd6d672e9a392a44a1ef1d497c67c0be2cd07bad9fb446779302c5d93d95"
+      }
+     }
+    },
+    {
+     "id": "c",
+     "steps": [
+      17,
+      37
+     ],
+     "files": {
+      "g1": {
+       "path": "z500em.g1.c.bin",
+       "bytes": 425194,
+       "sha256": "34118b4f19c52230b3976b8734bf14517bd4bf848cc51272ef51c4935669cf58"
+      },
+      "np05": {
+       "path": "z500em.np05.c.bin",
+       "bytes": 223786,
+       "sha256": "62b170100690d825fac62b911e888f1728a2698cd4952fd5f7d5b13ae92a59e0"
+      }
+     }
+    }
+   ],
+   "source": {
+    "dataset": "ECMWF IFS HRES 0.25 deg open data: IFS ENS gh 500 hPa ensemble mean (em)",
+    "valid": null
+   }
+  },
+  "pr1": {
+   "units": "%",
+   "scale": 1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    24,
+    36,
+    48,
+    60,
+    72,
+    84,
+    96,
+    108,
+    120,
+    132,
+    144,
+    156,
+    168,
+    180,
+    192,
+    204,
+    216,
+    228,
+    240,
+    252,
+    264,
+    276,
+    288,
+    300,
+    312,
+    324,
+    336,
+    348,
+    360
+   ],
+   "domains": [
+    "g1"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      9
+     ],
+     "files": {
+      "g1": {
+       "path": "pr1.g1.a.bin",
+       "bytes": 360086,
+       "sha256": "558436991dfd5f93ef348581a1e5818ffeedf97baaeee11dd59e7f4e6ef7e6c1"
+      }
+     }
+    },
+    {
+     "id": "b",
+     "steps": [
+      9,
+      19
+     ],
+     "files": {
+      "g1": {
+       "path": "pr1.g1.b.bin",
+       "bytes": 432393,
+       "sha256": "59a9a772d70a2e852cda8372b8ef057b8a74125b4c096ed277bb1d534a6dff73"
+      }
+     }
+    },
+    {
+     "id": "c",
+     "steps": [
+      19,
+      29
+     ],
+     "files": {
+      "g1": {
+       "path": "pr1.g1.c.bin",
+       "bytes": 439287,
+       "sha256": "04a161803153ff01b72a2279d5c8a8323f57775ce4cca4c22136c20719d60874"
+      }
+     }
+    }
+   ],
+   "source": {
+    "dataset": "ECMWF IFS HRES 0.25 deg open data: IFS ENS probability of 24 h precipitation >= 1 mm (tpg1), stored at the window's end hour",
+    "valid": null
+   }
+  },
+  "pr10": {
+   "units": "%",
+   "scale": 1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    24,
+    36,
+    48,
+    60,
+    72,
+    84,
+    96,
+    108,
+    120,
+    132,
+    144,
+    156,
+    168,
+    180,
+    192,
+    204,
+    216,
+    228,
+    240,
+    252,
+    264,
+    276,
+    288,
+    300,
+    312,
+    324,
+    336,
+    348,
+    360
+   ],
+   "domains": [
+    "g1"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      9
+     ],
+     "files": {
+      "g1": {
+       "path": "pr10.g1.a.bin",
+       "bytes": 180939,
+       "sha256": "1187559a10dcd2f37f13cd76b0f91d6bf59eca31624b8259d94f5e638e2c9cb5"
+      }
+     }
+    },
+    {
+     "id": "b",
+     "steps": [
+      9,
+      19
+     ],
+     "files": {
+      "g1": {
+       "path": "pr10.g1.b.bin",
+       "bytes": 246825,
+       "sha256": "a942efce45ce08a9a0eda252fc50daad836191a7b6eabd0862120f7778c8019d"
+      }
+     }
+    },
+    {
+     "id": "c",
+     "steps": [
+      19,
+      29
+     ],
+     "files": {
+      "g1": {
+       "path": "pr10.g1.c.bin",
+       "bytes": 279462,
+       "sha256": "dd39fcc682264a4c5d90e49d9f4345f60c228e6e5b25042c15cfadf85558dc8b"
+      }
+     }
+    }
+   ],
+   "source": {
+    "dataset": "ECMWF IFS HRES 0.25 deg open data: IFS ENS probability of 24 h precipitation >= 10 mm (tpg10), stored at the window's end hour",
+    "valid": null
+   }
+  },
+  "t850a": {
+   "units": "K",
+   "scale": 0.1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48,
+    54,
+    60,
+    66,
+    72,
+    78,
+    84,
+    90,
+    96,
+    102,
+    108,
+    114,
+    120,
+    126,
+    132,
+    138,
+    144,
+    150,
+    156,
+    162,
+    168,
+    174,
+    180,
+    186,
+    192,
+    198,
+    204,
+    210,
+    216,
+    222,
+    228,
+    234,
+    240,
+    246,
+    252,
+    258,
+    264,
+    270,
+    276,
+    282,
+    288,
+    294,
+    300,
+    306,
+    312,
+    318,
+    324,
+    330,
+    336,
+    342,
+    348,
+    354,
+    360
+   ],
+   "domains": [
+    "g1"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      21
+     ],
+     "files": {
+      "g1": {
+       "path": "t850a.g1.a.bin",
+       "bytes": 956812,
+       "sha256": "0dd80c30ab98c5b03338cf2530553918dedb37aa3cda724d338383461daf8f27"
+      }
+     }
+    },
+    {
+     "id": "b",
+     "steps": [
+      21,
+      41
+     ],
+     "files": {
+      "g1": {
+       "path": "t850a.g1.b.bin",
+       "bytes": 914262,
+       "sha256": "7b7715fa2e202e257bcbdb2c8e939c6c3d2ce763b126b551b5c4f1e7df722ece"
+      }
+     }
+    },
+    {
+     "id": "c",
+     "steps": [
+      41,
+      61
+     ],
+     "files": {
+      "g1": {
+       "path": "t850a.g1.c.bin",
+       "bytes": 917920,
+       "sha256": "004f467e9a4c15e83e3bfefacbd4e64f3756a66d38f5aaefb811a206f917403c"
+      }
+     }
+    }
+   ],
+   "source": {
+    "dataset": "ECMWF IFS HRES 0.25 deg open data: t 850 hPa minus climatology, no-data where surface pressure is under 870 hPa",
+    "valid": null
+   }
+  },
+  "ws250": {
+   "units": "m/s",
+   "scale": 0.1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48,
+    54,
+    60,
+    66,
+    72,
+    78,
+    84,
+    90,
+    96,
+    102,
+    108,
+    114,
+    120,
+    126,
+    132,
+    138,
+    144,
+    150,
+    156,
+    162,
+    168,
+    174,
+    180,
+    186,
+    192,
+    198,
+    204,
+    210,
+    216,
+    222,
+    228,
+    234,
+    240,
+    246,
+    252,
+    258,
+    264,
+    270,
+    276,
+    282,
+    288,
+    294,
+    300,
+    306,
+    312,
+    318,
+    324,
+    330,
+    336,
+    342,
+    348,
+    354,
+    360
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      21
+     ],
+     "files": {
+      "g1": {
+       "path": "ws250.g1.a.bin",
+       "bytes": 1196064,
+       "sha256": "b2c8d2a275e719f71fb8d7932cd2b40107fdd5854ead9bea021cacbd660a34dc"
+      },
+      "np05": {
+       "path": "ws250.np05.a.bin",
+       "bytes": 708802,
+       "sha256": "44cc965d0094c2231cfd7752387836a2e9a75d6a8604ec995c8f24b41498b482"
+      }
+     }
+    },
+    {
+     "id": "b",
+     "steps": [
+      21,
+      41
+     ],
+     "files": {
+      "g1": {
+       "path": "ws250.g1.b.bin",
+       "bytes": 1130869,
+       "sha256": "4e0074b4a9b65e6a440fb310eee12963df2fa205d53b175f833504a5179b0ffd"
+      },
+      "np05": {
+       "path": "ws250.np05.b.bin",
+       "bytes": 672426,
+       "sha256": "def15bfd5170af98435cb99445814e4a590e1c5f72a090bb4ae183711c044731"
+      }
+     }
+    },
+    {
+     "id": "c",
+     "steps": [
+      41,
+      61
+     ],
+     "files": {
+      "g1": {
+       "path": "ws250.g1.c.bin",
+       "bytes": 1134418,
+       "sha256": "9c4a630aaca50134a1630df9cdf00b0ef5e12c71aab38a7ee459478026456db9"
+      },
+      "np05": {
+       "path": "ws250.np05.c.bin",
+       "bytes": 662212,
+       "sha256": "3a55e759af4fb3e87c38be6c2b3dae61e92fbc372fad640c3ca7fadc20568463"
+      }
+     }
+    }
+   ],
+   "source": {
+    "dataset": "ECMWF IFS HRES 0.25 deg open data: wind speed from u, v 250 hPa on the native grid",
+    "valid": null
+   }
+  },
+  "msl": {
+   "units": "Pa",
+   "scale": 10,
+   "offset": 101325,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48,
+    54,
+    60,
+    66,
+    72,
+    78,
+    84,
+    90,
+    96,
+    102,
+    108,
+    114,
+    120,
+    126,
+    132,
+    138,
+    144,
+    150,
+    156,
+    162,
+    168,
+    174,
+    180,
+    186,
+    192,
+    198,
+    204,
+    210,
+    216,
+    222,
+    228,
+    234,
+    240,
+    246,
+    252,
+    258,
+    264,
+    270,
+    276,
+    282,
+    288,
+    294,
+    300,
+    306,
+    312,
+    318,
+    324,
+    330,
+    336,
+    342,
+    348,
+    354,
+    360
+   ],
+   "domains": [
+    "g1",
+    "np05"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      21
+     ],
+     "files": {
+      "g1": {
+       "path": "msl.g1.a.bin",
+       "bytes": 876152,
+       "sha256": "746f4d6f34517e717d69a0f3e5afbffe04fe2699bbcf7f1f82a092961c305291"
+      },
+      "np05": {
+       "path": "msl.np05.a.bin",
+       "bytes": 501630,
+       "sha256": "ba309492b13bbc96f6a1c8afe7a0ad80679c432961f553147559522f2a35ee76"
+      }
+     }
+    },
+    {
+     "id": "b",
+     "steps": [
+      21,
+      41
+     ],
+     "files": {
+      "g1": {
+       "path": "msl.g1.b.bin",
+       "bytes": 828777,
+       "sha256": "1ae76d19da1a20660b8c052e7e4cb1e65850922566ba7efacaaaa42cc3cfb700"
+      },
+      "np05": {
+       "path": "msl.np05.b.bin",
+       "bytes": 476659,
+       "sha256": "ef7d68cce3ae53eada0ad35814f5ddb39216ff1349b381384b8037d05fa5871b"
+      }
+     }
+    },
+    {
+     "id": "c",
+     "steps": [
+      41,
+      61
+     ],
+     "files": {
+      "g1": {
+       "path": "msl.g1.c.bin",
+       "bytes": 833600,
+       "sha256": "2c89e57cb0484e20aa2e923d7c3b00b741c70f6547e78dded6b95ba6f102e15f"
+      },
+      "np05": {
+       "path": "msl.np05.c.bin",
+       "bytes": 478558,
+       "sha256": "e74ddcdb9d75549a867e143a4cb9d959670b123e7937e59528d7aa7d817abfd7"
+      }
+     }
+    }
+   ],
+   "source": {
+    "dataset": "ECMWF IFS HRES 0.25 deg open data: msl",
+    "valid": null
+   }
+  },
+  "t2m": {
+   "units": "K",
+   "scale": 0.1,
+   "offset": 0,
+   "nodata": -32768,
+   "filter": "dx-shuffle",
+   "steps": [
+    0,
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48,
+    54,
+    60,
+    66,
+    72,
+    78,
+    84,
+    90,
+    96,
+    102,
+    108,
+    114,
+    120,
+    126,
+    132,
+    138,
+    144,
+    150,
+    156,
+    162,
+    168
+   ],
+   "domains": [
+    "g1"
+   ],
+   "chunks": [
+    {
+     "id": "a",
+     "steps": [
+      0,
+      21
+     ],
+     "files": {
+      "g1": {
+       "path": "t2m.g1.a.bin",
+       "bytes": 1072474,
+       "sha256": "ea0f92db00417b95a4ca691403fa11c6c13b855d8a3b2a8823b8abfb8f63a223"
+      }
+     }
+    },
+    {
+     "id": "b",
+     "steps": [
+      21,
+      29
+     ],
+     "files": {
+      "g1": {
+       "path": "t2m.g1.b.bin",
+       "bytes": 408740,
+       "sha256": "0dd18ca361ebc8c11a9b2521942888e18d35fc714822681212b54e7fa3ee9afb"
+      }
+     }
+    }
+   ],
+   "source": {
+    "dataset": "ECMWF IFS HRES 0.25 deg open data: 2t, 2 m temperature",
+    "valid": null
+   }
+  }
+ },
+ "probes": [
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500",
+   "domain": "g1",
+   "step": 0,
+   "value": 5519
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500",
+   "domain": "g1",
+   "step": 0,
+   "value": 5540
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500",
+   "domain": "g1",
+   "step": 0,
+   "value": 5633
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500",
+   "domain": "g1",
+   "step": 0,
+   "value": 5857
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500",
+   "domain": "g1",
+   "step": 0,
+   "value": 5769
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "z500",
+   "domain": "g1",
+   "step": 0,
+   "value": 5397
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500",
+   "domain": "g1",
+   "step": 360,
+   "value": 5576
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500",
+   "domain": "g1",
+   "step": 360,
+   "value": 5552
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500",
+   "domain": "g1",
+   "step": 360,
+   "value": 5459
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500",
+   "domain": "g1",
+   "step": 360,
+   "value": 5889
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500",
+   "domain": "g1",
+   "step": 360,
+   "value": 5706
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "z500",
+   "domain": "g1",
+   "step": 360,
+   "value": 5807
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500",
+   "domain": "np05",
+   "step": 0,
+   "value": 5524
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500",
+   "domain": "np05",
+   "step": 0,
+   "value": 5543
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500",
+   "domain": "np05",
+   "step": 0,
+   "value": 5642
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500",
+   "domain": "np05",
+   "step": 0,
+   "value": 5856
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500",
+   "domain": "np05",
+   "step": 0,
+   "value": 5778
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500",
+   "domain": "np05",
+   "step": 360,
+   "value": 5579
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500",
+   "domain": "np05",
+   "step": 360,
+   "value": 5552
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500",
+   "domain": "np05",
+   "step": 360,
+   "value": 5467
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500",
+   "domain": "np05",
+   "step": 360,
+   "value": 5888
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500",
+   "domain": "np05",
+   "step": 360,
+   "value": 5721
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": -190
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": -3
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": -9
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": 6
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": 178
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 0,
+   "value": -127
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 360,
+   "value": -114
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 360,
+   "value": 28
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 360,
+   "value": -154
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 360,
+   "value": 44
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 360,
+   "value": 154
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "z500a",
+   "domain": "g1",
+   "step": 360,
+   "value": 302
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": -187
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": -9
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": -7
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": 5
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 0,
+   "value": 174
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 360,
+   "value": -112
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 360,
+   "value": 19
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 360,
+   "value": -154
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 360,
+   "value": 45
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500a",
+   "domain": "np05",
+   "step": 360,
+   "value": 156
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 6,
+   "value": 3.3
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 6,
+   "value": 0.0
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 6,
+   "value": 0.0
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 6,
+   "value": 0.3
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 6,
+   "value": 0.0
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 6,
+   "value": 0.1
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 360,
+   "value": 0.0
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 360,
+   "value": 0.0
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 360,
+   "value": 0.2
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 360,
+   "value": 0.3
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 360,
+   "value": 12.8
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "tp6",
+   "domain": "g1",
+   "step": 360,
+   "value": 0.0
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500sd",
+   "domain": "g1",
+   "step": 0,
+   "value": 2.7
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500sd",
+   "domain": "g1",
+   "step": 0,
+   "value": 2.2
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500sd",
+   "domain": "g1",
+   "step": 0,
+   "value": 1.9
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500sd",
+   "domain": "g1",
+   "step": 0,
+   "value": 0.9
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500sd",
+   "domain": "g1",
+   "step": 0,
+   "value": 1.4
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "z500sd",
+   "domain": "g1",
+   "step": 0,
+   "value": 1.8
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500sd",
+   "domain": "g1",
+   "step": 360,
+   "value": 90.3
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500sd",
+   "domain": "g1",
+   "step": 360,
+   "value": 95.2
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500sd",
+   "domain": "g1",
+   "step": 360,
+   "value": 70.6
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500sd",
+   "domain": "g1",
+   "step": 360,
+   "value": 31.9
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500sd",
+   "domain": "g1",
+   "step": 360,
+   "value": 108.9
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "z500sd",
+   "domain": "g1",
+   "step": 360,
+   "value": 138.1
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500sd",
+   "domain": "np05",
+   "step": 0,
+   "value": 2.5
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500sd",
+   "domain": "np05",
+   "step": 0,
+   "value": 2.2
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500sd",
+   "domain": "np05",
+   "step": 0,
+   "value": 1.7
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500sd",
+   "domain": "np05",
+   "step": 0,
+   "value": 0.8
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500sd",
+   "domain": "np05",
+   "step": 0,
+   "value": 1.4
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500sd",
+   "domain": "np05",
+   "step": 360,
+   "value": 90.2
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500sd",
+   "domain": "np05",
+   "step": 360,
+   "value": 97.4
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500sd",
+   "domain": "np05",
+   "step": 360,
+   "value": 69.7
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500sd",
+   "domain": "np05",
+   "step": 360,
+   "value": 32.6
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500sd",
+   "domain": "np05",
+   "step": 360,
+   "value": 107.5
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500em",
+   "domain": "g1",
+   "step": 144,
+   "value": 5781
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500em",
+   "domain": "g1",
+   "step": 144,
+   "value": 5499
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500em",
+   "domain": "g1",
+   "step": 144,
+   "value": 5691
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500em",
+   "domain": "g1",
+   "step": 144,
+   "value": 5817
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500em",
+   "domain": "g1",
+   "step": 144,
+   "value": 5709
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "z500em",
+   "domain": "g1",
+   "step": 144,
+   "value": 5492
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500em",
+   "domain": "g1",
+   "step": 360,
+   "value": 5659
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500em",
+   "domain": "g1",
+   "step": 360,
+   "value": 5573
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500em",
+   "domain": "g1",
+   "step": 360,
+   "value": 5583
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500em",
+   "domain": "g1",
+   "step": 360,
+   "value": 5871
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500em",
+   "domain": "g1",
+   "step": 360,
+   "value": 5545
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "z500em",
+   "domain": "g1",
+   "step": 360,
+   "value": 5556
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500em",
+   "domain": "np05",
+   "step": 144,
+   "value": 5781
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500em",
+   "domain": "np05",
+   "step": 144,
+   "value": 5502
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500em",
+   "domain": "np05",
+   "step": 144,
+   "value": 5696
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500em",
+   "domain": "np05",
+   "step": 144,
+   "value": 5807
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500em",
+   "domain": "np05",
+   "step": 144,
+   "value": 5713
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "z500em",
+   "domain": "np05",
+   "step": 360,
+   "value": 5662
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "z500em",
+   "domain": "np05",
+   "step": 360,
+   "value": 5577
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "z500em",
+   "domain": "np05",
+   "step": 360,
+   "value": 5588
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "z500em",
+   "domain": "np05",
+   "step": 360,
+   "value": 5870
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "z500em",
+   "domain": "np05",
+   "step": 360,
+   "value": 5557
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "pr1",
+   "domain": "g1",
+   "step": 24,
+   "value": 90
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "pr1",
+   "domain": "g1",
+   "step": 24,
+   "value": 0
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "pr1",
+   "domain": "g1",
+   "step": 24,
+   "value": 4
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "pr1",
+   "domain": "g1",
+   "step": 24,
+   "value": 11
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "pr1",
+   "domain": "g1",
+   "step": 24,
+   "value": 0
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "pr1",
+   "domain": "g1",
+   "step": 24,
+   "value": 0
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "pr1",
+   "domain": "g1",
+   "step": 360,
+   "value": 27
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "pr1",
+   "domain": "g1",
+   "step": 360,
+   "value": 44
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "pr1",
+   "domain": "g1",
+   "step": 360,
+   "value": 14
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "pr1",
+   "domain": "g1",
+   "step": 360,
+   "value": 25
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "pr1",
+   "domain": "g1",
+   "step": 360,
+   "value": 34
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "pr1",
+   "domain": "g1",
+   "step": 360,
+   "value": 33
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "pr10",
+   "domain": "g1",
+   "step": 24,
+   "value": 3
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "pr10",
+   "domain": "g1",
+   "step": 24,
+   "value": 0
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "pr10",
+   "domain": "g1",
+   "step": 24,
+   "value": 0
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "pr10",
+   "domain": "g1",
+   "step": 24,
+   "value": 0
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "pr10",
+   "domain": "g1",
+   "step": 24,
+   "value": 0
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "pr10",
+   "domain": "g1",
+   "step": 24,
+   "value": 0
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "pr10",
+   "domain": "g1",
+   "step": 360,
+   "value": 13
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "pr10",
+   "domain": "g1",
+   "step": 360,
+   "value": 22
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "pr10",
+   "domain": "g1",
+   "step": 360,
+   "value": 0
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "pr10",
+   "domain": "g1",
+   "step": 360,
+   "value": 5
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "pr10",
+   "domain": "g1",
+   "step": 360,
+   "value": 24
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "pr10",
+   "domain": "g1",
+   "step": 360,
+   "value": 4
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "t850a",
+   "domain": "g1",
+   "step": 0,
+   "value": -7.6
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "t850a",
+   "domain": "g1",
+   "step": 0,
+   "value": -1.2
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "t850a",
+   "domain": "g1",
+   "step": 0,
+   "value": -1.0
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "t850a",
+   "domain": "g1",
+   "step": 0,
+   "value": 6.3
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "t850a",
+   "domain": "g1",
+   "step": 0,
+   "value": -2.7
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "t850a",
+   "domain": "g1",
+   "step": 360,
+   "value": -8.6
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "t850a",
+   "domain": "g1",
+   "step": 360,
+   "value": -3.1
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "t850a",
+   "domain": "g1",
+   "step": 360,
+   "value": 0.0
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "t850a",
+   "domain": "g1",
+   "step": 360,
+   "value": 14.7
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "t850a",
+   "domain": "g1",
+   "step": 360,
+   "value": 5.6
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "ws250",
+   "domain": "g1",
+   "step": 0,
+   "value": 45.1
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "ws250",
+   "domain": "g1",
+   "step": 0,
+   "value": 37.1
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "ws250",
+   "domain": "g1",
+   "step": 0,
+   "value": 43.8
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "ws250",
+   "domain": "g1",
+   "step": 0,
+   "value": 41.0
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "ws250",
+   "domain": "g1",
+   "step": 0,
+   "value": 39.2
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "ws250",
+   "domain": "g1",
+   "step": 0,
+   "value": 13.3
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "ws250",
+   "domain": "g1",
+   "step": 360,
+   "value": 27.4
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "ws250",
+   "domain": "g1",
+   "step": 360,
+   "value": 22.9
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "ws250",
+   "domain": "g1",
+   "step": 360,
+   "value": 45.3
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "ws250",
+   "domain": "g1",
+   "step": 360,
+   "value": 32.8
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "ws250",
+   "domain": "g1",
+   "step": 360,
+   "value": 49.0
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "ws250",
+   "domain": "g1",
+   "step": 360,
+   "value": 12.1
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "ws250",
+   "domain": "np05",
+   "step": 0,
+   "value": 45.2
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "ws250",
+   "domain": "np05",
+   "step": 0,
+   "value": 36.5
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "ws250",
+   "domain": "np05",
+   "step": 0,
+   "value": 40.5
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "ws250",
+   "domain": "np05",
+   "step": 0,
+   "value": 39.7
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "ws250",
+   "domain": "np05",
+   "step": 0,
+   "value": 38.0
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "ws250",
+   "domain": "np05",
+   "step": 360,
+   "value": 26.3
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "ws250",
+   "domain": "np05",
+   "step": 360,
+   "value": 23.5
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "ws250",
+   "domain": "np05",
+   "step": 360,
+   "value": 53.8
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "ws250",
+   "domain": "np05",
+   "step": 360,
+   "value": 35.1
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "ws250",
+   "domain": "np05",
+   "step": 360,
+   "value": 46.2
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "msl",
+   "domain": "g1",
+   "step": 0,
+   "value": 101725
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "msl",
+   "domain": "g1",
+   "step": 0,
+   "value": 101815
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "msl",
+   "domain": "g1",
+   "step": 0,
+   "value": 100575
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "msl",
+   "domain": "g1",
+   "step": 0,
+   "value": 101745
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "msl",
+   "domain": "g1",
+   "step": 0,
+   "value": 102655
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "msl",
+   "domain": "g1",
+   "step": 0,
+   "value": 100505
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "msl",
+   "domain": "g1",
+   "step": 360,
+   "value": 102085
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "msl",
+   "domain": "g1",
+   "step": 360,
+   "value": 102595
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "msl",
+   "domain": "g1",
+   "step": 360,
+   "value": 102425
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "msl",
+   "domain": "g1",
+   "step": 360,
+   "value": 101975
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "msl",
+   "domain": "g1",
+   "step": 360,
+   "value": 100625
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "msl",
+   "domain": "g1",
+   "step": 360,
+   "value": 103755
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "msl",
+   "domain": "np05",
+   "step": 0,
+   "value": 101725
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "msl",
+   "domain": "np05",
+   "step": 0,
+   "value": 101825
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "msl",
+   "domain": "np05",
+   "step": 0,
+   "value": 100585
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "msl",
+   "domain": "np05",
+   "step": 0,
+   "value": 101835
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "msl",
+   "domain": "np05",
+   "step": 0,
+   "value": 102685
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "msl",
+   "domain": "np05",
+   "step": 360,
+   "value": 102065
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "msl",
+   "domain": "np05",
+   "step": 360,
+   "value": 102565
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "msl",
+   "domain": "np05",
+   "step": 360,
+   "value": 102355
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "msl",
+   "domain": "np05",
+   "step": 360,
+   "value": 102075
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "msl",
+   "domain": "np05",
+   "step": 360,
+   "value": 100595
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "t2m",
+   "domain": "g1",
+   "step": 0,
+   "value": 280.8
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "t2m",
+   "domain": "g1",
+   "step": 0,
+   "value": 273.2
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "t2m",
+   "domain": "g1",
+   "step": 0,
+   "value": 275.7
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "t2m",
+   "domain": "g1",
+   "step": 0,
+   "value": 298.1
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "t2m",
+   "domain": "g1",
+   "step": 0,
+   "value": 278.3
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "t2m",
+   "domain": "g1",
+   "step": 0,
+   "value": 281.6
+  },
+  {
+   "name": "San Francisco",
+   "lat": 37.77,
+   "lon": -122.42,
+   "field": "t2m",
+   "domain": "g1",
+   "step": 168,
+   "value": 287.9
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.61,
+   "lon": -122.33,
+   "field": "t2m",
+   "domain": "g1",
+   "step": 168,
+   "value": 279.4
+  },
+  {
+   "name": "Denver",
+   "lat": 39.74,
+   "lon": -104.99,
+   "field": "t2m",
+   "domain": "g1",
+   "step": 168,
+   "value": 276.2
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.31,
+   "lon": -157.86,
+   "field": "t2m",
+   "domain": "g1",
+   "step": 168,
+   "value": 295.8
+  },
+  {
+   "name": "New York",
+   "lat": 40.71,
+   "lon": -74.01,
+   "field": "t2m",
+   "domain": "g1",
+   "step": 168,
+   "value": 277.2
+  },
+  {
+   "name": "London",
+   "lat": 51.51,
+   "lon": -0.13,
+   "field": "t2m",
+   "domain": "g1",
+   "step": 168,
+   "value": 275.2
+  }
+ ]
+}
