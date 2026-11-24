@@ -113,6 +113,10 @@ const labelWidth = (str, bold) => {
 /** The clear space always kept between two day labels, in px, whatever the font. */
 export const LABEL_GAP = 4;
 export const MIN_LABEL_GAP = LABEL_GAP;
+// Day-label fitting where the platform draws labels off their placed x (fitDayLabels): a measured miss under the
+// tolerance is the 0.01 px rounding of a drawn x or float error, not a miss (so precise platforms never refit); each refit
+// adds REFIT_STEP beyond the measured shortfall; SNAP_ALLOWANCE is the last resort.
+export const SHORTFALL_TOLERANCE = 0.02, REFIT_STEP = 0.05, SNAP_ALLOWANCE = 1.02;
 // Half an em of the 12 px font is the preferred air: a row tightens from it to LABEL_GAP before a shorter form is used.
 export const PREFERRED_LABEL_GAP = 6;
 // How far a short-form label may be eased off its column's centre to keep the gap (at most a fifth of its column too).
@@ -150,15 +154,16 @@ export function measureLabels(texts, host) {
 }
 
 /**
- * Spreads a row of labels ([{cx, w}], left to right) apart so neighbours keep LABEL_GAP, moving each as little as
- * possible (least squares, by pooling adjacent violators) and never more than `slackFrac` of a column (a fifth by
- * default) from where it was placed, nor out of [0, regionW]: a label still reads as its own column's. Returns the
- * moved copy, or null when the row cannot keep the gap that way (the caller then shortens or thins it).
+ * Spreads a row of labels ([{cx, w}], left to right) apart so neighbours keep `gap` plus `allow`, moving each as little
+ * as possible (least squares, by pooling adjacent violators) and never more than `slackFrac` of a column (a fifth by
+ * default) from where it was placed, nor within allow/2 of the ends of [0, regionW]: a label still reads as its own
+ * column's. `allow` is the room fitDayLabels adds where the platform draws labels off their placed x. Returns the moved
+ * copy, or null when the row cannot keep the gap that way (the caller then shortens or thins it).
  */
-export function spreadLabels(L, colW, regionW, slackFrac = 0.2, gap = LABEL_GAP) {
+export function spreadLabels(L, colW, regionW, slackFrac = 0.2, gap = LABEL_GAP, allow = 0) {
   const n = L.length;
   if (n < 2) return L;
-  const need = (k) => (L[k - 1].w + L[k].w) / 2 + gap + 0.02; // + the 0.01 px rounding of each drawn x
+  const need = (k) => (L[k - 1].w + L[k].w) / 2 + gap + allow + 0.02; // + the 0.01 px rounding of each drawn x
   const S = [0];
   for (let k = 1; k < n; k++) S.push(S[k - 1] + need(k));
   // y = x - S must be non-decreasing; pool adjacent violators toward the targets cx - S
@@ -172,7 +177,7 @@ export function spreadLabels(L, colW, regionW, slackFrac = 0.2, gap = LABEL_GAP)
   const x = [];
   for (const b of blocks) for (let j = 0; j < b.cnt; j++) x.push(b.sum / b.cnt + S[x.length]);
   // keep the edges: push in from the left, then from the right
-  const lo = (k) => L[k].w / 2, hi = (k) => regionW - L[k].w / 2;
+  const lo = (k) => L[k].w / 2 + allow / 2, hi = (k) => regionW - L[k].w / 2 - allow / 2;
   for (let k = 0; k < n; k++) x[k] = Math.max(x[k], lo(k), k ? x[k - 1] + need(k) : -Infinity);
   for (let k = n - 1; k >= 0; k--) x[k] = Math.min(x[k], hi(k), k + 1 < n ? x[k + 1] - need(k + 1) : Infinity);
   const slack = colW * slackFrac + 1e-9;
@@ -184,7 +189,7 @@ export function spreadLabels(L, colW, regionW, slackFrac = 0.2, gap = LABEL_GAP)
 }
 
 /**
- * Which day labels to draw and where, so no two boxes come within LABEL_GAP of each other and none leaves its region
+ * Which day labels to draw and where, so no two boxes come within LABEL_GAP (+ allow) of each other and none leaves its region
  * [0, regionW]. Each day offers its forms longest first, by level ("Today"; "Tomorrow", "Fri 20", "Fri"; "Sat 21",
  * "Sat 21", "Sat"). The order: level 0 then level 1 with PREFERRED_LABEL_GAP of air, level 1 with LABEL_GAP (a dated
  * row is kept whenever it fits at all), then level 2 with the active day keeping its level-1 form (dated), then level 2
@@ -193,20 +198,22 @@ export function spreadLabels(L, colW, regionW, slackFrac = 0.2, gap = LABEL_GAP)
  * of short forms that misses the gap by a little is spread apart (spreadLabels, each label at most NUDGE px and a fifth
  * of its column). Only when that still fails are labels thinned to every 2nd, 3rd, ... day, counted from the active
  * day so it is always named; Today (the first column) is kept whenever it fits beside them.
- * `measure(text, bold)` gives each label's width (real boxes in the browser; the glyph estimate by default).
+ * `measure(text, bold)` gives each label's width (real boxes in the browser; the glyph estimate by default). `allow`
+ * is extra room kept in every gap and, halved, at each edge (fitDayLabels sets it; 0 where labels land as placed).
  * Returns [{i, text, cx, w}].
  */
-export function layoutDayLabels(forms, colW, regionW, active, measure = labelWidth) {
+export function layoutDayLabels(forms, colW, regionW, active, measure = labelWidth, allow = 0) {
   const n = forms.length;
   const hasActive = active >= 0 && active < n;
   const place = (i, text) => {
     const w = measure(text, i === active);
-    return { i, text, w, cx: clamp(colW * (i + 0.5), w / 2, Math.max(w / 2, regionW - w / 2)) };
+    const e = w / 2 + allow / 2;
+    return { i, text, w, cx: clamp(colW * (i + 0.5), e, Math.max(e, regionW - e)) };
   };
-  const clash = (a, b, gap) => Math.min(a.cx + a.w / 2, b.cx + b.w / 2) - Math.max(a.cx - a.w / 2, b.cx - b.w / 2) > -gap + 1e-6;
+  const clash = (a, b, gap) => Math.min(a.cx + a.w / 2, b.cx + b.w / 2) - Math.max(a.cx - a.w / 2, b.cx - b.w / 2) > -(gap + allow) + 1e-6;
   // the long forms ('Tomorrow') only where they fit as placed; the short forms may be spread a little
   const slack = Math.min(NUDGE / colW, 0.2);
-  const ok = (L, f, gap) => spreadLabels(L, colW, regionW, f === 0 ? 0 : slack, gap);
+  const ok = (L, f, gap) => spreadLabels(L, colW, regionW, f === 0 ? 0 : slack, gap, allow);
   const G = PREFERRED_LABEL_GAP, g = LABEL_GAP;
   const steps = [[0, G, false], [1, G, false], [1, g, false], [2, G, false], [2, g, false], [3, G, false], [3, g, false], [3, g, true]];
   let fallback = [];
@@ -237,6 +244,69 @@ export function layoutDayLabels(forms, colW, regionW, active, measure = labelWid
 }
 
 /**
+ * How far a row of drawn boxes ([{l, r}]) misses LABEL_GAP between neighbours or [0, regionW] at the ends, in px (0:
+ * clear). Misses under SHORTFALL_TOLERANCE (the float error of a measured box) count as clear.
+ */
+export function labelShortfall(boxes, regionW) {
+  const B = [...boxes].sort((a, b) => a.l - b.l);
+  let s = 0;
+  B.forEach((b, k) => { if (k) s = Math.max(s, LABEL_GAP - (b.l - B[k - 1].r)); });
+  // an edge label is held allow/2 in, so an overflow of d needs 2d more allowance
+  if (B.length) s = Math.max(s, -2 * B[0].l, 2 * (B.at(-1).r - regionW));
+  return s > SHORTFALL_TOLERANCE ? s : 0;
+}
+
+/**
+ * layoutDayLabels, then a check of where the labels really land: `render(L)` draws the row as it will be drawn and
+ * returns each box ([{l, r}]), or null when nothing can be measured. Some platforms do not place text at subpixel x
+ * (Chrome on Linux), so a label can land up to half a pixel off its laid-out position. When the drawn row misses the gap
+ * or the edges, the layout is redone with that much more room (`allow`, plus REFIT_STEP so a re-layout that lands a
+ * hair differently still clears, at most SNAP_ALLOWANCE per round: the most whole-pixel snapping can take from a gap,
+ * half a pixel each side), up to `rounds` times, each re-layout measured again. A row still short after that is laid
+ * out once more with SNAP_ALLOWANCE on top of what was tried. Where labels land as placed, the first layout stands
+ * unchanged.
+ */
+export function fitDayLabels(forms, colW, regionW, active, measure = labelWidth, render = null, rounds = 3) {
+  let allow = 0;
+  let L = layoutDayLabels(forms, colW, regionW, active, measure, allow);
+  if (!render) return L;
+  for (let r = 0; r <= rounds; r++) {
+    const boxes = render(L);
+    const short = boxes ? labelShortfall(boxes, regionW) : 0;
+    if (!short) return L;
+    if (r === rounds) break;
+    allow += Math.min(short + REFIT_STEP, SNAP_ALLOWANCE);
+    L = layoutDayLabels(forms, colW, regionW, active, measure, allow);
+  }
+  return layoutDayLabels(forms, colW, regionW, active, measure, allow + SNAP_ALLOWANCE);
+}
+
+/** The real boxes of a row of day labels drawn as drawDayLabels draws them, inside `host` (or a hidden probe SVG); null when not measurable. */
+function drawnLabelBoxes(L, act, host) {
+  if (typeof document === 'undefined' || typeof document.createElementNS !== 'function') return null;
+  let probe = null;
+  try {
+    if (!host) {
+      if (!document.body) return null;
+      probe = el('svg', { class: 'strip strip-probe', 'aria-hidden': 'true', width: 1, height: 1, style: 'position:absolute;left:-9999px;top:0;visibility:hidden' });
+      document.body.appendChild(probe);
+      host = probe;
+    }
+    const g = el('g', { 'aria-hidden': 'true', style: 'visibility:hidden' }, host);
+    const out = [];
+    for (const a of L) {
+      const t = el('text', { x: r2(a.cx), y: 12, 'text-anchor': 'middle', class: 'strip-label', style: labelStyle(a.i === act) }, g);
+      t.textContent = a.text;
+      const b = typeof t.getBBox === 'function' ? t.getBBox() : null;
+      if (!b || !(b.width > 0)) { g.remove(); return null; }
+      out.push({ l: b.x, r: b.x + b.width });
+    }
+    g.remove();
+    return out;
+  } catch { return null; } finally { if (probe) probe.remove(); }
+}
+
+/**
  * Draws the day labels of a strip from its stored layout inputs, measured in `host` (see measureLabels). With a host that
  * cannot be measured (the strip sits in a hidden sheet) the labels already drawn are kept; returns whether it drew.
  */
@@ -249,7 +319,8 @@ function drawDayLabels(svg, host) {
   const measure = measured || labelWidth;
   // a refit replaces the old labels in place (same paint order); the first draw appends
   const old = svg.querySelectorAll ? [...svg.querySelectorAll('text.strip-label:not(.strip-label-end)')] : [];
-  for (const L of layoutDayLabels(forms, colW, regionW, act, measure)) {
+  const render = measured ? (L) => drawnLabelBoxes(L, act, host) : null;
+  for (const L of fitDayLabels(forms, colW, regionW, act, measure, render)) {
     const t = el('text', { x: r2(L.cx), y: 12, 'text-anchor': 'middle', class: 'strip-label', style: labelStyle(L.i === act) });
     t.textContent = L.text;
     if (old.length) svg.insertBefore(t, old[0]); else svg.appendChild(t);

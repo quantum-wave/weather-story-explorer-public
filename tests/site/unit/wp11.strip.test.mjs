@@ -590,3 +590,40 @@ test('L4 the product sample (tests/site/fixtures/recorded) at the home card widt
     assert.deepEqual(normalHits(svg), [], `recorded W ${W} active ${active}`);
   }
 });
+
+test('B4 where the platform draws labels off their placed x (no subpixel text positioning), the drawn row is checked and refitted: gaps and edges hold; where labels land as placed, nothing changes', () => {
+  const est = (t, bold) => (t.length * 7.2 + (/W/.test(t) ? 4 : 0)) * (bold ? 1.06 : 1);
+  // drawn at the strip's rounded x (0.01 px), then either exactly there or with the start snapped to a whole pixel
+  const r2 = (x) => Math.round(x * 100) / 100;
+  const snapped = (L) => L.map((a) => { const l = Math.round(r2(a.cx) - a.w / 2); return { l, r: l + a.w }; });
+  const exact = (L) => L.map((a) => ({ l: r2(a.cx) - a.w / 2, r: r2(a.cx) + a.w / 2 }));
+  const weeks = [['Today', 'Tue 17', 'Wed 18', 'Thu 19', 'Fri 20', 'Sat 21', 'Sun 22'], ['Today', 'Tomorrow', 'Wed 24', 'Thu 25', 'Fri 26', 'Sat 27', 'Sun 28'],
+    ['Today', 'Fri 26', 'Sat 27', 'Sun 28', 'Mon 29', 'Tue 30', 'Wed 1']];
+  let brokenWithoutCheck = 0, cases = 0;
+  for (const days of weeks) {
+    const forms = days.map((d, i) => (i === 0 ? [d] : d === 'Tomorrow' ? [d, 'Tue 23', 'Tue'] : [d, d, d.slice(0, 3)]));
+    for (const measure of [undefined, est, (t, b) => est(t, b) * 1.03, (t, b) => est(t, b) * 1.1, (t, b) => est(t, b) * 1.25]) for (let regionW = 200; regionW <= 700; regionW += 3.5) for (const active of [-1, 0, 1, 3, 6]) {
+      cases++;
+      const where = `${days[1]}/${regionW}/${active}`;
+      const L = ST.fitDayLabels(forms, regionW / 7, regionW, active, measure, snapped);
+      assert.equal(ST.labelShortfall(snapped(L), regionW), 0, 'drawn row keeps the gap and the edges ' + where + ' ' + JSON.stringify(snapped(L)));
+      if (active >= 0) assert.ok(L.some((a) => a.i === active), 'active day kept ' + where);
+      if (ST.labelShortfall(snapped(ST.layoutDayLabels(forms, regionW / 7, regionW, active, measure)), regionW)) brokenWithoutCheck++;
+      // labels that land where they are placed: exactly the plain layout (no day name lost)
+      assert.deepEqual(ST.fitDayLabels(forms, regionW / 7, regionW, active, measure, exact), ST.layoutDayLabels(forms, regionW / 7, regionW, active, measure), 'unchanged ' + where);
+    }
+  }
+  // pinned: on a precise platform the 313 px home card keeps all seven dated labels (no allowance leaks in)
+  const wk = weeks[0].map((d, i) => (i ? [d, d, d.slice(0, 3)] : [d]));
+  assert.deepEqual(ST.fitDayLabels(wk, 313 / 7, 313, -1, undefined, exact).map((a) => a.text), weeks[0]);
+  // a renderer that is always short: every round is measured, and the last resort has more room than any measured row
+  const seen = [];
+  const gapOf = (L) => Math.min(...L.slice(1).map((a, k) => a.cx - a.w / 2 - (L[k].cx + L[k].w / 2)));
+  const always = (L) => { seen.push(L); return L.map((a, k) => ({ l: k * 50, r: k * 50 + 48 })); };
+  const last = ST.fitDayLabels(wk, 264 / 7, 264, -1, undefined, always);
+  assert.equal(seen.length, 4, 'the first layout and three refits are all measured');
+  // three capped refits (SNAP_ALLOWANCE each) and SNAP_ALLOWANCE on top: every planned gap keeps all of it
+  assert.ok(last.length < 2 || gapOf(last) >= ST.LABEL_GAP + 4 * ST.SNAP_ALLOWANCE - 1e-6, 'the last resort keeps more room than any measured row: ' + gapOf(last));
+  assert.notDeepEqual(last, seen.at(-1), 'the last resort is not the row last measured short');  // the check is what holds the gap: without it, snapping breaks rows across the sweep
+  assert.ok(brokenWithoutCheck > 0, `snapping alone breaks ${brokenWithoutCheck} of ${cases} rows`);
+});
