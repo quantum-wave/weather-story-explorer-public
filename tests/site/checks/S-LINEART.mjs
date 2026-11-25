@@ -26,8 +26,9 @@ const DPR = 2;
 const VIEWS = [['np', 1000, 600], ['nh', 800, 800], ['gl', 1800, 1000]];
 const GROUNDS = [['paper', 'light'], ['night', 'dark']];
 const NEED = { coast: 4.5, border: 3 };
-// 'off': a lens whose field this fixture lacks (rivers: ivt) draws no fill, just the ground; 'on': the Pattern lens
-const FIELDS = [['off', { lens: 'r' }], ['on', { lens: 'z' }]];
+// 'off': a lens whose field this fixture lacks (rivers: ivt) draws no fill, just the ground; 'on': the Pattern lens in the default
+// (Soft) colour family; 'on-ref': the Pattern lens in the Reference (ECMWF) family
+const FIELDS = [['off', { lens: 'r' }], ['on', { lens: 'z', colors: 'soft' }], ['on-ref', { lens: 'z', colors: 'reference' }]];
 
 const lin = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
 const lum = ([r, g, b]) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
@@ -216,15 +217,15 @@ export async function run({ page, baseUrl, assert }) {
         analyse(img, await page.eval(PICK), `${view}/${gname}/field ${fname}`, gname);
       }
       // The deepest bands: the real lines drawn by basemap.drawLines over a solid fill of the palette's deepest blue and deepest
-      // red (z500a -39 and +39 dam). Where the synthetic field is pale this is what proves the casing (core alone is 1.85:1
+      // red (z500a -39 and +39 dam), in both colour families. Where the synthetic field is pale this is what proves the casing (core alone is 1.85:1
       // on the deepest Paper blue, DESIGN-SPEC 4.4).
-      for (const [bandName, dam] of [['deepest blue', -39], ['deepest red', 39]]) {
+      for (const [bandName, dam, colors] of [['deepest blue', -39, 'reference'], ['deepest red', 39, 'reference'], ['soft deepest blue', -39, 'soft'], ['soft deepest red', 39, 'soft']]) {
         const png = await page.eval(`(async () => {
           const [{ baseProjection, MapView, IDENTITY }, basemap, { bandRGBA }] = await Promise.all([import('/js/render/view.js'), import('/js/render/basemap.js'), import('/js/render/palette.js')]);
           const W = innerWidth, H = innerHeight, mv = new MapView(baseProjection(${JSON.stringify(view)}, W, H), IDENTITY());
           const cv = document.createElement('canvas'); cv.width = W * ${DPR}; cv.height = H * ${DPR};
           const c = cv.getContext('2d'); c.scale(${DPR}, ${DPR});
-          const [r, g, b] = bandRGBA('z500a', ${dam}, ${JSON.stringify(gname)});
+          const [r, g, b] = bandRGBA('z500a', ${dam}, ${JSON.stringify(gname)}, ${JSON.stringify(colors)});
           c.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')'; c.fillRect(0, 0, W, H);
           basemap.drawLines(c, mv, { ocean: ${JSON.stringify(gname === 'paper' ? '#FFFFFF' : '#000000')} }, false, ${JSON.stringify(gname)});
           window.__lineartProj = mv; window.__lineartView = ${JSON.stringify(view)};

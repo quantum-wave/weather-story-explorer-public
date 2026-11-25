@@ -8,7 +8,7 @@ const initial = () => ({
   view: 'np', // np | nh | gl | wm
   t: 0, // forecast hours, float
   playing: false,
-  speed: 12, // forecast hours per second: 6 | 12 | 24
+  speed: 6, // forecast hours per second: 3 | 6 | 12 (Slow, Normal, Fast; time/clock.js speeds)
   focus: null, // Focus | null
   theme: 'dark', // dark | light
   sheet: 'peek', // peek | half | full

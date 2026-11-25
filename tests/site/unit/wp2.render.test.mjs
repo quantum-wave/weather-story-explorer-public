@@ -136,15 +136,18 @@ test('colormap: the old entry points are the palette bands (exact hex, opaque, n
   const cm = await load('render/colormap.js'), pal = await load('render/palette.js');
   const unpack = (u) => [u & 255, (u >> 8) & 255, (u >> 16) & 255, u >>> 24];
   const hex = (c) => '#' + c.slice(0, 3).map((v) => v.toString(16).padStart(2, '0')).join('');
-  assert.equal(hex(cm.anomalyRGBA(6.9, 'light')), '#fe9400'); assert.equal(cm.anomalyRGBA(6.9, 'light')[3], 255);
-  assert.equal(hex(cm.anomalyRGBA(-13, 'light')), '#00a7fe');
+  // the ECMWF hex is the Reference family; the default (Soft) is the palette's own Soft band
+  assert.equal(hex(cm.anomalyRGBA(6.9, 'light', 'reference')), '#fe9400'); assert.equal(cm.anomalyRGBA(6.9, 'light', 'reference')[3], 255);
+  assert.equal(hex(cm.anomalyRGBA(-13, 'light', 'reference')), '#00a7fe');
+  assert.deepEqual(cm.anomalyRGBA(6.9, 'light'), pal.bandRGBA('z500a', 6.9, 'paper', 'soft'), 'the default is Soft');
+  assert.notEqual(hex(cm.anomalyRGBA(6.9, 'light')), '#fe9400');
   assert.deepEqual(cm.anomalyRGBA(1, 'dark'), [0, 0, 0, 0]); assert.deepEqual(cm.anomalyRGBA(NaN, 'dark'), [0, 0, 0, 0]);
   assert.deepEqual(cm.anomalyRGBA(6.9, 'dark'), pal.bandRGBA('z500a', 6.9, 'night'), 'a dark theme draws the Night table');
   const lut = cm.anomalyLUT('light'), at = (dam) => lut[Math.round(((dam + cm.ANOM_RANGE) / (2 * cm.ANOM_RANGE)) * (cm.LUT_SIZE - 1))];
   for (const d of [-24, -13, 13, 24]) assert.deepEqual(unpack(at(d)), cm.anomalyRGBA(Math.round(((Math.round(((d + 60) / 120) * 1023) / 1023) * 120 - 60) * 100) / 100, 'light'), `LUT at ${d}`);
   assert.equal(cm.anomalyLUT('light'), lut, 'cached');
   assert.equal(unpack(cm.jetLUT()[0])[3], 0, 'nothing below 30 m/s');
-  assert.equal(hex(cm.jetRGBA(35)), '#ffff00');
+  assert.equal(hex(cm.jetRGBA(35, 'light', 'reference')), '#ffff00'); assert.equal(hex(cm.jetRGBA(35)), pal.PALETTES.ws250.soft.paper[0]);
   assert.equal(cm.fadeSaturation(0), 1); assert.equal(cm.fadeSaturation(300), 1, 'the fade is retired: a colour never depends on the spread');
   assert.ok(Array.isArray(cm.STOPS) && cm.STOPS.length === 6 && cm.STOPS.every((r) => r.length === 5));
 });

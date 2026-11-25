@@ -1,6 +1,12 @@
 // Lens palettes (DESIGN-SPEC sections 4.2, 5.1, 5.4, 6.1, 10.1). Pure: no DOM, no fetch, no globals.
-// Each palette is a set of value bands. Paper tables are the sourced ECMWF values (REFERENCES REF-20, 22, 26, 28)
-// used hex for hex; Night tables are built from them by the rule in section 10.1 (a construction, flagged).
+// Each palette is a set of value bands in two colour families, chosen in the Display menu ("Map colors"):
+//   - Reference: the Paper tables are the sourced ECMWF values (REFERENCES REF-20, 22, 26, 28) used hex for hex; Night tables are
+//     built from them by the rule in section 10.1 (a construction, flagged). `p.paper`, `p.night` and `p.rgb` are this family.
+//   - Soft (the default): derived from Reference in OKLab, band for band (a construction, flagged `softConstruction`): chroma cut
+//     to SOFT_CHROMA of the Reference band's, hue kept, Paper lightness lifted part way toward white, and on a diverging palette
+//     the two arms given the same lightness band for band (each pair at their mean), so the arms are symmetric. Lightness keeps
+//     its order along every arm, the neutral gap stays unshaded, and every Night band still clears 3:1 on both Night grounds.
+// Every function that returns a colour takes the family as its last argument ('soft' | 'reference'; anything else is Soft).
 //
 // Band model. `edges` are the ascending breakpoints; the intervals between them (and the two open ends) are the
 // bands, and `paper[i]` / `night[i]` are the colours of the coloured bands, lowest value first. The `neutral` interval
@@ -72,6 +78,37 @@ function nightArm(paper, core, ext, extSteps) {
   ext.forEach((i, k) => { night[i] = nightColour(paper[i], extSteps ? extSteps[k] : NIGHT_L); });
   return night;
 }
+
+// ---- Soft family (a construction from Reference; see the top of the file) ----
+/** Share of the Reference band's OKLab chroma a Soft band keeps. */
+export const SOFT_CHROMA = 0.55;
+/** Paper only: how far a Soft band's OKLab lightness moves toward white (L + (1 - L) * lift; order kept). */
+const SOFT_LIFT = 0.12;
+/** Night only: the Soft bands' lightness range is pulled toward its floor by this share, so the light end glares less on a dark ground. */
+const SOFT_NIGHT_DIM = 0.25;
+/**
+ * The Soft table of one ground from that ground's Reference table. `split` (a diverging palette's first high-arm band) pairs
+ * band i with band n-1-i, which on both diverging palettes is the band the same distance from zero, and gives both their mean
+ * lightness. Night bands are lifted, hue and chroma kept, until they clear 3:1 on both Night grounds.
+ */
+function softTable(ref, { lift, split, night }) {
+  const lab = ref.map((h) => toLab(toRGB(h)));
+  let L = lab.map(([l]) => l + (1 - l) * lift);
+  if (split != null && split * 2 === L.length) L = L.map((l, i) => (l + L[L.length - 1 - i]) / 2);
+  if (night) { const lo = Math.min(...L); L = L.map((l) => l - (l - lo) * SOFT_NIGHT_DIM); }
+  return lab.map(([, a, b], i) => {
+    const hue = Math.atan2(b, a), chroma = Math.hypot(a, b) * SOFT_CHROMA;
+    let LL = L[i], c = atLightness(LL, hue, chroma);
+    if (night) while (Math.min(...NIGHT_GROUNDS.map((g) => contrast(c, g))) < 3 && LL < 0.95) { LL += 0.005; c = atLightness(LL, hue, chroma); }
+    return toHex(c);
+  });
+}
+
+/** The colour families, the default first. */
+export const MAP_COLORS = Object.freeze(['soft', 'reference']);
+export const DEFAULT_COLORS = 'soft';
+/** 'reference' stays Reference; anything else (absent, unknown) is the default, Soft. */
+export const colorsOf = (c) => (c === 'reference' ? 'reference' : 'soft');
 
 // ---- number words ----
 const MINUS = '−';
@@ -152,6 +189,17 @@ function build(def) {
   p.night = Object.freeze(p.night);
   p.nightConstruction = true;
   p.rgb = { paper: p.paper.map(toRGB), night: p.night.map(toRGB) };
+  const soft = {
+    paper: Object.freeze(softTable(p.paper, { lift: def.softLift ?? SOFT_LIFT, split: p.armSplit, night: false })),
+    night: Object.freeze(softTable(p.night, { lift: 0, split: p.armSplit, night: true })),
+  };
+  p.soft = Object.freeze(soft);
+  p.softConstruction = true;
+  p.tables = Object.freeze({ reference: Object.freeze({ paper: p.paper, night: p.night }), soft: p.soft });
+  p.rgbs = Object.freeze({
+    reference: Object.freeze({ paper: Object.freeze(p.rgb.paper), night: Object.freeze(p.rgb.night) }),
+    soft: Object.freeze({ paper: Object.freeze(soft.paper.map(toRGB)), night: Object.freeze(soft.night.map(toRGB)) }),
+  });
   // first interval index that is neutral
   p.neutralInterval = def.neutral[0] === -Infinity ? 0 : def.edges.indexOf(def.neutral[0]) + 1;
   Object.freeze(p.rgb.paper); Object.freeze(p.rgb.night);
@@ -210,6 +258,12 @@ export const LENS_FIELDS = Object.freeze({
 });
 
 const pal = (id) => { const p = PALETTES[id]; if (!p) throw new Error('unknown palette ' + id); return p; };
+const gr = (ground) => (ground === 'night' ? 'night' : 'paper');
+
+/** The band hex table of a palette on a ground in a colour family, lowest band first. */
+export function bandColors(id, ground = 'paper', colors = DEFAULT_COLORS) { return pal(id).tables[colorsOf(colors)][gr(ground)]; }
+/** The same as [r, g, b] triples. */
+export function bandRGBs(id, ground = 'paper', colors = DEFAULT_COLORS) { return pal(id).rgbs[colorsOf(colors)][gr(ground)]; }
 
 /** Interval index (0..edges.length) a value falls in, ties as described at the top of the file. */
 function interval(p, v) {
@@ -226,7 +280,7 @@ function interval(p, v) {
 }
 
 /**
- * Index into `paper` / `night` of the band holding v; -1 where the palette is not drawn (the neutral interval);
+ * Index into a band table (`paper` / `night`, either family) of the band holding v; -1 where the palette is not drawn (the neutral interval);
  * null for no data (not a finite number). Beyond the last stop it clamps to the first or last colour.
  */
 export function bandIndex(id, v) {
@@ -238,20 +292,20 @@ export function bandIndex(id, v) {
   return Math.max(0, Math.min(p.paper.length - 1, i));
 }
 
-/** [r, g, b, a] of a value on a ground ('paper' | 'night'); alpha 0 for the neutral gap and for no data, else 255. */
-export function bandRGBA(id, v, ground = 'paper') {
-  const p = pal(id), i = bandIndex(id, v);
+/** [r, g, b, a] of a value on a ground ('paper' | 'night') in a colour family; alpha 0 for the neutral gap and for no data, else 255. */
+export function bandRGBA(id, v, ground = 'paper', colors = DEFAULT_COLORS) {
+  const i = bandIndex(id, v);
   if (i === null || i < 0) return [0, 0, 0, 0];
-  const c = (ground === 'night' ? p.rgb.night : p.rgb.paper)[i];
+  const c = bandRGBs(id, ground, colors)[i];
   return [c[0], c[1], c[2], 255];
 }
 
 /** `size` entries sampling [lo, hi] evenly, packed little-endian RGBA (an ImageData Uint32Array view). */
-export function bandLUT(id, ground, size, lo, hi) {
+export function bandLUT(id, ground, size, lo, hi, colors = DEFAULT_COLORS) {
   const out = new Uint32Array(size);
   for (let k = 0; k < size; k++) {
     const v = size === 1 ? lo : lo + ((hi - lo) * k) / (size - 1);
-    const [r, g, b, a] = bandRGBA(id, v, ground);
+    const [r, g, b, a] = bandRGBA(id, v, ground, colors);
     out[k] = ((a << 24) | (b << 16) | (g << 8) | r) >>> 0;
   }
   return out;
@@ -262,11 +316,11 @@ export function bandLUT(id, ground, size, lo, hi) {
  * The Paper token is ink at 35%; on the deepest blue bands that gives under 1.5:1, so the light variant is returned
  * there. Contrast is measured on the hairline pixel (the ink blended over a band) against that band.
  */
-export function edgeHairline(id, ground, edge) {
+export function edgeHairline(id, ground, edge, colors = DEFAULT_COLORS) {
   const p = pal(id);
   if (!p.majorEdges.some((e) => Math.abs(e - edge) < 1e-9)) return null;
   const tk = ground === 'night' ? CHART.night : CHART.paper;
-  const rgb = ground === 'night' ? p.rgb.night : p.rgb.paper;
+  const rgb = bandRGBs(id, ground, colors);
   const d = 1e-6;
   const sides = [bandIndex(id, edge - d), bandIndex(id, edge + d)].filter((i) => i != null && i >= 0).map((i) => rgb[i]);
   const score = (t) => { const ink = toRGB(t.color); return Math.min(...sides.map((b) => contrast(b.map((x, k) => x * (1 - t.alpha) + ink[k] * t.alpha), b))); };
@@ -290,18 +344,21 @@ const LEGEND = {
     subtitle: 'Wind speed at 250 hPa, about 10 km up. Shading starts at 30 m/s; 36 m/s (70 kt) is the usual edge of a jet.',
     unit: 'm/s', ends: null, lineSample: { label: '36', text: 'line at 36 m/s (70 kt), the edge of the jet' }, hatch: null,
     footer: 'Colours follow ECMWF’s 200 hPa wind chart; below 30 m/s nothing is shaded',
+    softFooter: 'Colours softened from ECMWF’s 200 hPa wind chart; below 30 m/s nothing is shaded',
   },
   t850a: {
     title: 'Air mass temperature, vs normal',
     subtitle: 'Temperature about 1.5 km up, compared with the usual for this date.',
     unit: '°C', ends: { low: 'colder', high: 'warmer' }, lineSample: null, hatch: null,
     footer: 'ECMWF temperature-anomaly colours; nothing is shaded within ±1 °C',
+    softFooter: 'ECMWF temperature-anomaly colours, softened; nothing is shaded within ±1 °C',
   },
   tp6: {
     title: 'Rain in 6 hours',
     subtitle: 'Rain expected to fall in the 6 hours before the time shown.',
     unit: 'mm', ends: null, lineSample: null, hatch: null,
     footer: 'ECMWF rain colours, shaded from 0.1 mm',
+    softFooter: 'ECMWF rain colours, softened, shaded from 0.1 mm',
   },
   ivt: {
     title: 'Moisture transport (atmospheric rivers)',
@@ -321,15 +378,15 @@ const LEGEND = {
 const inchLabel = (x) => (x < 0.01 ? x.toFixed(3) : String(Number(x.toPrecision(2))));
 
 /**
- * What a legend draws for a palette on a ground over the value range [lo, hi]:
+ * What a legend draws for a palette on a ground and colour family over the value range [lo, hi]:
  * `{title, subtitle, unit, ends, ticks, stops, lineSample, hatch, footer}`.
  * stops: contiguous {from, to, color, gap}; the unshaded gap (z500a +-2) has gap: true and color null.
  * ticks: {value, label, major} only at hairlined edges (z500a) plus the gap edges; every edge for a banded ramp
  * that has no hairlines.
  */
-export function legendSpec(id, ground, lo, hi, units = 'metric') {
-  const p = pal(id), words = LEGEND[id];
-  const rgb = ground === 'night' ? p.night : p.paper;
+export function legendSpec(id, ground, lo, hi, units = 'metric', colors = DEFAULT_COLORS) {
+  const p = pal(id), words = LEGEND[id], soft = colorsOf(colors) === 'soft';
+  const rgb = bandColors(id, ground, colors);
   if (lo == null || hi == null) { const e = p.edges; lo = p.neutral[0] === -Infinity ? 0 : -Math.max(...e.filter((x) => Math.abs(x) <= 40).map(Math.abs)); hi = p.neutral[0] === -Infinity ? e[e.length - 1] + 10 : -lo; }
   const bounds = [-Infinity, ...p.edges, Infinity];
   const stops = [];
@@ -347,7 +404,7 @@ export function legendSpec(id, ground, lo, hi, units = 'metric') {
   const label = (v) => (us ? inchLabel(p.toDisplay(v, 'us')) : p.signed ? (v > 0 ? '+' : v < 0 ? MINUS : '') + Math.abs(v) : String(v));
   const ticks = vals.map((v) => ({ value: v, label: label(v), major: p.majorEdges.includes(v) || !p.majorEdges.length }));
   return {
-    title: words.title, subtitle: words.subtitle, unit: us ? 'in' : words.unit, ends: words.ends, ticks, stops, lineSample: words.lineSample, hatch: words.hatch, footer: words.footer,
+    title: words.title, subtitle: words.subtitle, unit: us ? 'in' : words.unit, ends: words.ends, ticks, stops, lineSample: words.lineSample, hatch: words.hatch, footer: soft && words.softFooter ? words.softFooter : words.footer,
     unitSwitch: rain ? { options: ['mm', 'in'], active: us ? 'in' : 'mm' } : null,
   };
 }

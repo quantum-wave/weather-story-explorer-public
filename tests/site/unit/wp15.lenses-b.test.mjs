@@ -80,10 +80,11 @@ test('Rivers: IVT fill from 250, contours every 250 from 250, CW3E words in the 
   assert.equal(ln.field, 'ivt'); assert.equal(ln.step, 250); assert.equal(ln.from, 250, 'no 0 contour'); assert.equal(ln.style, 'contour');
   assert.equal(ln.labelEvery % 250, 0);
   // pixel colours the lens draws: 800 is the 750 band, 200 is unfilled
-  assert.deepEqual(pal.bandRGBA('ivt', 800, 'paper'), [0xe3, 0x1a, 0x1c, 255]);
+  assert.deepEqual(pal.bandRGBA('ivt', 800, 'paper', 'reference'), [0xe3, 0x1a, 0x1c, 255]);
   assert.equal(pal.bandRGBA('ivt', 200, 'paper')[3], 0);
   assert.equal(pal.bandRGBA('ivt', 249.9, 'paper')[3], 0);
-  assert.deepEqual(pal.bandRGBA('ivt', 250, 'paper'), [0xfe, 0xd9, 0x76, 255]);
+  assert.deepEqual(pal.bandRGBA('ivt', 250, 'paper', 'reference'), [0xfe, 0xd9, 0x76, 255]);
+  assert.deepEqual(pal.bandRGBA('ivt', 250, 'paper').slice(0, 3), pal.PALETTES.ivt.rgbs.soft.paper[0], 'the default is Soft');
   // the CW3E category words, one per band edge
   const words = [[300, 'weak atmospheric river'], [600, 'moderate atmospheric river'], [800, 'strong atmospheric river'], [1100, 'extreme atmospheric river'], [1300, 'exceptional atmospheric river']];
   for (const [v, w] of words) assert.equal(R.describe(v), `${v} kg/m/s · ${w}`);

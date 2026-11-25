@@ -27,9 +27,11 @@ test('Jet: ECMWF 200 hPa bands from 30 m/s with no fade-in: 35 m/s is exactly #f
   assert.deepEqual([...pal.PALETTES.ws250.paper], HEX, 'the REF-22 table');
   assert.deepEqual([...pal.PALETTES.ws250.edges], [30, 40, 50, 60, 70, 80, 90]);
   const hex = (c) => '#' + c.slice(0, 3).map((v) => v.toString(16).padStart(2, '0')).join('');
-  assert.equal(hex(pal.bandRGBA('ws250', 35, 'paper')), '#ffff00'); assert.equal(pal.bandRGBA('ws250', 35, 'paper')[3], 255);
+  // the REF-22 hex is the Reference family; the default (Soft) is its own table, band for band
+  assert.equal(hex(pal.bandRGBA('ws250', 35, 'paper', 'reference')), '#ffff00'); assert.equal(pal.bandRGBA('ws250', 35, 'paper')[3], 255);
+  assert.equal(hex(pal.bandRGBA('ws250', 35, 'paper')), pal.PALETTES.ws250.soft.paper[0]);
   for (const v of [0, 20, 20.5, 25, 29.99]) assert.equal(pal.bandRGBA('ws250', v, 'paper')[3], 0, `${v} m/s draws nothing (no fade-in)`);
-  for (const [v, want] of [[30, 0], [39.9, 0], [40, 1], [55, 2], [65, 3], [75, 4], [85, 5], [95, 6], [130, 6]]) assert.equal(hex(pal.bandRGBA('ws250', v, 'paper')), HEX[want], `${v} m/s`);
+  for (const [v, want] of [[30, 0], [39.9, 0], [40, 1], [55, 2], [65, 3], [75, 4], [85, 5], [95, 6], [130, 6]]) assert.equal(hex(pal.bandRGBA('ws250', v, 'paper', 'reference')), HEX[want], `${v} m/s`);
   // the fill is opaque at every lead time: the descriptor carries no alpha, ramp or fade of its own
   assert.ok(!('alpha' in J.fill) && !('fadeFrom' in J.fill) && !('ramp' in J.fill));
 });

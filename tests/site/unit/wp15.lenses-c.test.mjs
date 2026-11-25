@@ -126,9 +126,11 @@ test('rain: the REF-28 bands from 0.1 mm; 0.05 mm is unfilled; the mm / in switc
   const pal = await load('render/palette.js'), { lens } = await load('lenses/index.js'), S = lens('s');
   const hex = (c) => '#' + c.slice(0, 3).map((n) => n.toString(16).padStart(2, '0')).join('');
   assert.equal(pal.bandRGBA('tp6', 0.05, 'paper')[3], 0, '0.05 mm is unfilled');
-  assert.equal(hex(pal.bandRGBA('tp6', 0.1, 'paper')), '#efdbb7');
-  assert.equal(hex(pal.bandRGBA('tp6', 12, 'paper')), '#77baf9');
-  assert.equal(hex(pal.bandRGBA('tp6', 500, 'paper')), '#ff00ff');
+  // the REF-28 hex is the Reference family; the default (Soft) is its own table, band for band
+  assert.equal(hex(pal.bandRGBA('tp6', 0.1, 'paper', 'reference')), '#efdbb7');
+  assert.equal(hex(pal.bandRGBA('tp6', 12, 'paper', 'reference')), '#77baf9');
+  assert.equal(hex(pal.bandRGBA('tp6', 500, 'paper', 'reference')), '#ff00ff');
+  assert.equal(hex(pal.bandRGBA('tp6', 12, 'paper')), pal.PALETTES.tp6.soft.paper[4]);
   const mm = pal.legendSpec('tp6', 'paper'), inch = pal.legendSpec('tp6', 'paper', null, null, 'us');
   assert.equal(mm.unit, 'mm'); assert.equal(inch.unit, 'in');
   assert.deepEqual(mm.unitSwitch, { options: ['mm', 'in'], active: 'mm' }); assert.deepEqual(inch.unitSwitch, { options: ['mm', 'in'], active: 'in' });

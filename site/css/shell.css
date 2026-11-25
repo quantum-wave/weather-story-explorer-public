@@ -3,7 +3,9 @@
 /* Colours, type and shape come from tokens.css (spec 10). What follows keeps the MVP names alive as aliases of the tokens, so
    the other stylesheets that still use them (--ink, --sheet, --card ...) follow the theme. New code uses the token names. */
 :root {
-  --r-sheet: 14px; --r-card: 10px; --topbar-h: 44px; --panel-w: 380px;
+  --r-sheet: 14px; --r-card: 10px; --topbar-h: 44px;
+  /* the desktop panel's width until the viewer sets one: ui/layout.js autoPanelW (the week's seven days fit at 486 px), set again there */
+  --panel-w: clamp(380px, 40vw, 486px);
   --ease: cubic-bezier(.2, .8, .2, 1);
   --spring: cubic-bezier(.22, 1.15, .36, 1);
   --sheet-h: 170px;
@@ -286,17 +288,17 @@ details.help p { margin: 0 0 var(--s2); }
    The component's own stylesheet (timeline.css, W3-08) still asks for a fixed-pitch face; this wins on specificity. */
 #timeline .tl-speed, #timeline .tl-time-main, #timeline .tl-time-sub { font-family: var(--font-ui); font-variant-numeric: tabular-nums; }
 /* The map tools row: four views (Regional, Hemisphere, Globe, World), Layers, Expand, and Reset after a pan or zoom. Which names fit is a
-   question of the stage's width, which is the viewport on a phone (a landscape phone included) and the viewport less the 380 px
-   default panel, its divider and margins (396 px) from 900 px up; the divider's maximum (layout.js) is measured from this row, so a
-   wider panel never squeezes it. Every button keeps its full name as its accessible name; only the visible label shortens.
+   question of the stage's width, which is the viewport on a phone (a landscape phone included) and, from 900 px up, the viewport less
+   the panel's default width (40% of the viewport, at least 380 and at most 486 px: layout.js autoPanelW) and 16 px of divider and margins, so
+   680 px of stage from a 1160 px viewport; the divider's maximum (layout.js) is measured from this row, so a wider panel never squeezes it. Every button keeps its full name as its accessible name; only the visible label shortens.
    - 680 px of stage and up: the full words (the row needs about 645 px with "Reset view" shown), "Reset view".
    - under that: "Reg | Hemi | Globe | World" in four equal 48 px cells, so the selected pill is the same size whichever view it is on;
      "Reset".
    - under 420 px of stage: Reset sits just under the row at the right instead of widening it, so the row never reshuffles when Reset
      appears, and the row never holds more than it can fit with at least 4 px to spare. */
 #view-switch .vw-long, .tool-long { display: none; }
-@media (min-width: 680px) and (max-width: 899px), (min-width: 1076px) { #view-switch .vw-long, .tool-long { display: inline; } }
-@media (max-width: 679px), (min-width: 900px) and (max-width: 1075px) {
+@media (min-width: 680px) and (max-width: 899px), (min-width: 1160px) { #view-switch .vw-long, .tool-long { display: inline; } }
+@media (max-width: 679px), (min-width: 900px) and (max-width: 1159px) {
   #view-switch { display: inline-grid; grid-template-columns: repeat(4, minmax(48px, 1fr)); }
   #view-switch button { min-width: 48px; padding: 0 4px; font-size: 12px; }
   #map-tools .tool-btn { padding: 0 8px; font-size: 12px; }

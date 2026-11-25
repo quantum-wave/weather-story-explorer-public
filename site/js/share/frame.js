@@ -109,6 +109,24 @@ export function drawStill(ctx, meta, state, renderer) {
   return { overlayCalled: flag.called };
 }
 
+/** The date stamp's ink and halo per ground: the screen's (css/datestamp.css). */
+export const STAMP = {
+  paper: { ink: 'rgba(28, 32, 36, 0.62)', halo: 'rgba(249, 246, 242, 0.85)' },
+  night: { ink: 'rgba(244, 241, 234, 0.66)', halo: 'rgba(8, 11, 14, 0.8)' },
+};
+/** Draws the stamp's two lines with their top-left at (x, top), on a 720 px design scale (`px`). */
+export function drawStamp(ctx, { day, hour }, x, top, px, ground) {
+  const st = STAMP[ground === 'night' ? 'night' : 'paper'];
+  const lines = [[day, `600 ${px(44)}px ${SANS}`, top + px(42)], [hour, `500 ${px(24)}px ${SANS}`, top + px(74)]].filter(([s]) => s);
+  ctx.save();
+  // the halo: a soft blurred stroke in the ground's colour under the letters (strokeText, so the words are drawn, and recorded, once)
+  ctx.shadowColor = st.halo; ctx.shadowBlur = px(12); ctx.strokeStyle = st.halo; ctx.lineWidth = px(4); ctx.lineJoin = 'round';
+  for (const [s, font, y] of lines) { ctx.font = font; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.strokeText(s, x, y); }
+  ctx.shadowBlur = 0;
+  for (const [s, font, y] of lines) drawText(ctx, s, x, y, { font, color: st.ink });
+  ctx.restore();
+}
+
 /** The compact stepped bar of a GIF frame: title, bar, the countable ticks, the end words. Returns nothing; draws inside [x, x+w]. */
 function gifLegend(ctx, meta, pal, size, px) {
   const x = px(16), w = size - px(32), model = meta.legend;
@@ -136,10 +154,10 @@ function gifLegend(ctx, meta, pal, size, px) {
 }
 
 /**
- * One GIF frame onto a square ctx: map, date chip, sample banner, legend band, progress bar with the focused moment marked.
+ * One GIF frame onto a square ctx: map, date stamp ({day, hour}; `dateText` alone is drawn as the day line), sample banner, legend band, progress bar with the focused moment marked.
  * frac = position of this frame in the range (0..1); mark = position of the focused moment (0..1) or null.
  */
-export function drawGifFrame(ctx, size, meta, state, renderer, { t, dateText, frac, mark }) {
+export function drawGifFrame(ctx, size, meta, state, renderer, { t, dateText, stamp, frac, mark }) {
   const pal = paletteFor(meta.ground);
   const flag = { called: false };
   renderMap(renderer, ctx, { width: size, height: size, t, state, meta, flag, ringFont: `600 ${Math.round(size / 32)}px ${SANS}` });
@@ -152,13 +170,8 @@ export function drawGifFrame(ctx, size, meta, state, renderer, { t, dateText, fr
     drawText(ctx, meta.sampleBanner, size / 2, px(23), { font: `700 ${px(f)}px ${SANS}`, color: pal.sampleInk, align: 'center' });
     topY = px(34);
   }
-  // date chip, sized to its text
-  const chipFont = `600 ${px(21)}px ${MONO}`;
-  ctx.font = chipFont;
-  const chipW = Math.ceil(ctx.measureText(dateText).width) + px(24);
-  ctx.fillStyle = pal.sheet; ctx.globalAlpha = 0.86;
-  ctx.fillRect(px(16), topY + px(16), chipW, px(40)); ctx.globalAlpha = 1;
-  drawText(ctx, dateText, px(28), topY + px(43), { font: chipFont, color: pal.text });
+  // the date stamp, as on the screen's map (ui/datestamp.js, css/datestamp.css): the day large, the hour and zone under it, translucent with a halo
+  drawStamp(ctx, stamp || { day: dateText, hour: '' }, px(20), topY + px(14), px, meta.ground);
   // legend band + progress
   const barY = size - px(14);
   ctx.fillStyle = pal.sheet; ctx.globalAlpha = 0.9; ctx.fillRect(0, size - px(86), size, px(86)); ctx.globalAlpha = 1;

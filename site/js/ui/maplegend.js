@@ -3,7 +3,7 @@
 // only on the hairlined edges plus +-2, what the contour lines are, the doubt hatch when it is drawing, the baseline
 // footer and one provenance line. Every word and colour comes from palette.legendSpec(); the run line from runLine() (the active case's chip text).
 // It works with or without store.lens (Pattern by default) and with or without a guide to open.
-import { legendSpec, LENS_FIELDS } from '../render/palette.js';
+import { legendSpec, LENS_FIELDS, colorsOf } from '../render/palette.js';
 import { runLabel, caseForLens } from '../data/kind.js';
 import { sampleBadgeText } from './header.js';
 import { getManifest } from '../data/index.js';
@@ -28,14 +28,14 @@ export function fillOf(s) {
 
 /**
  * The legend as data, no DOM: what to draw for a store state and a manifest.
- * `{lens, fill, ground, spec, bar: [{from, to, left, width, color, gap}], ticks: [{value, label, left, major, align}],
+ * `{lens, fill, ground, colors, spec, bar: [{from, to, left, width, color, gap}], ticks: [{value, label, left, major, align}],
  *   hatch: bool, hatchNote: string|null, run: string}`
  */
 export function legendModel(s, manifest) {
-  const lens = fillOf(s), fill = LENS_FIELDS[lens].fill, ground = groundOf(s);
+  const lens = fillOf(s), fill = LENS_FIELDS[lens].fill, ground = groundOf(s), colors = colorsOf(s?.colors);
   const signed = fill === 'z500a' || fill === 't850a';
   const units = s?.units === 'us' ? 'us' : 'metric';
-  const spec = legendSpec(fill, ground, signed ? LO : null, signed ? HI : null, units);
+  const spec = legendSpec(fill, ground, signed ? LO : null, signed ? HI : null, units, colors);
   const lo = spec.stops[0]?.from ?? LO, hi = spec.stops[spec.stops.length - 1]?.to ?? HI, span = hi - lo || 1;
   const pct = (v) => ((v - lo) / span) * 100;
   let bar = spec.stops.map((st) => ({ from: st.from, to: st.to, left: pct(st.from), width: pct(st.to) - pct(st.from), color: st.color, gap: !!st.gap }));
@@ -57,7 +57,7 @@ export function legendModel(s, manifest) {
   const hasSpread = !manifest || !!manifest.fields?.z500sd;
   const wantsHatch = fill === 'z500a' && !!spec.hatch && doubtOn;
   return {
-    lens, fill, ground, spec, bar, ticks, units,
+    lens, fill, ground, colors, spec, bar, ticks, units,
     hatch: wantsHatch && hasSpread,
     hatchNote: wantsHatch && !hasSpread ? NO_SPREAD : null,
     run: runLine(s, manifest),
@@ -113,11 +113,11 @@ export function mountMapLegend({ store = defaultStore, bus = defaultBus, host, o
 
   function build() {
     const m = legendModel(store.get(), getManifest());
-    const key = JSON.stringify([m.fill, m.ground, m.units, m.hatch, m.hatchNote, m.run, isCollapsed]);
+    const key = JSON.stringify([m.fill, m.ground, m.colors, m.units, m.hatch, m.hatchNote, m.run, isCollapsed]);
     if (key === lastKey) return;
     lastKey = key;
     const { spec } = m;
-    root.dataset.lens = m.lens; root.dataset.ground = m.ground; root.dataset.collapsed = String(isCollapsed);
+    root.dataset.lens = m.lens; root.dataset.ground = m.ground; root.dataset.colors = m.colors; root.dataset.collapsed = String(isCollapsed);
 
     const mini = el('span', { class: 'mlg-mini', 'aria-hidden': 'true' }, m.bar.map((b) => el('i', { style: b.gap ? `left:${b.left}%;width:${b.width}%` : `left:${b.left}%;width:${b.width}%;background:${b.color}` })));
     const toggle = el('button', { type: 'button', class: 'mlg-toggle', 'aria-expanded': String(!isCollapsed), 'aria-controls': bodyId },

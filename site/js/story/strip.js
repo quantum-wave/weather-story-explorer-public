@@ -401,7 +401,7 @@ const hasAny = (c) => c.pattern !== 'none' || hasRain(c) || c.airMass !== 'none'
  * Returns the knots drawn. `x0..x1` is the pixel span for hours h0..h1.
  */
 function drawWave(svg, defs, o) {
-  const { series, days, wins, h0, h1, x0, x1, top, wh, ground, px, mini } = o;
+  const { series, days, wins, h0, h1, x0, x1, top, wh, ground, colors, px, mini } = o;
   const z = series.z500a;
   if (!z?.steps?.length) return null;
   const mid = top + wh / 2;
@@ -450,7 +450,7 @@ function drawWave(svg, defs, o) {
     const h = h0 + ((xc - x0) / (x1 - x0)) * (h1 - h0);
     let key = null;
     if (noSignalAt(h)) key = 'none';
-    else { const c = bandRGBA('z500a', hermiteAt(xs, dam, md, xc), ground); key = c[3] ? `rgb(${c[0]},${c[1]},${c[2]})` : null; }
+    else { const c = bandRGBA('z500a', hermiteAt(xs, dam, md, xc), ground, colors); key = c[3] ? `rgb(${c[0]},${c[1]},${c[2]})` : null; }
     const last = runs[runs.length - 1];
     if (last && last.key === key && Math.abs(last.x1 - x) < 0.01) last.x1 = xe; else runs.push({ key, x0: x, x1: xe });
   }
@@ -542,7 +542,7 @@ export function placeNormalLabel({ wave, mid, regionW, yMin = -Infinity, yMax = 
  * @param {object[]} days day classes from buildDays (only days with data)
  * @param {object} series as returned by seriesFor with `windows` set (defaults to days.series)
  * @param {{compact?:boolean, range?:7|10|15, phone?:boolean, expanded?:boolean, width?:number, activeDay?:number,
- *   label?:(c:object)=>string, ground?:'paper'|'night', key?:boolean, weekdayLabels?:boolean}} opts
+ *   label?:(c:object)=>string, ground?:'paper'|'night', colors?:'soft'|'reference', key?:boolean, weekdayLabels?:boolean}} opts
  */
 export function stripSVG(days, series = days?.series, opts = {}) {
   const width = opts.width || 336;
@@ -597,12 +597,12 @@ export function stripSVG(days, series = days?.series, opts = {}) {
   el('line', { x1: 0, y1: mid, x2: mainW, y2: mid, class: 'normal-line', style: 'stroke:var(--hairline);stroke-width:1' }, svg);
 
   // wave (main), then the mini wave of the end cell
-  const main = drawWave(svg, defs, { series, days, wins, h0, h1, x0: 0, x1: mainW, top, wh: waveH, ground, px });
+  const main = drawWave(svg, defs, { series, days, wins, h0, h1, x0: 0, x1: mainW, top, wh: waveH, ground, colors: opts.colors, px });
   if (endCell) {
     const ex = mainW + gap;
     el('rect', { x: ex, y: top, width: endW, height: waveH + rainH, rx: 4, class: 'strip-end-bg', style: 'fill:var(--ink);opacity:.05' }, svg);
     el('line', { x1: ex, y1: mid, x2: ex + endW, y2: mid, class: 'end-normal-line', style: 'stroke:var(--hairline);stroke-width:1' }, svg);
-    drawWave(svg, defs, { series, days, wins, h0: wins[mainN].startH, h1: wins[n - 1].endH, x0: ex + 3, x1: ex + endW - 3, top: top + waveH * 0.2, wh: waveH * 0.6, ground, px: px * 0.6, mini: true });
+    drawWave(svg, defs, { series, days, wins, h0: wins[mainN].startH, h1: wins[n - 1].endH, x0: ex + 3, x1: ex + endW - 3, top: top + waveH * 0.2, wh: waveH * 0.6, ground, colors: opts.colors, px: px * 0.6, mini: true });
   }
   // columns
   // A weekday alone names a day only within one week, and only where a dated row cannot keep MIN_LABEL_GAP: the

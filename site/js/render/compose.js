@@ -26,7 +26,7 @@ import { drawFills, drawLines, basemapReady, basemapTier } from './basemap.js';
 import { isolines, labelSpots } from './isolines.js';
 import { theme as themeTokens, groundFor, FONT_CHART } from './theme.js';
 import { chartTokens } from './chart-tokens.js';
-import { PALETTES } from './palette.js';
+import { PALETTES, colorsOf } from './palette.js';
 import { RasterJob, rasterSize, qualityFrom, refine2x, motionFit, BICUBIC_FROM_ZOOM, SLICE_MS } from './sample.js';
 import { lens as lensOf } from '../lenses/index.js';
 import * as annotate from './annotate.js';
@@ -241,7 +241,8 @@ export function makeScene() {
     const doubt = dgrids ? { layers: dgrids, limit: DOUBT_GPM } : null;
     const bicubic = quality === 'rest' && mv.xf.k >= BICUBIC_FROM_ZOOM;
     const hairlines = quality !== 'rotate' && PALETTES[pal.palette].majorEdges.length > 0;
-    const baseKey = [mv.key, pal.field, pal.palette, s.t, data.dataVersion(), ground, doubt ? 1 : 0, hairlines ? 1 : 0, grids.map((g) => g.domId + (g.feather ? 'f' : '')).join('+')].join('|');
+    const colors = colorsOf(s.colors);
+    const baseKey = [mv.key, pal.field, pal.palette, s.t, data.dataVersion(), ground, colors, doubt ? 1 : 0, hairlines ? 1 : 0, grids.map((g) => g.domId + (g.feather ? 'f' : '')).join('+')].join('|');
     const key = `${baseKey}|${rw}x${rh}|${bicubic ? 1 : 0}`;
     // a compose of other inputs abandons a running job (the coarse draw a job's own compose makes is `internal`)
     if (pending && pending.baseKey !== baseKey && !opts.internal) { pending.job.cancel(); pending = null; }
@@ -249,7 +250,7 @@ export function makeScene() {
     const R = rasterBuf(slot, rw, rh);
     if (opts.cachedOnly && R.key !== key) return { drew: false, pending: false, partial: false }; // the caller wants no new raster work
     stats.rasterPx = rw * rh; stats.rasterQuality = quality; if (quality === 'rest') stats.restRasterPx = rw * rh;
-    const spec = () => ({ mv, W: mv.W, H: mv.H, rw, rh, u32: R.u32, pool: quality === 'rotate', layers: grids, factor: pal.factor, palette: pal.palette, ground, bicubic, hairlines, doubt });
+    const spec = () => ({ mv, W: mv.W, H: mv.H, rw, rh, u32: R.u32, pool: quality === 'rotate', layers: grids, factor: pal.factor, palette: pal.palette, ground, colors, bicubic, hairlines, doubt });
     const paint = () => {
       const t2 = nowMs();
       R.ctx.putImageData(R.img, 0, 0);
@@ -401,7 +402,7 @@ export function makeScene() {
 
   /**
    * Draw one frame of view `mv` into `ctx` (CSS px units for mv.W x mv.H; the context may be scaled for dpr).
-   * opts: s {t, lens, layers, theme, ground, overlays, case, playing}, dpr (resolution of the offscreen layers), quality
+   * opts: s {t, lens, layers, theme, ground, colors, overlays, case, playing}, dpr (resolution of the offscreen layers), quality
    * ('rest' | 'motion' | 'rotate'; or the old low / rasterScale), sliceMs (rest raster in slices), alpha (field opacity: 1 but for
    * the first-field fade-in), force (always recompute contours), avoid (label keep-out rects; default the legend and tools).
    * Returns {drewField, pending}.

@@ -95,6 +95,14 @@
 .pn-msg.reserved:empty { display: block; }
 .pn-suggest.reserved { min-height: calc(5 * 44px + 2px); }
 .pn-hint { padding: 12px; color: var(--pn-dim); font-size: 13px; }
+/* nothing matched: the "Search online" offer stands where the list was, in the same reserved space */
+.pn-suggest[hidden], .pn-online[hidden] { display: none; }
+.pn-online { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 12px; border: 1px dashed var(--pn-line); border-radius: 10px; }
+.pn-online.reserved { min-height: calc(5 * 44px + 2px); }
+.pn-online-btn { font-weight: 600; }
+.pn-online-lead { margin: 0; color: var(--pn-text); font-size: 14px; overflow-wrap: anywhere; }
+.pn-online-via { margin: -6px 0 0; color: var(--pn-dim); font-size: 13px; }
+.pn-online-note { margin: 0; color: var(--pn-dim); font-size: 13px; }
 .pn-opt { flex-wrap: wrap; }
 .pn-opt-name { font-weight: 600; }
 .pn-opt-sub { color: var(--pn-dim); font-size: 13px; }

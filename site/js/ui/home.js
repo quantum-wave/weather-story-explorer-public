@@ -1,7 +1,7 @@
-// The plan-first home (DESIGN-SPEC 3.1-3.5): Your week, Trips, People, Places, each with a summary sentence and the strip.
+// The plan-first home (DESIGN-SPEC 3.1-3.5): Your week, Trips, People, Places, each with its day table and a summary sentence.
 // Every honest state of "Your week" renders here (live, short of range, stale, very stale, recorded, short dataset,
 // loading, load failure); the words come from story/phrases.js, the dataset kinds from data/kind.js.
-// Tapping a card or a strip day focuses that place: the clock tweens to the day and the map re-centres. On the phone the
+// Tapping a card or a day column focuses that place: the clock tweens to the day and the map re-centres. On the phone the
 // sheet never drops to peek for it: from half it stays at half, from full it goes to half (UX-4).
 import { h, clear } from './dom.js';
 import { prefs } from './prefs.js';
@@ -46,7 +46,7 @@ export function mountHome(app) {
   const secMore = h('section', { id: 'sec-more' });
   body.append(notes, secWeek, secTrips, secPeople, secPlaces, secAdd, secPins, secMore);
 
-  const stories = new Map(); // key -> {place, days, summary, status, activeDay, range, avail, expanded}
+  const stories = new Map(); // key -> {place, days, summary, status, activeDay, range, avail}
   let focusKey = null;
   let groupFilter = 'all';
   let showAll = { person: false, place: false };
@@ -120,7 +120,7 @@ export function mountHome(app) {
     const same = st && st.place.lat === place.lat && st.place.lon === place.lon && st.trip?.start === place.trip?.start && st.trip?.end === place.trip?.end && (place.kind !== 'home' || st.chosen === chosenRange());
     if (st && st.status !== 'loading' && st.status !== 'error' && !force && same) { st.place = place; return st; }
     if (st?.status === 'loading' && !force && same) return st;
-    st = { place, days: [], summary: '', status: 'loading', activeDay: 0, trip: place.trip && { ...place.trip }, range: 7, avail: 0, expanded: false, chosen: chosenRange() };
+    st = { place, days: [], summary: '', status: 'loading', activeDay: 0, trip: place.trip && { ...place.trip }, range: 7, avail: 0, chosen: chosenRange() };
     stories.set(place.key, st);
     try {
       const opts = { tz: tzFor(place), anchor: anchorMs(), now: nowMs(), placeName: place.label };
@@ -165,7 +165,7 @@ export function mountHome(app) {
     const multi = isMultiCase(mf());
     // old sample days are real past days: name the full date with its year, never a weekday that reads as this week
     const dayName = multi ? weekdayDate(parseDay(c.date), { year: true }) : undefined;
-    return story.dayLine(st.place.label, dayName, c, { sample: !isLive(mf()), placeName: st.place.label });
+    return story.dayLine(st.place.label, dayName, c, { sample: !isLive(mf()), placeName: st.place.label, units: units() });
   };
 
   // ---------- focus ----------
@@ -212,104 +212,63 @@ export function mountHome(app) {
     return hi > lo ? (lo + hi) / 2 : Math.min(Math.max(w.startH, steps[0]), steps[steps.length - 1]);
   }
 
-  // ---------- strips ----------
-  // Phone: the strip keeps the 16 px gutter, so at 390 px it is 358 px wide. At ranges 10 and 15 days 1-7 are 44 px columns
-  // (7 x 44 = 308) and the compressed end cell gives up width to fit (strip.js: 46 px and a 4 px gap). The end cell swaps
-  // in the full strip, which scrolls sideways inside its wrapper. Its columns are a whole fraction of the wrapper (six at
-  // 358 px, 59.7 px each, never under 52 px so every "Wed 28" fits, the active one in semibold) and the scroll snaps to
-  // them, so at rest no column, label or rain bar is cut at either edge. What must always be read stays out of the
-  // scrolling part: the key sits under the wrapper and the "normal" label is pinned to its right edge on the line.
-  const EXPANDED_COL = 52; // the narrowest column at which every "Wed 28" date label fits, the active one in semibold
+  // ---------- day tables ----------
+  // Each card's days are a table of columns (story/daytable.js): the day, an icon, high and low, rain, how sure. The table
+  // keeps the card's 16 px gutter on the phone. When every day fits at MIN_COL (56 px) the columns share the width; when
+  // they do not (a 390 px phone shows five; on the desktop panel's default width range 7 fits and ranges 10 and 15 show
+  // seven) the table scrolls sideways inside its wrapper and comes to rest on whole columns. The selected day is scrolled into view.
   const measure = () => {
     const w = body.clientWidth || 380;
     return Math.max(240, Math.floor(isPhone() ? w - 32 : w - 32 - 34));
   };
-  const isWide = (st) => !!st.expanded && isPhone() && st.days.length > 7;
-  /** The expanded strip's column: the wrapper divided into as many whole columns as fit at EXPANDED_COL or wider. */
-  const expandedCol = (width) => width / Math.max(1, Math.floor(width / EXPANDED_COL));
+  const units = () => (store.get().units === 'us' ? 'us' : 'metric');
   function stripFor(st, width) {
-    const phone = isPhone();
-    const n = st.days.length;
-    return story.stripSVG(st.days, st.days.series, {
-      width: isWide(st) ? Math.max(width, n * expandedCol(width)) : width, activeDay: st.activeDay, phone, range: st.range, expanded: st.expanded,
-      ground: store.get().theme === 'light' ? 'paper' : 'night',
+    return story.dayTable(st.days, st.days.series, {
+      width, activeDay: st.activeDay, units: units(), sample: !isLive(mf()),
       label: (c) => dayLineFor(st, c.dayIndex) || story.weekdayShort(c.date),
-      // a weekday alone stands in for a date only on the phone, and never on a very stale run: its columns show dates (3.2)
-      weekdayLabels: phone && staleness(mf(), nowMs()) !== 'very-stale',
     });
   }
   function paintStrip(wrap, st, { reveal = false } = {}) {
     const keep = wrap.scrollLeft;
+    // a repaint keeps keyboard focus on the same day, so picking a day with Enter never drops the reader's place
+    const focused = wrap.contains(document.activeElement) ? document.activeElement.closest?.('.strip-day')?.dataset.day : undefined;
     clear(wrap);
-    const frame = wrap.parentElement?.classList.contains('strip-frame') ? wrap.parentElement : null;
-    frame?.querySelectorAll(':scope > .strip-pin, :scope > .strip-key-out').forEach((e) => e.remove());
-    const wide = isWide(st);
-    wrap.classList.toggle('expanded', wide);
-    const width = measure();
-    const svg = stripFor(st, width);
-    wrap.append(svg);
-    if (!wide) return;
-    // the key leaves the scrolling SVG for a block under it (real text that wraps), and the SVG ends at its columns
-    const keyLines = [...svg.querySelectorAll('text.strip-key')].map((t) => { const s = t.textContent; t.remove(); return s; });
-    const colH = +svg.querySelector('rect.strip-day')?.getAttribute('height');
-    if (keyLines.length && colH > 0) {
-      const vb = (svg.getAttribute('viewBox') || '').split(' ');
-      svg.setAttribute('height', colH);
-      if (vb.length === 4) { vb[3] = String(colH); svg.setAttribute('viewBox', vb.join(' ')); }
-    }
-    // the "normal" label is pinned to the wrapper's right edge on the line, on a chip of the card's ground
-    svg.querySelector('text.strip-normal')?.remove();
-    const mid = +svg.querySelector('line.normal-line')?.getAttribute('y1');
-    if (frame && Number.isFinite(mid)) frame.append(h('span', { class: 'strip-normal strip-pin', 'aria-hidden': 'true', text: 'normal', style: { marginTop: `${Math.round(mid - 8)}px` } }));
-    if (frame && keyLines.length) frame.append(h('p', { class: 'strip-key-out' }, ...keyLines.map((l) => h('span', { class: 'strip-key', text: l }))));
-    // snap points: one per column, so the scroll comes to rest on whole columns
-    const n = st.days.length, col = expandedCol(width);
-    for (let i = 0; i < n; i++) wrap.append(h('span', { class: 'strip-snap', 'aria-hidden': 'true', style: { left: `${i * col}px`, width: `${col}px` } }));
-    for (const t of svg.querySelectorAll('text.strip-zone-note')) t.dataset.x0 = t.getAttribute('x');
+    const table = stripFor(st, wrap.clientWidth || measure());
+    wrap.classList.toggle('dt-scroll', table.classList.contains('dt-scrolls'));
+    wrap.append(table);
+    wrap.scrollLeft = keep; // a repaint keeps the reader's scroll position
+    if (focused != null) table.querySelector(`.strip-day[data-day="${focused}"]`)?.focus({ preventScroll: true });
+    // Once the table has a box: shorten names that do not fit, and on a reveal bring the selected day into view when it is
+    // not. A frame that runs after a newer paint replaced this table, or after the reader scrolled, changes nothing it should not.
     const place = () => {
-      const vis = Math.max(1, Math.round(wrap.clientWidth / col) || Math.floor(width / col));
-      if (reveal) {
-        const first = Math.max(0, Math.min(st.activeDay - Math.floor((vis - 1) / 2), n - vis));
-        wrap.scrollLeft = first * col;
-      } else wrap.scrollLeft = keep;
-      fitStripText(wrap);
+      if (table.parentNode !== wrap) return;
+      story.fitNames(table);
+      story.fitBands(table);
+      const act = table.querySelector('.strip-day.is-active');
+      if (!reveal || !act) return;
+      const a = act.offsetLeft, w = act.offsetWidth, W = wrap.clientWidth, sl = wrap.scrollLeft;
+      if (a < sl || a + w > sl + W) wrap.scrollLeft = Math.max(0, a - Math.floor((W / w - 1) / 2) * w);
     };
     if (wrap.isConnected) place(); else requestAnimationFrame(place);
   }
-  /**
-   * Text in the scrolling strip is never shown cut by the wrapper's edge. A zone note ("broad pattern", "pattern only")
-   * slides to stay in view while its zone is on screen; any text still crossing an edge (mid-scroll, before the snap
-   * settles) is hidden until it is whole again.
-   */
-  function fitStripText(wrap) {
-    const svg = wrap.querySelector('svg.strip');
-    if (!svg || !wrap.classList.contains('expanded')) return;
-    const L = wrap.scrollLeft, R = L + wrap.clientWidth, W = +svg.getAttribute('width') || R;
-    const dashed = svg.querySelector('line.zone-dashed');
-    const notes = [...svg.querySelectorAll('text.strip-zone-note')].map((t) => {
-      const x0 = +t.dataset.x0, w = t.getComputedTextLength?.() || 0;
-      const broad = dashed && Math.abs(x0 - (+dashed.getAttribute('x1') + 3)) < 1;
-      return { t, x0, w, b: broad ? +dashed.getAttribute('x2') : W };
+  /** Arrow keys move between the day columns of one table (Home and End to the ends); Enter or Space picks the day. */
+  function armTableKeys(wrap) {
+    wrap.addEventListener('keydown', (e) => {
+      const t = e.target.closest?.('.strip-day');
+      if (!t || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+      const all = [...wrap.querySelectorAll('.strip-day')], i = all.indexOf(t);
+      const j = e.key === 'Home' ? 0 : e.key === 'End' ? all.length - 1 : i + (e.key === 'ArrowRight' ? 1 : -1);
+      if (j < 0 || j >= all.length || j === i) return;
+      e.preventDefault();
+      all[j].focus();
     });
-    let limit = Infinity;
-    for (const N of notes.slice().reverse()) {
-      const x = Math.max(N.x0, Math.min(L + 4, N.b - N.w - 2, limit - 6 - N.w));
-      N.t.setAttribute('x', Math.round(x * 100) / 100);
-      limit = Math.min(limit, x);
-    }
-    for (const t of svg.querySelectorAll('text')) {
-      let b; try { b = t.getBBox(); } catch { continue; }
-      const cut = b.x < L - 0.5 || b.x + b.width > R + 0.5;
-      const seen = b.x + b.width > L && b.x < R;
-      t.style.visibility = seen && cut ? 'hidden' : '';
-    }
   }
   /**
    * A vertical finger drag that starts on a strip behaves like a drag on the panel body (spec 4.6): it scrolls the panel
    * when the panel can scroll that way, and moves the sheet one step only at the scroll edge (finger down with the body at
    * the top) or when the sheet is not yet full (finger up). Off the phone layout it is never intercepted. The decision is
    * made on the first touchmove that shows the axis, while the browser has not yet started scrolling and the event can
-   * still be cancelled; otherwise the touch is left to the browser (vertical scrolling, and sideways on an expanded strip).
+   * still be cancelled; otherwise the touch is left to the browser (vertical scrolling, and sideways on a table that scrolls).
    */
   function armStripDrag(wrap) {
     let g = null;
@@ -363,31 +322,35 @@ export function mountHome(app) {
       if (none) head.append(h('p', { class: 'sample-tag', text: none }));
       return el;
     }
-    head.append(h('p', { class: 'summary', text: st.summary }));
-    if (st.confidence) head.append(h('p', { class: 'confidence', text: st.confidence }));
+    // with a day table the card reads kicker, table, then the sentence under it (the table is what the eye goes to first);
+    // the sentence block focuses the place on a tap like the head (the head button is the keyboard route)
+    const words = strip ? h('div', { class: 'card-words', onclick: () => focusPlace(place) }) : head;
+    words.append(h('p', { class: 'summary', text: st.summary }));
+    if (st.confidence) words.append(h('p', { class: 'confidence', text: st.confidence }));
     const src = sourceLabel();
-    if (src) head.append(h('p', { class: 'sample-tag', text: src }));
-    if (note) head.append(h('p', { class: 'card-note', text: note }));
+    if (src) words.append(h('p', { class: 'sample-tag', text: src }));
+    if (note) words.append(h('p', { class: 'card-note', text: note }));
     if (!strip) return el;
     const wrap = h('div', { class: 'strip-wrap' });
     const frame = h('div', { class: 'strip-frame' }, wrap);
     paintStrip(wrap, st);
-    let fitting = 0;
-    wrap.addEventListener('scroll', () => { if (!fitting) fitting = requestAnimationFrame(() => { fitting = 0; fitStripText(wrap); }); }, { passive: true });
     wrap.addEventListener('click', (e) => {
       const d = e.target.closest?.('.strip-day');
-      if (d) { focusPlace(place, { t: parseFloat(d.dataset.t), day: +d.dataset.day }); return; }
-      if (e.target.closest?.('.strip-end')) { st.expanded = true; paintStrip(wrap, st, { reveal: true }); paintCollapse(el, st, wrap); }
+      if (d) focusPlace(place, { t: parseFloat(d.dataset.t), day: +d.dataset.day });
     });
     wrap.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter' && e.key !== ' ') return;
-      const t = e.target;
-      if (t.classList?.contains('strip-day')) { e.preventDefault(); focusPlace(place, { t: parseFloat(t.dataset.t), day: +t.dataset.day }); }
-      else if (t.classList?.contains('strip-end')) { e.preventDefault(); t.dispatchEvent(new MouseEvent('click', { bubbles: true })); }
+      const t = e.target.closest?.('.strip-day');
+      if (t) { e.preventDefault(); focusPlace(place, { t: parseFloat(t.dataset.t), day: +t.dataset.day }); }
     });
+    armTableKeys(wrap);
+    // a band's words hide where too little of the band shows to hold them (story/daytable.js fitBands)
+    let bandsRaf = 0;
+    wrap.addEventListener('scroll', () => {
+      if (!bandsRaf) bandsRaf = requestAnimationFrame(() => { bandsRaf = 0; const t = wrap.querySelector('.daytable'); if (t) story.fitBands(t); });
+    }, { passive: true });
     armStripDrag(wrap);
-    el.append(frame);
-    paintCollapse(el, st, wrap);
+    el.append(frame, words);
     if (week) {
       const cov = st.days.coverage || {};
       if (cov.withData < 3) el.append(h('p', { class: 'card-note coverage-note', text: story.coverageNote(cov) }));
@@ -397,11 +360,6 @@ export function mountHome(app) {
     return el;
   }
   const sentence = (t) => t.charAt(0).toUpperCase() + t.slice(1) + '.';
-  function paintCollapse(el, st, wrap) {
-    el.querySelector('.strip-collapse')?.remove();
-    if (!(isPhone() && st.expanded && st.days.length > 7)) return;
-    (wrap.closest('.strip-frame') || wrap).after(h('button', { type: 'button', class: 'link-btn strip-collapse', text: 'Show the first 7 days', onclick: () => { st.expanded = false; paintStrip(wrap, st); paintCollapse(el, st, wrap); } }));
-  }
 
   // ---------- sections ----------
   const addLink = (label, prefill) => h('button', { type: 'button', class: 'link-btn add-btn', text: 'Add', 'aria-label': label, onclick: () => addFlow(prefill, label) });
@@ -600,7 +558,7 @@ export function mountHome(app) {
     if (!prefs.get('welcomed') && !friend.active() && (!sample || prefs.get('demoDismissed'))) {
       notes.append(h('div', { class: 'note-card plain', id: 'welcome-card' },
         h('p', { class: 'title', text: 'Your week, your trips, your people' }),
-        h('p', { text: 'Each card says in one sentence what the weather pattern aloft does to that place, then shows why. Tap a card to watch the pattern move over it.' }),
+        h('p', { text: 'Each card shows the coming days at a place, then says in one sentence what the weather pattern aloft does there. Tap a day to watch the pattern move over it.' }),
         h('div', { class: 'actions' }, h('button', { type: 'button', class: 'btn ghost', text: 'Got it', onclick: () => { prefs.set('welcomed', true); renderNotes(); } }))));
     }
     void s;
@@ -662,7 +620,7 @@ export function mountHome(app) {
         if (i !== st.activeDay) { st.activeDay = i; paintFocus(); paintActive(); }
       }
     }
-    if ('theme' in p && ready) refreshStrips();
+    if (('theme' in p || 'colors' in p || 'units' in p) && ready) { refreshStrips(); if ('units' in p) { paintFocus(); paintActive(); } }
     // a new case is a new dataset: the cards' stories, their source tag and the focus block are rebuilt from it (never the old case's)
     if ('lens' in p && ready && activeCaseId() !== shownCase) { shownCase = activeCaseId(); stories.clear(); refresh().catch(() => {}); }
     if ('range' in p && ready && chosenRange() !== stories.get('home')?.chosen) onRange().catch(() => {});

@@ -114,7 +114,7 @@ function openFlow({ mode, id = null, item = null, kind = null, text = '', pins =
     out.push(h('label', { class: 'pn-field' }, h('span', { text: nameLabel() }), name));
     picker = mountCityPicker({
       value: st.city, label: st.kind === 'trip' ? 'Where' : st.kind === 'person' ? 'City' : 'Nearest city', gazetteer, reserve: true, engaged: !st.city && (focus === 'city' || (focus === 'auto' && st.kind !== 'trip')),
-      placeholder: 'Search for a city or place', onLayout: resize,
+      placeholder: 'Search for a city or place', onLayout: resize, mapHold: true,
       onInput: () => { st.city = null; updateSave(); maybeContract(); },
       onPick: (c) => {
         st.city = c;

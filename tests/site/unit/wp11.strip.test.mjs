@@ -173,6 +173,17 @@ test('S5 slices take the palette colour of their value, blank inside +-2 dam, ne
   assert.match(none[0].attrs.style, /var\(--ink\);opacity:\.4/);
 });
 
+test('S5b slices follow the Map colors family: Soft by default, the ECMWF Reference band when asked (N24 LOOK)', () => {
+  const [d, s] = mk(7, () => 70); // +7 dam all week
+  const fill = (o) => ST.stripSVG(d, s, o).all('rect.slice')[0].attrs.style;
+  const css = (c) => `fill:rgb(${c[0]},${c[1]},${c[2]})`;
+  for (const ground of ['paper', 'night']) {
+    assert.equal(fill({ ground }), css(PAL.bandRGBA('z500a', 7, ground, 'soft')), `${ground}: the default is Soft`);
+    assert.equal(fill({ ground, colors: 'reference' }), css(PAL.bandRGBA('z500a', 7, ground, 'reference')), `${ground}: Reference when asked`);
+  }
+  assert.equal(fill({ ground: 'paper', colors: 'reference' }), 'fill:rgb(254,148,0)', '+7 dam on Reference Paper is ECMWF #fe9400');
+});
+
 test('P1 phone: ranges 10 and 15 show days 1-7 and one compressed end cell; expanded shows them all', () => {
   const [d, s] = mk(15, sine, MEAN);
   const ten = d.slice(0, 10);

@@ -94,3 +94,19 @@ test('footer and series interpolation', () => {
   assert.equal(valueAt(s, 99), 10);
   assert.equal(valueAt(null, 1), null);
 });
+
+test('gifStamp rounds to the nearest local hour, so the GIF stamp does not change every frame', async () => {
+  const { gifStamp } = await import('../../../site/js/share/format.js');
+  assert.equal(typeof gifStamp, 'function');
+  const base = new Date(2026, 10, 17, 19, 0);
+  const hours = new Set();
+  for (const m of [0, 10, 29, 44, 59]) {
+    const at = new Date(base.getTime() + m * 60e3);
+    const s = gifStamp(at, { timeZone: undefined });
+    assert.ok(!/:\d\d/.test(s.hour.replace(/\(.*\)/, '')), `no minutes in the local time: ${s.hour}`);
+    if (m < 30) assert.match(s.hour, /^7 pm/); else assert.match(s.hour, /^8 pm/);
+    hours.add(s.hour);
+  }
+  assert.equal(hours.size, 2);
+  assert.equal(gifStamp(new Date(2026, 10, 17, 19, 45)).day, 'Tue 17 Nov');
+});

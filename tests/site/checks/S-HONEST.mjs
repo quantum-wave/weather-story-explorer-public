@@ -49,7 +49,7 @@ export async function run({ page, baseUrl, assert }) {
     assert.equal(card.cols, 3, 'one column per day the sample has: ' + card.cols);
     assert.equal(card.hatch, 0, 'no hatched day');
     assert.ok(!/No data past/i.test(card.text) && !/settled/i.test(card.text), 'card text: ' + card.text);
-    assert.deepEqual(card.labels, ['Sat 31', 'Sun 1', 'Mon 2'], 'columns are labelled with the real dates, never an initial: ' + card.labels);
+    assert.deepEqual(card.labels, ['Sat 31 Dec', 'Sun 1 Jan', 'Mon 2 Jan'], 'columns are labelled with the real dates, never an initial: ' + card.labels);
     // (the map legend and the layers panel still carry the old words until the packages that own them land: the home panel is this package's)
     assert.ok(!/settled/i.test(await page.eval(`document.getElementById('home').innerText`)), 'the words settled and unsettled appear nowhere in the home panel');
 

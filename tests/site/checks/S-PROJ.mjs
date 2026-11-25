@@ -70,10 +70,12 @@ export async function run({ page, baseUrl, assert }) {
   const ptr = (type, id, x, y) => `window.__wp2.canvas.dispatchEvent(new PointerEvent('${type}', { pointerId: ${id}, pointerType: 'touch', clientX: ${x}, clientY: ${y}, button: 0, bubbles: true }))`;
   await page.eval('window.__wp2.renderer.resetView(0)');
   await page.eval('window.__wp2.renderer.centreOn(45, -150, 0, 2)');
-  const t0 = await page.eval('window.__wp2.renderer.getTransform()');
+  const t0 = await page.eval('window.__wp2.renderer.getTransform()'), g0 = await page.eval('window.__wp2.renderer.invert([500, 300])');
   await page.eval(`${ptr('pointerdown', 1, 500, 300)}; ${ptr('pointermove', 1, 440, 270)}; ${ptr('pointermove', 1, 400, 250)}; ${ptr('pointerup', 1, 400, 250)}`);
-  const t1 = await page.eval('window.__wp2.renderer.getTransform()');
-  assert.ok(Math.abs(t1.tx - (t0.tx - 100)) < 1.5 && Math.abs(t1.ty - (t0.ty - 50)) < 1.5, `drag pans by the finger: ${t0.tx},${t0.ty} -> ${t1.tx},${t1.ty}`);
+  const t1 = await page.eval('window.__wp2.renderer.getTransform()'), at1 = await page.eval(`window.__wp2.renderer.project(${JSON.stringify(g0)})`);
+  // Regional: the horizontal part turns the central meridian, the vertical part pans; the grabbed point stays under the finger
+  assert.ok(at1 && Math.abs(at1[0] - 400) < 1.5 && Math.abs(at1[1] - 250) < 1.5, `drag moves the grabbed point with the finger: ${g0} at ${at1}`);
+  assert.ok(t1.rot[0] < t0.rot[0] - 0.5 && t1.tx === t0.tx && t1.ty < t0.ty - 30, `a left drag turns the meridian (no sideways pan) and an upward drag pans up: ${JSON.stringify(t0)} -> ${JSON.stringify(t1)}`);
   await page.eval('window.__wp2.renderer.resetView(0)');
   await page.eval(`${ptr('pointerdown', 1, 450, 300)}; ${ptr('pointerdown', 2, 550, 300)}; ${ptr('pointermove', 1, 350, 300)}; ${ptr('pointermove', 2, 650, 300)}; ${ptr('pointerup', 1, 350, 300)}; ${ptr('pointerup', 2, 650, 300)}`);
   const k2 = await page.eval('window.__wp2.renderer.getTransform().k');
@@ -86,7 +88,8 @@ export async function run({ page, baseUrl, assert }) {
   const back = await page.eval('window.__wp2.renderer.invert([400, 600])');
   assert.ok(back && Math.abs(((back[0] - under[0] + 540) % 360) - 180) < 1.5 && Math.abs(back[1] - under[1]) < 1.5, `the point under the finger follows it: ${under} -> ${back}`);
   assert.ok(Math.abs((await page.eval('window.__wp2.renderer.getTransform().rot[0]')) + 90) < 1, 'a quarter turn about the pole');
-  // World (W4-10): the wheel zooms about the pointer, a drag pans and stops at the map's outline (no blank band), the view never rotates
+  // World (W4-10): the wheel zooms about the pointer, a vertical drag pans and stops at the map's outline (no blank band), a horizontal
+  // drag turns the central meridian (it never tilts)
   const blank = (w, h) => page.eval(`(() => { const r = window.__wp2.renderer; let n = 0, off = 0; const m = ${Math.round(Math.min(w, h) * 0.01) + 1};
     for (let y = m; y <= ${h} - m; y += 12) for (let x = m; x <= ${w} - m; x += 12) { n++; if (!r.invert([x, y])) off++; } return off / n; })()`);
   for (const [w, h] of [[390, 844], [1440, 900]]) {
@@ -103,11 +106,13 @@ export async function run({ page, baseUrl, assert }) {
     // a drag far past the edge in each direction: the free chart stays on the map (the outline is held against the frame)
     const mx = Math.round(w / 2), my = Math.round(h / 2);
     for (const [dx, dy, name] of [[0, 9000, 'down'], [0, -9000, 'up'], [9000, 0, 'right'], [-9000, 0, 'left'], [9000, 9000, 'down-right']]) {
+      const tb = await page.eval('window.__wp2.renderer.getTransform()');
       await page.eval(`${ptr('pointerdown', 1, mx, my)}; ${ptr('pointermove', 1, mx + Math.sign(dx) * 30, my + Math.sign(dy) * 30)}; ${ptr('pointermove', 1, mx + dx, my + dy)}; ${ptr('pointerup', 1, mx + dx, my + dy)}`);
       await new Promise((r) => setTimeout(r, 600));
       const f = await blank(w, h), tf = await page.eval('window.__wp2.renderer.getTransform()');
-      // the outline's own extent on screen (equator edges, poles), against the free frame (the canvas less its 1 % margin)
-      const o = await page.eval(`(() => { const r = window.__wp2.renderer, a = r.project([-150 - 179.99, 0]), b = r.project([-150 + 179.99, 0]), n = r.project([-150, 90]), s = r.project([-150, -90]); return { x0: Math.min(a[0], b[0]), x1: Math.max(a[0], b[0]), y0: n[1], y1: s[1] }; })()`);
+      // the outline's own extent on screen (equator edges, poles) about the central meridian now shown, against the free frame (the canvas less its 1 % margin)
+      const c0 = -150 - tf.rot[0];
+      const o = await page.eval(`(() => { const r = window.__wp2.renderer, a = r.project([${c0} - 179.99, 0]), b = r.project([${c0} + 179.99, 0]), n = r.project([${c0}, 90]), s = r.project([${c0}, -90]); return { x0: Math.min(a[0], b[0]), x1: Math.max(a[0], b[0]), y0: n[1], y1: s[1] }; })()`);
       const m = Math.round(Math.min(w, h) * 0.01), fw = w - 2 * m, fh = h - 2 * m;
       const covW = Math.min(1, (o.x1 - o.x0) / fw), covH = Math.min(1, (o.y1 - o.y0) / fh);
       const edge = (lo, hi, f0, f1, ax) => (hi - lo >= f1 - f0 - 0.5
@@ -115,7 +120,9 @@ export async function run({ page, baseUrl, assert }) {
         : assert.ok(Math.abs((lo + hi) / 2 - (f0 + f1) / 2) <= 1.5, `World ${w}x${h} dragged ${name}: the map is smaller than the frame on ${ax} and should sit centred: ${lo.toFixed(1)}..${hi.toFixed(1)} in ${f0}..${f1}`));
       edge(o.x0, o.x1, m, w - m, 'x'); edge(o.y0, o.y1, m, h - m, 'y');
       assert.ok(f <= 1 - 0.6 * covW * covH, `World ${w}x${h} dragged ${name} at k=${tf.k.toFixed(2)}: ${(f * 100).toFixed(1)}% of the free chart is off the map, more than the zoom forces (${((1 - 0.6 * covW * covH) * 100).toFixed(0)}%)`);
-      assert.deepEqual([tf.rot[0], tf.rot[1]], [0, 0], 'World never rotates');
+      assert.equal(tf.rot[1], 0, 'World never tilts');
+      if (dx) assert.ok(Math.abs(((tf.rot[0] - tb.rot[0] + 540) % 360) - 180) > 1, `World ${w}x${h} dragged ${name}: a horizontal drag turns the central meridian (${tb.rot[0]} -> ${tf.rot[0]})`);
+      else assert.equal(tf.rot[0], tb.rot[0], `World ${w}x${h} dragged ${name}: a vertical drag does not turn the map`);
     }
   }
   await page.eval(`window.__wp2.store.set({ view: 'np' })`);

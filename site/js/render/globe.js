@@ -66,3 +66,36 @@ export function visible(rotation, lon, lat) {
   const c = versor.cartesian([-rotation[0], -rotation[1]]), p = versor.cartesian([lon, lat]);
   return c[0] * p[0] + c[1] * p[1] + c[2] * p[2] > 1e-12;
 }
+
+const RAD = Math.PI / 180;
+const wrap180 = (d) => ((((d + 180) % 360) + 360) % 360) - 180;
+
+// d3's rotation [lambda, phi, gamma] applied to [lon, lat] (degrees), as d3.geoRotation(r)([lon, lat]): where the point sits in the
+// rotated frame, whose [0, 0] is the projection's centre.
+export function rotateForward(r, [lon, lat]) {
+  const l = (lon + r[0]) * RAD, p = lat * RAD, dp = (r[1] || 0) * RAD, dg = (r[2] || 0) * RAD;
+  const x = Math.cos(p) * Math.cos(l), y = Math.cos(p) * Math.sin(l), z = Math.sin(p);
+  const k = z * Math.cos(dp) + x * Math.sin(dp);
+  return [Math.atan2(y * Math.cos(dg) - k * Math.sin(dg), x * Math.cos(dp) - z * Math.sin(dp)) / RAD, Math.asin(Math.max(-1, Math.min(1, k * Math.cos(dg) + y * Math.sin(dg)))) / RAD];
+}
+
+// Spin and tilt without roll (gamma 0): the rotation [lambda, phi] that puts geographic point g at v in the rotated frame (v is
+// rotateForward of the point under the pointer). phi stays inside [phiMin, phiMax]; of the two tilts that fit, the one nearer phi0.
+// Where no tilt in range fits exactly, the nearest one is taken and lambda still turns g to v's bearing. With lambda0 and maxJump, a
+// solution that would spin more than maxJump degrees from lambda0 is passed over (a step that crosses the middle would otherwise
+// flip the map round): if both would, lambda0 is kept with the nearer tilt. Returns [lambda, phi].
+export function solveSpinTilt(g, v, phi0, phiMin, phiMax, lambda0 = null, maxJump = Infinity) {
+  const lv = v[0] * RAD, pv = v[1] * RAD;
+  const xr = Math.cos(pv) * Math.cos(lv), yr = Math.cos(pv) * Math.sin(lv), zr = Math.sin(pv);
+  const R = Math.hypot(zr, xr), a = Math.atan2(xr, zr), s = Math.sin(g[1] * RAD);
+  const c = R > 1e-12 ? Math.max(-1, Math.min(1, s / R)) : 1;
+  const clamp = (p) => Math.max(phiMin, Math.min(phiMax, p));
+  const cands = [Math.acos(c) - a, -Math.acos(c) - a].map((raw) => {
+    const p = wrap180(raw / RAD), pc = clamp(p), ph = pc * RAD, xw = xr * Math.cos(ph) + zr * Math.sin(ph);
+    return { rot: [wrap180(Math.atan2(yr, xw) / RAD - g[0]), pc], err: Math.abs(pc - p), near: Math.abs(pc - phi0) };
+  });
+  const ok = lambda0 == null ? cands : cands.filter((k) => Math.abs(wrap180(k.rot[0] - lambda0)) <= maxJump);
+  if (!ok.length) return [lambda0, cands.sort((m, n) => m.near - n.near)[0].rot[1]];
+  ok.sort((m, n) => (Math.abs(m.err - n.err) > 1e-9 ? m.err - n.err : m.near - n.near));
+  return ok[0].rot;
+}

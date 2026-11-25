@@ -75,19 +75,28 @@ for (const name of ['sample-min', 'synthetic']) {
 
 test('data: fieldAt blends the field own adjacent steps, null outside and when not loaded', async () => {
   const { data, m } = await open('sample-min');
+  const { cubicAt } = await load('data/interp.js');
   assert.equal(data.fieldAt('z500a', 'np05', 6), null, 'not loaded yet');
   await data.ensure('z500a', 'np05', 6);
   const steps = data.fieldSteps('z500a');
   assert.deepEqual(steps, [0, 12, 24, 36]);
   const a = Float32Array.from(data.fieldAt('z500a', 'np05', 0));
   const b = Float32Array.from(data.fieldAt('z500a', 'np05', 12));
+  const c = Float32Array.from(data.fieldAt('z500a', 'np05', 24));
+  // between 0 and 12 h: the monotone cubic through 0, 12 and 24 h (no step before 0), inside the two bracketing values
   const mid = data.fieldAt('z500a', 'np05', 6);
   let checked = 0;
-  for (let k = 0; k < a.length; k += 97) { if (a[k] === a[k] && b[k] === b[k]) { assert.ok(Math.abs(mid[k] - (a[k] + b[k]) / 2) < 1e-3); checked++; } }
+  for (let k = 0; k < a.length; k += 97) {
+    if (a[k] === a[k] && b[k] === b[k] && c[k] === c[k]) {
+      assert.ok(Math.abs(mid[k] - cubicAt(6, 0, a[k], 12, b[k], null, { t: 24, v: c[k] })) < 1e-3, 'node ' + k);
+      assert.ok(mid[k] >= Math.min(a[k], b[k]) - 1e-3 && mid[k] <= Math.max(a[k], b[k]) + 1e-3, 'inside the bracket at node ' + k);
+      checked++;
+    }
+  }
   assert.ok(checked > 100);
   const q = data.fieldAt('z500a', 'np05', 9); // 3/4 of the way 0 -> 12
   const k0 = 60 * m.domains.np05.nx + 100;
-  assert.ok(Math.abs(q[k0] - (a[k0] * 0.25 + b[k0] * 0.75)) < 1e-3);
+  assert.ok(Math.abs(q[k0] - cubicAt(9, 0, a[k0], 12, b[k0], null, { t: 24, v: c[k0] })) < 1e-3);
   assert.equal(data.fieldAt('z500a', 'np05', 37), null, 'beyond the last step');
   assert.equal(data.fieldAt('z500a', 'np05', -1), null);
   assert.equal(data.fieldAt('nope', 'np05', 0), null);

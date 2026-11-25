@@ -95,7 +95,7 @@ try {
     import('./share/index.js'), import('./story/index.js'), import('./ui/layout.js'), import('./ui/header.js'), import('./ui/layers.js'),
     import('./ui/home.js'), import('./ui/focus.js'), import('./ui/maplegend.js'),
     import('./ui/fullscreen.js'), import('./ui/guide.js'), import('./ui/readout.js'), import('./ui/coach.js'), import('./render/basemap.js'),
-    import('./pins/mount.js'),
+    import('./pins/mount.js'), import('./ui/datestamp.js'),
   ]);
 } catch (e) {
   console.warn(e?.stack || e);
@@ -107,7 +107,7 @@ try {
 const [
   { store, bus }, data, { createRenderer }, { pins }, clock, { installKeys }, { mountScrubber }, { installDebug }, links, { installLinks },
   share, story, { mountLayout }, { mountHeader, applyTheme }, { mountLayers }, { mountHome }, { focusLabelOverlay }, { mountMapLegend },
-  { mountFullscreen }, { mountGuide }, { mountReadout }, { mountCoach }, { loadBasemap }, pinsMount,
+  { mountFullscreen }, { mountGuide }, { mountReadout }, { mountCoach }, { loadBasemap }, pinsMount, { mountDateStamp },
 ] = modules;
 
 const $ = (id) => document.getElementById(id);
@@ -175,6 +175,7 @@ mountFullscreen(app);
 mountGuide(app);
 mountReadout(app);
 mountCoach(app);
+wse.ui.dateStamp = mountDateStamp(app); // the valid time in large letters over the chart
 // The ground and graticule draw at once and the coastline as soon as the bundled basemap parses, before any forecast data.
 renderer.resize(); renderer.draw();
 // The first-paint coastline stays over the map until the renderer has drawn its own (the frame before the basemap parses has none).

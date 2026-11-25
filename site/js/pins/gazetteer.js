@@ -2,9 +2,10 @@
 // plus site/geo/places-extra.json (hand-curated regions, resorts, parks and small towns; see that file's "fields").
 // cities.json rows [id, name, admin, cc, lat, lon, pop100] are sorted by population. The curated entries are merged in
 // by weight (their `w` is on the pop100 scale), so array order is the default rank. Merged rows carry an 8th
-// element, the kind ('region' | 'resort' | 'park' | 'town'), or undefined for a plain city.
+// element, the kind ('region' | 'resort' | 'park' | 'town' | 'lodge'), or undefined for a plain city.
 // Nothing is fetched at import. Both files load together on first use (search, nearest, byId, or an explicit load()).
-// Search matches word prefixes, accent-insensitive; curated aliases ("Palisades Tahoe") match too.
+// Search matches word prefixes, accent-insensitive; curated aliases ("Palisades Tahoe") match too. When that finds fewer
+// than FEW places, a typo-tolerant pass adds names within a small edit distance (fuzzyMax), flagged `fuzzy: true`.
 
 /** @typedef {{id:number|string, name:string, admin:string, cc:string, lat:number, lon:number}} City */
 
@@ -57,7 +58,7 @@ export function snapshotCity(c) {
   return { id: c.id ?? '', name: String(c.name ?? '').slice(0, 80), admin: String(c.admin ?? '').slice(0, 8), cc: String(c.cc ?? '').slice(0, 3), lat: r2(lat), lon: r2(lon) };
 }
 
-let data = null;        // { rows, fname, falias }
+let data = null;        // { rows, fname, falias, fz }
 let loading = null;
 
 /** Merge the curated places into the population-sorted rows (stable: ties keep cities first), drop what they replace. */
@@ -82,7 +83,80 @@ function prepare(doc, extra) {
     fname[i] = fold(rows[i][1]);
     if (rows[i][8]) falias.set(i, rows[i][8].map(fold));
   }
-  return { rows, fname, falias, exactQuals: null };
+  return { rows, fname, falias, fz: fuzzyIndex(rows.length, fname, falias), exactQuals: null };
+}
+
+// ---- typo tolerance ----
+// Built once at load: every leading run of whole words of each folded name and alias ("big basin", "big basin redwoods",
+// ...) of FZ_MIN or more characters, grouped by length, each with a bitmask of the letters it holds. A query is compared only
+// with keys whose length is within the allowed distance and whose letter set differs by at most two letters per edit (one
+// edit changes the set by at most two letters), so the edit-distance arithmetic runs on a few hundred keys, not all of them.
+const FEW = 3;          // prefix matching that finds fewer places than this also runs the fuzzy pass
+const FZ_MIN = 4;       // shorter queries are never fuzzy-matched
+/** Edits allowed for a folded query of `len` characters: none under 4, one for 4-7, two for 8 or more. */
+export const fuzzyMax = (len) => (len >= 8 ? 2 : len >= FZ_MIN ? 1 : 0);
+function letterMask(s) {
+  let m = 0;
+  for (let k = 0; k < s.length; k++) { const c = s.charCodeAt(k); if (c >= 97 && c <= 122) m |= 1 << (c - 97); else if (c >= 48 && c <= 57) m |= 1 << 26; }
+  return m;
+}
+function bits(x) { x -= (x >>> 1) & 0x55555555; x = (x & 0x33333333) + ((x >>> 2) & 0x33333333); return (((x + (x >>> 4)) & 0x0f0f0f0f) * 0x01010101) >>> 24; }
+
+let dpA = new Int32Array(64), dpB = new Int32Array(64), dpC = new Int32Array(64);
+/** Damerau-Levenshtein distance (optimal string alignment: adjacent transpositions count one edit), or max + 1 once it must exceed max. */
+export function editDistance(a, b, max = Infinity) {
+  const la = a.length, lb = b.length;
+  if (Math.abs(la - lb) > max) return max + 1;
+  if (lb + 1 > dpA.length) { const n = 2 * (lb + 1); dpA = new Int32Array(n); dpB = new Int32Array(n); dpC = new Int32Array(n); }
+  let prev2 = dpA, prev = dpB, cur = dpC;
+  for (let j = 0; j <= lb; j++) prev[j] = j;
+  for (let i = 1; i <= la; i++) {
+    cur[0] = i; let rowMin = i;
+    const ca = a.charCodeAt(i - 1);
+    for (let j = 1; j <= lb; j++) {
+      const cb = b.charCodeAt(j - 1);
+      let v = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca === cb ? 0 : 1));
+      if (i > 1 && j > 1 && ca === b.charCodeAt(j - 2) && a.charCodeAt(i - 2) === cb) v = Math.min(v, prev2[j - 2] + 1);
+      cur[j] = v; if (v < rowMin) rowMin = v;
+    }
+    if (rowMin > max) return max + 1;
+    const t = prev2; prev2 = prev; prev = cur; cur = t;
+  }
+  return Math.min(prev[lb], max + 1);
+}
+
+function fuzzyIndex(n, fname, falias) {
+  const byKey = new Map();
+  const put = (key, i) => { const l = byKey.get(key); if (!l) byKey.set(key, [i]); else if (l[l.length - 1] !== i) l.push(i); };
+  const addName = (s, i) => { const w = s.split(' '); let key = ''; for (let k = 0; k < w.length; k++) { key = k ? key + ' ' + w[k] : w[k]; if (key.length >= FZ_MIN - 1) put(key, i); } };
+  for (let i = 0; i < n; i++) { addName(fname[i], i); const al = falias.get(i); if (al) for (const a of al) addName(a, i); }
+  const byLen = [];
+  for (const [key, idx] of byKey) (byLen[key.length] ||= []).push([key, idx]);
+  return byLen.map((list) => list && { keys: list.map((x) => x[0]), masks: Int32Array.from(list, (x) => letterMask(x[0])), rows: list.map((x) => x[1]) });
+}
+
+/** Rows whose name or alias (or its leading words) is within fuzzyMax edits of `full`, best first: fewer edits, then weight. */
+function fuzzyRun(full, qual, filterQual, m, prefixOk = true, cap = 2) {
+  const d = Math.min(cap, fuzzyMax(full.length));
+  if (!d || !data) return [];
+  const { fz, rows } = data;
+  const qm = letterMask(full);
+  const best = new Map(); // row -> edits
+  for (let len = full.length - d; len <= full.length + d; len++) {
+    const b = fz[len]; if (!b) continue;
+    const { keys, masks } = b;
+    for (let j = 0; j < keys.length; j++) {
+      if (bits(masks[j] ^ qm) > 2 * d) continue;
+      const e = editDistance(full, keys[j], d);
+      if (e > d) continue;
+      for (const i of b.rows[j]) { const was = best.get(i); if (was === undefined || e < was) best.set(i, e); }
+    }
+  }
+  const out = [];
+  for (const [i, e] of best) if (!filterQual || qualMatches(qual, rows[i], prefixOk)) out.push([e, i]);
+  out.sort((x, y) => x[0] - y[0] || x[1] - y[1]); // rows are weight-sorted, so a lower index is the heavier place
+  // Only the closest tier: one edit away (Costanoa for "coastanoa") hides the names two edits away (Constanta).
+  return out.filter((x) => x[0] === out[0][0]).slice(0, m).map((x) => x[1]);
 }
 
 /** Every folded string an exact (no prefix) qualifier can be, so "san fran" skips a full scan for the qualifier "fran". */
@@ -127,7 +201,7 @@ export function load() {
 }
 export const isReady = () => !!data;
 
-const toCity = (r) => { const c = { id: r[0], name: r[1], admin: r[2], cc: r[3], lat: r[4], lon: r[5] }; if (r[7]) c.kind = r[7]; return c; };
+const toCity = (r, fuzzy = false) => { const c = { id: r[0], name: r[1], admin: r[2], cc: r[3], lat: r[4], lon: r[5] }; if (r[7]) c.kind = r[7]; if (fuzzy) c.fuzzy = true; return c; };
 
 /** Does qualifier text q (folded) name the state/province/country of row r? Exact for codes, prefix for names. */
 function qualMatches(q, r, prefixOk = true) {
@@ -253,12 +327,32 @@ export function searchSync(q, n = 8) {
       }
       add(run(toks, '', m, false));
     }
-    return { out, short: skipped && out.length < n };
+    // Typo tolerance: only when the prefix search came up nearly empty, and always after what it found. Beside a real
+    // match it allows one edit only, so "Costanoa" is not followed by Constanta. A fuzzy hit that repeats a prefix hit is
+    // not a collapse, so it does not ask for the wider second pass.
+    const short = skipped && out.length < n;
+    let fuzzyFrom = out.length;
+    if (out.length < Math.min(n, FEW)) {
+      const before = out.length, cap = before ? 1 : 2;
+      if (qual) add(fuzzyRun(toks.join(' '), qual, true, m, true, cap));
+      else {
+        if (toks.length >= 2) {
+          for (let k = Math.min(3, toks.length - 1); k >= 1; k--) {
+            const q2 = toks.slice(-k).join(' ');
+            if (!exactQuals().has(q2)) continue;
+            const hits = fuzzyRun(toks.slice(0, -k).join(' '), q2, true, m, false, cap);
+            if (hits.length) { add(hits); break; }
+          }
+        }
+        add(fuzzyRun(toks.join(' '), '', false, m, true, cap));
+      }
+      fuzzyFrom = before;
+    }
+    return { out, fuzzyFrom, short };
   };
   let res = collect(n);
   if (res.short) res = collect(n * 4 + 8);
-  const out = res.out;
-  return out.map((i) => toCity(data.rows[i]));
+  return res.out.map((i, k) => toCity(data.rows[i], k >= res.fuzzyFrom));
 }
 
 /**

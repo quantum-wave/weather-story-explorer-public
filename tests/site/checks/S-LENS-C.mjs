@@ -29,7 +29,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const SETUP = `(() => {
   if (window.__ft) return true;
   const ft = window.__ft = { scene: null, last: null, texts: [] };
-  ft.render = async ({ lens = 's', ground = 'paper', t = 0, view = 'np', W = 1000, H = 600, overlays = { contours: false }, spy = false }) => {
+  ft.render = async ({ lens = 's', ground = 'paper', t = 0, view = 'np', W = 1000, H = 600, overlays = { contours: false }, spy = false, colors = 'reference' }) => {
     const { makeScene } = await import('/js/render/compose.js');
     ft.scene ||= makeScene();
     const bm = await import('/js/render/basemap.js');
@@ -44,7 +44,7 @@ const SETUP = `(() => {
     ft.texts = [];
     if (spy) { const ft0 = ctx.fillText.bind(ctx); ctx.fillText = (txt, ...a) => { ft.texts.push(String(txt)); return ft0(txt, ...a); }; }
     const mv = ft.scene.viewFor(view, W, H);
-    ft.scene.compose(ctx, mv, { s: { t, view, lens, ground, theme: 'light', overlays }, dpr: 1, quality: 'rest', alpha: 1, force: true });
+    ft.scene.compose(ctx, mv, { s: { t, view, lens, ground, theme: 'light', overlays, colors }, dpr: 1, quality: 'rest', alpha: 1, force: true });
     ft.last = { ctx, mv, W, H };
     bm.setBasemap(ft.geo);
     return true;
@@ -202,8 +202,13 @@ async function runSynthetic({ page, baseUrl, assert }) {
   if (await page.eval(`document.querySelector('#map-legend').dataset.collapsed === 'true'`)) { await inp.click(page, '#map-legend .mlg-toggle'); await sleep(250); }
   const mmTicks = await page.eval(`[...document.querySelectorAll('#map-legend .mlg-tick')].map((e) => e.textContent)`);
   assert.deepEqual(mmTicks, ['0.1', '1', '2', '5', '10', '15', '20', '30', '40', '50', '100', '300']);
+  // the default Map colors (Soft) draws the Soft rain table; Reference draws the twelve REF-28 colours
   const stops = await page.eval(`[...document.querySelectorAll('#map-legend .mlg-stop')].map((e) => e.dataset.hex)`);
-  assert.deepEqual(stops, REF28.map(([, c]) => c), 'the legend bar is the twelve REF-28 colours');
+  assert.deepEqual(stops, await page.eval(`import('/js/render/palette.js').then((m) => [...m.PALETTES.tp6.soft.paper])`), 'the legend bar is the twelve Soft rain colours');
+  await page.eval(`window.__wse.store.set({ colors: 'reference' })`); await sleep(250);
+  const refStops = await page.eval(`[...document.querySelectorAll('#map-legend .mlg-stop')].map((e) => e.dataset.hex)`);
+  assert.deepEqual(refStops, REF28.map(([, c]) => c), 'with Reference the legend bar is the twelve REF-28 colours');
+  await page.eval(`window.__wse.store.set({ colors: 'soft' })`); await sleep(250);
   assert.equal(await page.eval(`document.querySelector('#map-legend .mlg-unit-name').textContent`), 'mm');
   await inp.click(page, '#map-legend .mlg-unit-btn[data-units="us"]');
   await page.waitFor(`document.querySelector('#map-legend .mlg-unit-name')?.textContent === 'in'`, { timeout: 5000 });

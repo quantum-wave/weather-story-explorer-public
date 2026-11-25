@@ -24,8 +24,14 @@ export const isPhone = () => phoneQuery.matches;
 export const landscapeQuery = window.matchMedia(`${LANDSCAPE_NARROW}, ${LANDSCAPE_PHONE}`);
 export const isLandscapePhone = () => landscapeQuery.matches;
 
-// The desktop divider (spec 4.7): the story panel is PANEL_MIN to PANEL_MAX wide, remembered per viewer, and folds to a RAIL wide strip.
-export const PANEL_MIN = 300, PANEL_MAX = 560, PANEL_DEFAULT = 380, RAIL_W = 44;
+// The desktop divider (spec 4.7): the story panel is PANEL_MIN to PANEL_MAX wide and folds to a RAIL wide strip. A width the viewer
+// sets with the divider is remembered; until then the width follows the window (autoPanelW): PANEL_WEEK where the window has room,
+// so the week card's table shows all seven days at 60 px a column (story/daytable.js; the table is the panel less 66 px of padding
+// and card edges), never more than PANEL_SHARE of the window, never less than PANEL_DEFAULT, and never past the divider's maximum.
+// shell.css gives --panel-w the same width before this module runs, so the first paint already has the panel's real width.
+export const PANEL_MIN = 300, PANEL_MAX = 560, PANEL_DEFAULT = 380, PANEL_WEEK = 486, PANEL_SHARE = 0.4, RAIL_W = 44;
+/** The panel's width on a `vw` px wide desktop window where the viewer has not set one. */
+export const autoPanelW = (vw) => Math.round(Math.min(PANEL_WEEK, Math.max(PANEL_DEFAULT, PANEL_SHARE * vw)));
 const KEY_STEP = 16, KEY_BIG = 48, MAP_MIN = 340; // the floor for the map column when its controls cannot be measured
 const FIT_SLACK = 4; // px left over beside the measured controls (wider fonts on other platforms)
 const WIDEST_STAMP = 'Wed 30 Sep 2026 \u00b7 10:30 pm GMT+10:30'; // the longest first line the scrubber readout can show
@@ -211,7 +217,11 @@ export function mountLayout({ appEl, home, handle, stage, canvas, timeline, rend
 
   // ---------- desktop divider and fold ----------
   const divider = document.getElementById('divider');
-  let panelW = Number(prefs.get('panelW', PANEL_DEFAULT)) || PANEL_DEFAULT, folded = prefs.get('panelFolded', false) === true;
+  // the viewer's width, or null to follow the window. Older builds wrote the key 'panelW' on every fold as well as on a resize,
+  // so its fixed default (380) there is no choice; any other value there is one.
+  const legacyW = Number(prefs.get('panelW', 0));
+  let panelW = Number(prefs.get('panelWidth', 0)) || (legacyW && legacyW !== PANEL_DEFAULT ? legacyW : null);
+  let folded = prefs.get('panelFolded', false) === true;
   // The widest the panel may be: the map column must keep the room its own controls need. That is the one row of map tools (Layers
   // and Expand, and Reset when shown, beside the view switch) and the scrubber's header (its fixed buttons plus the readout's widest
   // first line), measured from the real elements, plus FIT_SLACK. The column's width is the window less the panel and fixed chrome, so
@@ -250,6 +260,7 @@ export function mountLayout({ appEl, home, handle, stage, canvas, timeline, rend
     return Math.round(Math.max(PANEL_MIN, Math.min(PANEL_MAX, room)));
   };
   const clampW = (w) => Math.round(Math.min(maxW(), Math.max(PANEL_MIN, w)));
+  const curW = () => clampW(panelW ?? autoPanelW(window.innerWidth));
   let foldBtn = null;
   if (divider) {
     divider.setAttribute('aria-label', 'Resize story panel');
@@ -267,7 +278,7 @@ export function mountLayout({ appEl, home, handle, stage, canvas, timeline, rend
     const desktop = !isPhone();
     divider.hidden = !desktop; if (foldBtn) foldBtn.hidden = !desktop;
     if (!desktop) { appEl.style.removeProperty('--panel-w'); appEl.removeAttribute('data-folded'); return; }
-    const w = folded ? RAIL_W : clampW(panelW);
+    const w = folded ? RAIL_W : curW();
     appEl.style.setProperty('--panel-w', `${w}px`);
     if (folded) appEl.setAttribute('data-folded', ''); else appEl.removeAttribute('data-folded');
     divider.setAttribute('aria-valuemin', String(PANEL_MIN)); divider.setAttribute('aria-valuemax', String(maxW()));
@@ -281,13 +292,13 @@ export function mountLayout({ appEl, home, handle, stage, canvas, timeline, rend
   }
   function setPanel(w, { save = true } = {}) { panelW = clampW(w); folded = false; if (save) saveHome(); paintPanel(); }
   function setFolded(f) { folded = !!f; saveHome(); paintPanel(); }
-  function saveHome() { prefs.set('panelW', panelW); prefs.set('panelFolded', folded); }
+  function saveHome() { if (panelW != null) prefs.set('panelWidth', panelW); prefs.set('panelFolded', folded); }
   if (divider) {
     let drag = null, raf = 0;
     divider.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       e.preventDefault(); divider.focus({ preventScroll: true });
-      drag = { x: e.clientX, w: clampW(panelW), moved: false };
+      drag = { x: e.clientX, w: curW(), moved: false };
       try { divider.setPointerCapture(e.pointerId); } catch { /* the pointer is gone */ }
     });
     divider.addEventListener('pointermove', (e) => {
@@ -309,7 +320,7 @@ export function mountLayout({ appEl, home, handle, stage, canvas, timeline, rend
     divider.addEventListener('dblclick', (e) => { e.preventDefault(); setFolded(!folded); });
     divider.addEventListener('keydown', (e) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const step = e.shiftKey ? KEY_BIG : KEY_STEP, cur = clampW(panelW);
+      const step = e.shiftKey ? KEY_BIG : KEY_STEP, cur = curW();
       let handled = true;
       if (e.key === 'ArrowRight') { if (folded) setFolded(false); else setPanel(cur + step); }
       else if (e.key === 'ArrowLeft') { if (folded) setFolded(false); else setPanel(cur - step); }
@@ -325,5 +336,5 @@ export function mountLayout({ appEl, home, handle, stage, canvas, timeline, rend
   }
   apply(current);
   paintPanel();
-  return { setSnap, snap: () => current, setPanelWidth: (w) => setPanel(w), foldPanel: setFolded, panelWidth: () => (folded ? RAIL_W : clampW(panelW)) };
+  return { setSnap, snap: () => current, setPanelWidth: (w) => setPanel(w), foldPanel: setFolded, panelWidth: () => (folded ? RAIL_W : curW()) };
 }

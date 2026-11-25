@@ -294,13 +294,14 @@ async function dividerChecks({ page, assert, baseUrl }) {
   assert.ok(s0.dw >= 6 && s0.dw <= 12 && s0.dh > 300, `${label}: a slim full-height bar (${s0.dw} x ${s0.dh})`);
   assert.equal(s0.tab, 0, `${label}: focusable`);
   assert.equal(s0.min, '300'); assert.equal(s0.max, '560');
-  assert.equal(Math.round(s0.home), 380, `${label}: the default panel width is 380`);
-  assert.equal(s0.now, '380');
+  // until the viewer sets a width, the panel is wide enough for the week card's seven days where the window has room (layout.js autoPanelW)
+  assert.equal(Math.round(s0.home), 486, `${label}: the default panel width at 1440 px is 486`);
+  assert.equal(s0.now, '486');
   await backingOk(page, assert, `${label}: initial`);
-  // a real mouse drag, right
-  await inp.drag(page, '#divider', { by: { dx: 100, dy: 0 }, steps: 10, ms: 200 }); await sleep(300);
+  // a real mouse drag, left
+  await inp.drag(page, '#divider', { by: { dx: -100, dy: 0 }, steps: 10, ms: 200 }); await sleep(300);
   let s = await st();
-  assert.ok(Math.abs(s.home - 480) <= 2, `${label}: a drag of +100 px sets the panel width to 480 (got ${s.home})`);
+  assert.ok(Math.abs(s.home - 386) <= 2, `${label}: a drag of -100 px sets the panel width to 386 (got ${s.home})`);
   assert.equal(s.now, String(Math.round(s.home)), `${label}: aria-valuenow follows`);
   assert.ok(Math.abs(s.stageLeft - s.divRight) <= 12, `${label}: the map follows the divider`);
   await backingOk(page, assert, `${label}: after the drag`);

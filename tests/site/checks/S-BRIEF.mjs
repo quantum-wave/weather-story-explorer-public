@@ -130,6 +130,7 @@ async function stepThrough(page, assert, tag, vp, fixtureLive) {
   const script = await page.eval(`__wse.ui.brief.script().beats.map((b) => ({ id: b.id, chapter: b.chapter, view: b.view, lens: b.lens, t0: b.t0, t1: b.t1, hook: b.hook || null,
     place: b.place ? { lat: b.place.lat, lon: b.place.lon, kind: b.place.kind } : null, strip: !!b.strip, camera: b.camera || null, lines: b.lines, title: b.title }))`);
   const heights = new Set();
+  let stripRepainted = false;
   for (let i = 0; i < script.length; i++) {
     const b = script[i];
     if (i > 0) { await inp.click(page, '#brief-card [data-act="next"]'); await page.waitFor(`document.getElementById('brief-card').dataset.beat === ${JSON.stringify(b.id)}`, { timeout: 15000 }); }
@@ -169,6 +170,18 @@ async function stepThrough(page, assert, tag, vp, fixtureLive) {
     if (b.strip) assert.ok(m.strip, `${at}: a home beat shows the compact strip`);
     if (b.strip) assert.ok(m.stripSel, `${at}: the strip marks the active day`);
     if (b.strip) assert.ok(m.stripH > 0 && m.stripH <= 60, `${at}: the strip is the compact form (${m.stripH} px tall)`);
+    if (b.strip && !stripRepainted) {
+      // switching Map colors or the theme mid-briefing repaints the strip (it was redrawn only when the day changed)
+      stripRepainted = true;
+      const html = () => page.eval(`document.querySelector('#brief-card .brief-strip svg')?.outerHTML || ''`);
+      for (const [key, alt] of [['colors', (v) => (v === 'reference' ? 'soft' : 'reference')], ['theme', (v) => (v === 'light' ? 'dark' : 'light')]]) {
+        const was = await page.eval(`__wse.store.get().${key}`), h0 = await html(); let h1;
+        await page.eval(`__wse.store.set({ ${key}: ${JSON.stringify(alt(was))} })`); await sleep(150);
+        h1 = await html(); assert.notEqual(h1, h0, `${at}: the strip repaints when ${key} changes`);
+        await page.eval(`__wse.store.set({ ${key}: ${JSON.stringify(was)} })`); await sleep(150);
+        assert.notEqual(await html(), h1, `${at}: and repaints again when ${key} is set back`);
+      }
+    }
     if (!fixtureLive && !['title', 'end'].includes(b.chapter)) assert.ok(!/confident|fairly sure|timing uncertain/i.test(m.stampPhrase), `${at}: no confidence word on data that is not live`);
   }
   assert.equal(heights.size, 1, `${tag}: the card keeps one height on every beat (${[...heights]})`);

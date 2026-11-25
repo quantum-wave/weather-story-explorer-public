@@ -1,0 +1,27 @@
+/* datestamp.css: the date stamp over the chart (ui/datestamp.js). Large translucent letters at the top left of the map, under the map
+   tools row and under every control (z-index 4: the tools row is 5, the legend and the Briefing pill 6). Ink on Paper, light on Night,
+   each with a soft halo in the ground's own colour so it reads over any lens's fill. It fades out while anything overlaps it. */
+.map-stamp {
+  --stamp-ink: rgba(28, 32, 36, .62); --stamp-halo: rgba(249, 246, 242, .85);
+  position: absolute; z-index: 4; top: 72px; left: 16px; max-width: calc(100% - 32px);
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0;
+  pointer-events: none; user-select: none; -webkit-user-select: none;
+  color: var(--stamp-ink); font-family: var(--font-ui); font-variant-numeric: tabular-nums; white-space: nowrap;
+  text-shadow: 0 0 2px var(--stamp-halo), 0 0 8px var(--stamp-halo), 0 0 16px var(--stamp-halo);
+  transition: opacity 160ms ease;
+}
+.map-stamp[data-ground="night"] { --stamp-ink: rgba(244, 241, 234, .66); --stamp-halo: rgba(8, 11, 14, .8); }
+.map-stamp-day { font-weight: 600; font-size: 40px; line-height: 44px; letter-spacing: -.01em; }
+.map-stamp-hour { font-weight: 500; font-size: 22px; line-height: 28px; }
+.map-stamp[data-yield] { opacity: 0; }
+
+/* phone (and a landscape touch phone): smaller letters, the same corner */
+@media (max-width: 899px), (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+  .map-stamp { top: 64px; }
+  .map-stamp-day { font-size: 28px; line-height: 32px; }
+  .map-stamp-hour { font-size: 17px; line-height: 20px; }
+  /* the sheet covers the chart at full; the expanded map's sample label takes the row under the tools */
+  #app[data-snap="full"] .map-stamp { visibility: hidden; }
+  #app[data-expanded] #stage:has(.wse-sample-chip:not([hidden])) .map-stamp { top: calc(104px + env(safe-area-inset-top, 0px)); }
+}
+@media (prefers-reduced-motion: reduce) { .map-stamp { transition: none; } }

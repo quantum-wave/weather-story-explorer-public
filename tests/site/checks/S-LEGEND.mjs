@@ -134,7 +134,7 @@ export async function run({ page, baseUrl, assert, fixture }) {
   for (const ground of ['paper', 'night']) {
     const ext = await page.eval(`(async () => { const p = await import('/js/render/palette.js'); const g = document.getElementById('map-legend').dataset.ground;
       const L = ([r, g2, b]) => { const f = (c) => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g2) + 0.0722 * f(b); };
-      const rows = (g === 'night' ? p.PALETTES.z500a.rgb.night : p.PALETTES.z500a.rgb.paper).slice().sort((a, b) => L(a) - L(b)); return { g, dark: rows[0], light: rows[rows.length - 1] }; })()`);
+      const rows = [...p.bandRGBs('z500a', g, 'reference'), ...p.bandRGBs('z500a', g, 'soft')].sort((a, b) => L(a) - L(b)); return { g, dark: rows[0], light: rows[rows.length - 1] }; })()`);
     assert.equal(ext.g, ground);
     for (const [name, col] of [['darkest', ext.dark], ['lightest', ext.light]]) {
       await page.eval(`(() => { document.getElementById('map').style.visibility = 'hidden'; document.getElementById('bd')?.remove();

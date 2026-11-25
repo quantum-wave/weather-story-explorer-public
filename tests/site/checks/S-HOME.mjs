@@ -73,30 +73,34 @@ export async function run({ page, baseUrl, assert, fixture, dataDir }) {
   if (fixture === 'recorded-min') assert.equal(note, `This recording covers ${n} days`, tag('the recording says how many days it covers: ' + JSON.stringify(note)));
   assert.equal(title, n < 3 ? `${n} day${n === 1 ? '' : 's'} of data` : 'A recorded week', tag('the card title follows the data: ' + title));
   assert.equal(await cols(), Math.min(7, n), tag('columns equal the days with data inside the range'));
-  // 1440 x 900, the 7-day card: every column carries its real date ("Thu 19"), never the weekday alone (spec 3.2 Recorded:
-  // "the real dates in every column"; 3.3: "On desktop all columns show"), each label over its column and at least 4 px
-  // clear of its neighbours, measured in the page (fails before: LABEL_GAP 6 dropped the row to "Mon | Tue | ... | Thu 19")
+  // 1440 x 900, the 7-day card: every column carries its real date ("Thu 26 Nov"), never the weekday alone (spec 3.2 Recorded:
+  // "the real dates in every column"), each label inside its own column and at least 4 px clear of its neighbours, the
+  // selected day shown whole in the table's visible width (the day table scrolls when the days do not fit), measured in the page
   if (n >= 7) {
     for (let a = 0; a < 7; a++) {
+      const ta = await page.eval(`+document.querySelector('#sec-week .strip-day[data-day="${a}"]').dataset.t`);
       await click(page, `#sec-week .strip-day[data-day="${a}"]`);
-      await page.waitFor(`__wse.ui.home.stories.get('home').activeDay === ${a}`, { timeout: 5000 }).catch(() => {});
+      // the clock tweens to the day (the selection follows it through the days between), then rests there
+      await page.waitFor(`Math.abs(__wse.store.get().t - ${ta}) < 0.6 && __wse.ui.home.stories.get('home').activeDay === ${a}`, { timeout: 5000 }).catch(() => {});
       await sleep(300);
       const g = await page.eval(`(() => {
         const box = (e) => { const b = e.getBoundingClientRect(); return { l: b.left, r: b.right }; };
-        const svg = document.querySelector('#sec-week svg.strip');
-        return { w: svg.getBoundingClientRect().width,
-          cols: [...svg.querySelectorAll('rect.strip-day')].map(box),
-          labels: [...svg.querySelectorAll('text.strip-label')].map((e) => ({ t: e.textContent, ...box(e) })) };
+        const wrap = document.querySelector('#sec-week .strip-wrap');
+        return { w: wrap.getBoundingClientRect().width, W: box(wrap),
+          cols: [...wrap.querySelectorAll('.strip-day')].map((e) => ({ ...box(e), active: e.classList.contains('is-active') })),
+          labels: [...wrap.querySelectorAll('.strip-label')].map((e) => ({ t: e.textContent, ...box(e) })) };
       })()`);
-      const at = tag(`1440 x 900, 7 days, day ${a} selected, strip ${g.w.toFixed(0)} px: `);
+      const at = tag(`1440 x 900, 7 days, day ${a} selected, table ${g.w.toFixed(0)} px: `);
       const names = g.labels.map((l) => l.t).join(' | ');
       assert.equal(g.labels.length, 7, at + 'seven labels: ' + names);
-      assert.ok(g.labels.every((l) => /^[A-Z][a-z]{2} \d{1,2}$/.test(l.t)), at + 'every label is dated: ' + names);
+      assert.ok(g.labels.every((l) => /^[A-Z][a-z]{2} \d{1,2} [A-Z][a-z]{2}$/.test(l.t)), at + 'every label is dated: ' + names);
       g.labels.forEach((L, k) => {
-        const c = g.cols[k], mid = (L.l + L.r) / 2;
-        assert.ok(mid > c.l && mid < c.r, at + `${L.t} sits over its column`);
+        const c = g.cols[k];
+        assert.ok(L.l >= c.l - 0.5 && L.r <= c.r + 0.5, at + `${L.t} sits inside its column`);
         if (k) assert.ok(L.l - g.labels[k - 1].r >= 4, at + `${g.labels[k - 1].t} | ${L.t} at least 4 px apart: ${(L.l - g.labels[k - 1].r).toFixed(1)}`);
       });
+      const act = g.cols[a];
+      assert.ok(act.active && act.l >= g.W.l - 0.5 && act.r <= g.W.r + 0.5, at + 'the selected day is marked and shows whole: ' + JSON.stringify(act));
     }
     await click(page, '#sec-week .strip-day[data-day="0"]'); await sleep(500);
   }
@@ -159,11 +163,11 @@ export async function run({ page, baseUrl, assert, fixture, dataDir }) {
     const T = (label, a, b) => `__wse.pins.addTrip({ label: ${JSON.stringify(label)}, city: __wse.pins.home(), start: ${JSON.stringify(addDays(cov.firstDate, a - 1))}, end: ${JSON.stringify(addDays(cov.firstDate, b - 1))} })`;
     await page.eval(`(() => { ${T('Detail trip', 3, 4)}; ${T('Broad trip', 9, 10)}; ${T('Far trip', 20, 21)}; ${T('Old trip', -6, -4)}; })()`);
     await sleep(1500);
-    const state = (lbl) => page.eval(`(() => { const e = [...document.querySelectorAll('#sec-trips [data-state]')].find((x) => x.textContent.includes(${JSON.stringify(lbl)})); return e && { state: e.dataset.state, text: e.textContent, strips: e.querySelectorAll('.strip-day').length, svg: !!e.querySelector('svg.strip') }; })()`);
+    const state = (lbl) => page.eval(`(() => { const e = [...document.querySelectorAll('#sec-trips [data-state]')].find((x) => x.textContent.includes(${JSON.stringify(lbl)})); return e && { state: e.dataset.state, text: e.textContent, strips: e.querySelectorAll('.strip-day').length, table: !!e.querySelector('.daytable') }; })()`);
     const d = await state('Detail trip'), b = await state('Broad trip'), f = await state('Far trip'), o = await state('Old trip');
     assert.equal(d.state, 'detail', tag('a trip on day 3 is in detail range')); assert.ok(d.strips >= 1 && d.strips <= 2, tag('its strip holds the trip days only: ' + d.strips));
     assert.equal(b.state, 'broad', tag('a trip on day 9 is the broad pattern')); assert.match(b.text, /Beyond this sample’s detailed days\./, tag('broad on a sample: ' + b.text)); assert.ok(!/Firmer from|starts covering/.test(b.text), tag('a sample never promises a date: ' + b.text));
-    assert.equal(f.state, 'too-far', tag('a trip on day 20 is too far out')); assert.match(f.text, /This sample doesn’t cover these dates\./, tag('too far on a sample: ' + f.text)); assert.ok(!/starts covering|Firmer from/.test(f.text), tag('a sample never promises a date: ' + f.text)); assert.equal(f.svg, false, tag('too far: no strip'));
+    assert.equal(f.state, 'too-far', tag('a trip on day 20 is too far out')); assert.match(f.text, /This sample doesn’t cover these dates\./, tag('too far on a sample: ' + f.text)); assert.ok(!/starts covering|Firmer from/.test(f.text), tag('a sample never promises a date: ' + f.text)); assert.equal(f.table, false, tag('too far: no day table'));
     assert.equal(o.state, 'over', tag('a trip in the past is over')); assert.match(o.text, /ended /, tag('over: ' + o.text)); assert.match(o.text, /Remove/, tag('over: can be removed'));
     assert.ok(!/settled/i.test(await text(page, '#sec-trips')), tag('no settled words in trips'));
   }
@@ -226,12 +230,15 @@ export async function run({ page, baseUrl, assert, fixture, dataDir }) {
   await sleep(900);
   assert.equal(await snapNow(page), 'full', tag('a vertical drag that starts on a strip moves the sheet up'));
 
-  // the strip keeps the card's 16 px side gutter: no strip text nearer than 16 px to a screen edge
+  // the day table keeps the card's 16 px side gutter: no table text shows nearer than 16 px to a screen edge (text of a
+  // column scrolled past the wrapper's edge is clipped by the wrapper, so what shows is the part inside it)
   {
-    const g = await page.eval(`(() => { const out = []; for (const t of document.querySelectorAll('#sec-week svg.strip text')) { const b = t.getBoundingClientRect(); if (b.width) out.push([b.left, innerWidth - b.right, t.textContent]); } const sv = document.querySelector('#sec-week svg.strip').getBoundingClientRect(); return { out, l: sv.left, r: innerWidth - sv.right }; })()`);
-    assert.ok(g.l >= 15.5 && g.r >= 15.5, tag(`the strip stays inside the 16 px gutter: ${g.l}, ${g.r}`));
+    const g = await page.eval(`(() => { const wrap = document.querySelector('#sec-week .strip-wrap'), W = wrap.getBoundingClientRect(), clips = getComputedStyle(wrap).overflowX !== 'visible'; const out = [];
+      for (const t of wrap.querySelectorAll('.daytable span')) { if (t.children.length) continue; const b = t.getBoundingClientRect(); if (!b.width) continue; const l = clips ? Math.max(b.left, W.left) : b.left, r = clips ? Math.min(b.right, W.right) : b.right; if (r > l) out.push([l, innerWidth - r, t.textContent]); }
+      return { out, l: W.left, r: innerWidth - W.right }; })()`);
+    assert.ok(g.l >= 15.5 && g.r >= 15.5, tag(`the day table stays inside the 16 px gutter: ${g.l}, ${g.r}`));
     const bad = g.out.filter(([l, r]) => l < 15.5 || r < 15.5);
-    assert.deepEqual(bad, [], tag('no strip text inside the gutter: ' + JSON.stringify(bad)));
+    assert.deepEqual(bad, [], tag('no table text inside the gutter: ' + JSON.stringify(bad)));
   }
 
   // a vertical finger drag on a strip scrolls the panel like a drag anywhere on it; the sheet moves only at the scroll edge
@@ -297,98 +304,77 @@ export async function run({ page, baseUrl, assert, fixture, dataDir }) {
     assert.ok(r && r.w >= 43.5 && r.h >= 43.5, tag(`${sel} is at least 44 x 44: ${JSON.stringify(r)}`));
   }
 
-  // 10 and 15 days on the phone, the compressed strip (seven columns and the end cell) inside the 16 px gutter: with each of
-  // days 1-7 selected in turn, every column is a 44 px target and every one of days 1-7 keeps its own label, in order,
-  // centred over its column, with visible air between neighbours (spec 3.3; acceptance 8)
+  // 10 and 15 days on the phone, the day table inside the 16 px gutter: with each of days 1-7 selected in turn, every column
+  // is a 44 px target, every day keeps its own label, in order, inside its column, with visible air between neighbours, and
+  // the selected day shows whole (spec 3.3; acceptance 8). The days that do not fit scroll sideways.
   for (const r of [10, 15]) {
     if (n < r) continue;
     await setSnap('full');
     await tap(page, `#range-control .range-btn[data-range="${r}"]`);
     await sleep(900);
-    assert.equal(await count(page, '#sec-week .strip-end'), 1, tag(`${r} days on the phone: the compressed end cell`));
+    assert.equal(await count(page, '#sec-week .strip-day'), r, tag(`${r} days on the phone: ${r} columns`));
     for (let a = 0; a < 7; a++) {
       await setSnap('full');
       await tap(page, `#sec-week .strip-day[data-day="${a}"]`);
       await sleep(700);
       const g = await page.eval(`(() => {
         const box = (e) => { const b = e.getBoundingClientRect(); return { l: b.left, r: b.right, w: b.width, h: b.height }; };
-        const svg = document.querySelector('#sec-week svg.strip'), body = document.getElementById('home-body').getBoundingClientRect();
-        const cols = [...svg.querySelectorAll('rect.strip-day')].map((e) => ({ day: +e.dataset.day, ...box(e) }));
-        const labels = [...svg.querySelectorAll('text.strip-label:not(.strip-label-end)')].map((e) => ({ t: e.textContent, ...box(e) }));
-        const end = box(svg.querySelector('rect.strip-end')), s = box(svg);
-        return { cols, labels, end, svgL: s.l - body.left, svgR: body.right - s.r };
+        const wrap = document.querySelector('#sec-week .strip-wrap'), body = document.getElementById('home-body').getBoundingClientRect(), W = box(wrap);
+        const cols = [...wrap.querySelectorAll('.strip-day')].map((e) => ({ day: +e.dataset.day, active: e.classList.contains('is-active'), ...box(e) }));
+        const labels = [...wrap.querySelectorAll('.strip-label')].map((e) => ({ t: e.textContent, ...box(e) }));
+        return { cols, labels, W, wrapL: W.l - body.left, wrapR: body.right - W.r, scrolls: wrap.scrollWidth > wrap.clientWidth };
       })()`);
       const at = tag(`range ${r}, day ${a} selected: `);
-      assert.equal(g.cols.length, 7, at + 'seven full columns');
+      assert.equal(g.cols.length, r, at + `${r} columns`);
+      assert.ok(g.scrolls, at + 'the days that do not fit scroll sideways');
       for (const c of g.cols) assert.ok(c.w >= 43.99 && c.h >= 44, at + `day ${c.day} column is at least 44 x 44: ${c.w.toFixed(1)} x ${c.h.toFixed(1)}`);
-      assert.ok(g.end.w >= 43.99 && g.end.h >= 44, at + `the end cell is at least 44 x 44: ${g.end.w.toFixed(1)} x ${g.end.h.toFixed(1)}`);
-      assert.ok(g.svgL >= 15.5 && g.svgR >= 15.5, at + `the strip keeps the 16 px gutter: ${g.svgL.toFixed(1)} / ${g.svgR.toFixed(1)}`);
+      assert.ok(g.wrapL >= 15.5 && g.wrapR >= 15.5, at + `the table keeps the 16 px gutter: ${g.wrapL.toFixed(1)} / ${g.wrapR.toFixed(1)}`);
       const names = g.labels.map((l) => l.t).join(', ');
-      assert.equal(g.labels.length, 7, at + `every one of days 1-7 has a label: ${names}`);
+      assert.equal(g.labels.length, r, at + `every day has a label: ${names}`);
       g.cols.forEach((c, k) => {
-        const L = g.labels[k], mid = L && (L.l + L.r) / 2;
-        assert.ok(L && mid > c.l && mid < c.r, at + `day ${c.day}'s label sits over its column: ${L && L.t}`);
+        const L = g.labels[k];
+        assert.ok(L && L.l >= c.l - 0.5 && L.r <= c.r + 0.5, at + `day ${c.day}'s label sits inside its column: ${L && L.t}`);
         if (k) assert.ok(L.l - g.labels[k - 1].r >= 4, at + `labels ${g.labels[k - 1].t} | ${L.t} are at least 4 px apart: ${(L.l - g.labels[k - 1].r).toFixed(1)}`);
       });
-      assert.ok(g.labels.every((l) => l.r <= g.end.l), at + 'no day label runs into the end cell');
+      const act = g.cols.find((c) => c.active);
+      assert.ok(act && act.day === a && act.l >= g.W.l - 0.5 && act.r <= g.W.r + 0.5, at + 'the selected day shows whole: ' + JSON.stringify(act));
     }
   }
   if (n >= 10) await setSnap('full');
 
-  // 15 days on the phone: days 1-7 and the compressed end cell; the end cell swaps in the full strip, scrolling sideways
+  // 15 days on the phone: every day is a column of the one table, which scrolls sideways and comes to rest on whole columns
   if (n >= 15) {
     await tap(page, '#range-control .range-btn[data-range="15"]');
     await sleep(900);
-    assert.equal(await count(page, '#sec-week .strip-day'), 7, tag('15 days on the phone: seven full columns'));
-    assert.equal(await count(page, '#sec-week .strip-end'), 1, tag('and one compressed end cell'));
-    await tap(page, '#sec-week .strip-end');
-    await sleep(700);
-    assert.equal(await count(page, '#sec-week .strip-day'), n, tag('the end cell expands to every day'));
+    assert.equal(await count(page, '#sec-week .strip-day'), n, tag('15 days on the phone: every day is a column'));
     const sc = await page.eval(`(() => { const w = document.querySelector('#sec-week .strip-wrap'); return { sw: w.scrollWidth, cw: w.clientWidth, cls: w.className }; })()`);
-    assert.ok(sc.sw > sc.cw, tag('the expanded strip scrolls sideways: ' + JSON.stringify(sc)));
-    const cell = await page.eval(`document.querySelector('#sec-week .strip-day').getBoundingClientRect().width`);
-    assert.ok(cell >= 43.5, tag('expanded columns are at least 44 px: ' + cell));
-    const xl = await page.eval(`[...document.querySelectorAll('#sec-week svg.strip text.strip-label')].map((t) => t.textContent)`);
-    assert.equal(xl.length, n, tag('every day of the expanded strip keeps its label: ' + xl.join(', ')));
-    assert.equal(await snapNow(page), 'full', tag('expanding the strip leaves the sheet where it was'));
-    // Nothing a reader needs is cut by the scrolling wrapper's edge (fails before: the key read "ssure aloft · Blue: lower"
-    // and "pattern only, no detail", the normal label "nor", the first label "23" and its rain bar "]"). On opening (the
-    // selected day revealed), at the far right (scrollLeft = max), and after a scroll to an arbitrary offset that settles:
-    // every .strip-key and the "normal" label lie fully inside the wrapper's visible rect and are not inside the scroller;
-    // every visible SVG text and every rain bar that shows at all shows whole; the scroll rests on a column boundary.
+    assert.ok(sc.sw > sc.cw, tag('the table scrolls sideways: ' + JSON.stringify(sc)));
+    const xl = await page.eval(`[...document.querySelectorAll('#sec-week .strip-wrap .strip-label')].map((t) => t.textContent)`);
+    assert.equal(xl.length, n, tag('every day keeps its label: ' + xl.join(', ')));
+    assert.equal(await snapNow(page), 'full', tag('choosing 15 days leaves the sheet where it was'));
+    // Nothing a reader needs is cut by the scrolling wrapper's edge at rest: on opening, at the far right (scrollLeft = max)
+    // and after a scroll to an arbitrary offset that settles, the scroll rests on a column boundary (or the end), so every
+    // column inside the visible width shows whole, the next one peeking in at the right edge.
     const edges = async (how) => {
       const g = await page.eval(`(() => {
         const wrap = document.querySelector('#sec-week .strip-wrap'), W = wrap.getBoundingClientRect();
-        const box = (e) => { const b = e.getBoundingClientRect(); return { l: b.left, r: b.right, w: b.width }; };
-        const vis = (e) => getComputedStyle(e).visibility !== 'hidden' && getComputedStyle(e).display !== 'none';
-        const fixed = [...document.querySelectorAll('#sec-week .strip-key, #sec-week .strip-normal')].map((e) => ({ t: e.textContent, inScroller: wrap.contains(e), vis: vis(e), ...box(e) }));
-        const svg = wrap.querySelector('svg.strip');
-        const texts = [...svg.querySelectorAll('text')].filter(vis).map((e) => ({ t: e.textContent, ...box(e) }));
-        const bars = [...svg.querySelectorAll('rect.bar')].map((e) => ({ t: 'bar ' + e.getAttribute('class'), ...box(e) }));
-        const col = svg.querySelector('rect.strip-day').getBoundingClientRect().width;
-        return { W: { l: W.left, r: W.right }, fixed, texts, bars, col, sl: wrap.scrollLeft, max: wrap.scrollWidth - wrap.clientWidth };
+        const cols = [...wrap.querySelectorAll('.strip-day')].map((e) => { const b = e.getBoundingClientRect(); return { l: b.left, r: b.right }; });
+        return { W: { l: W.left, r: W.right }, cols, col: cols[0].r - cols[0].l, sl: wrap.scrollLeft, max: wrap.scrollWidth - wrap.clientWidth };
       })()`);
-      const at = tag(`expanded 15-day strip, ${how} (scrollLeft ${g.sl.toFixed(1)} of ${g.max}): `);
-      assert.ok(g.fixed.filter((f) => /normal/.test(f.t)).length === 1, at + 'one "normal" label: ' + JSON.stringify(g.fixed.map((f) => f.t)));
-      assert.ok(g.fixed.some((f) => /pressure aloft/.test(f.t)), at + 'the key is on screen: ' + JSON.stringify(g.fixed.map((f) => f.t)));
-      for (const f of g.fixed) {
-        assert.ok(f.vis && f.w > 0, at + `"${f.t}" is shown`);
-        assert.ok(f.l >= g.W.l - 0.5 && f.r <= g.W.r + 0.5, at + `"${f.t}" lies inside the wrapper's visible width: ${f.l.toFixed(1)}-${f.r.toFixed(1)} vs ${g.W.l.toFixed(1)}-${g.W.r.toFixed(1)}`);
-        assert.ok(!f.inScroller, at + `"${f.t}" is not inside the scrolling wrapper`);
-      }
-      for (const x of [...g.texts, ...g.bars]) {
-        if (x.r <= g.W.l + 0.5 || x.l >= g.W.r - 0.5) continue; // wholly scrolled out of view
-        assert.ok(x.l >= g.W.l - 0.5 && x.r <= g.W.r + 0.5, at + `"${x.t}" is whole, not cut by the edge: ${x.l.toFixed(1)}-${x.r.toFixed(1)} vs ${g.W.l.toFixed(1)}-${g.W.r.toFixed(1)}`);
-      }
+      const at = tag(`15-day table, ${how} (scrollLeft ${g.sl.toFixed(1)} of ${g.max}): `);
       const off = g.sl / g.col - Math.round(g.sl / g.col);
-      assert.ok(Math.abs(off) * g.col < 1, at + `the scroll rests on a column boundary (column ${g.col.toFixed(2)} px)`);
+      assert.ok(Math.abs(off) * g.col < 1 || g.sl >= g.max - 1, at + `the scroll rests on a column boundary or the end (column ${g.col.toFixed(2)} px)`);
+      const whole = g.cols.filter((c) => c.l >= g.W.l - 0.5 && c.r <= g.W.r + 0.5).length;
+      assert.ok(whole >= 5, at + `five whole days show: ${whole}`);
       return g;
     };
     await edges('on opening');
     await page.eval(`(() => { const w = document.querySelector('#sec-week .strip-wrap'); w.scrollLeft = w.scrollWidth - w.clientWidth; })()`);
     await sleep(700);
     const gMax = await edges('scrolled to the far right');
-    assert.ok(gMax.sl >= gMax.max - 1, tag('the strip did scroll to its far right: ' + gMax.sl + ' / ' + gMax.max));
+    assert.ok(gMax.sl >= gMax.max - 1, tag('the table did scroll to its far right: ' + gMax.sl + ' / ' + gMax.max));
+    const lastWhole = gMax.cols.at(-1);
+    assert.ok(lastWhole.r <= gMax.W.r + 0.5, tag('at the far right the last day shows whole'));
     await page.eval(`document.querySelector('#sec-week .strip-wrap').scrollLeft = 400`);
     await sleep(900);
     await edges('scrolled to 400 px and settled');
@@ -444,7 +430,7 @@ export async function run({ page, baseUrl, assert, fixture, dataDir }) {
       const srv = await startServer({ dataDir: dir }), br = await Browser.launch({ baseUrl: srv.baseUrl });
       try { const p = await br.newPage(); await boot(p, srv.baseUrl); await fn(p); assert.deepEqual(p.errors(), [], JSON.stringify(p.errors())); } finally { await br.close(); await srv.close(); }
     };
-    const labels = (p) => p.eval(`[...document.querySelectorAll('#sec-week svg.strip text.strip-label')].map((t) => t.textContent)`);
+    const labels = (p) => p.eval(`[...document.querySelectorAll('#sec-week .strip-wrap .strip-label')].map((t) => t.textContent)`);
     const base = path.basename(dataDir);
     void base;
     // fresh: Today and Tomorrow, "Your week", the range control live
@@ -452,8 +438,8 @@ export async function run({ page, baseUrl, assert, fixture, dataDir }) {
       assert.equal(await text(p, '#sec-week .sec-title'), 'Your week', tag('live fresh: Your week'));
       assert.equal(await count(p, '#sec-week .stale-head'), 0, tag('live fresh: no stale head'));
       const l = await labels(p);
-      // the second column is Tomorrow, its date, or its weekday where the column is too narrow for a date 6 px clear of its neighbours
-      assert.ok(l[0] === 'Today' && /^(Tomorrow|[A-Z][a-z]{2}( \d{1,2})?)$/.test(l[1]), tag('live fresh: Today labels the first column: ' + l.slice(0, 4)));
+      // each label is the day and its date: Today first, then Tomorrow, or its weekday where the word does not fit the column
+      assert.ok(/^Today \d{1,2} [A-Z][a-z]{2}$/.test(l[0]) && /^(Tomorrow|[A-Z][a-z]{2}) \d{1,2} [A-Z][a-z]{2}$/.test(l[1]), tag('live fresh: Today labels the first column: ' + l.slice(0, 4)));
       assert.equal(await text(p, '#sec-week .sample-tag'), '', tag('live data carries no sample label'));
       await click(p, '#range-control .range-btn[data-range="10"]'); await sleep(800);
       assert.equal(await text(p, '#sec-week .sec-title'), 'Your next 10 days', tag('live range 10 title'));
@@ -474,13 +460,13 @@ export async function run({ page, baseUrl, assert, fixture, dataDir }) {
     });
     await open(await live('stale', 'synthetic-15d', 30), async (p) => {
       assert.match(await text(p, '#sec-week .stale-head'), /^Forecast from 3\d h ago$/, tag('live stale: the head says so in words'));
-      assert.ok((await labels(p)).includes('Today'), tag('live stale still says Today'));
+      assert.ok((await labels(p)).some((x) => /^Today /.test(x)), tag('live stale still says Today'));
     });
     await open(await live('very-stale', 'synthetic-15d', 60), async (p) => {
       assert.match(await text(p, '#sec-week .stale-head'), /^Old forecast from [A-Z][a-z]{2} \d{1,2} [A-Z][a-z]{2}$/, tag('live very stale: the head names the date'));
       const l = await labels(p);
       assert.ok(!l.some((x) => /Today|Tomorrow/.test(x)) && l.length > 2, tag('live very stale: dates only, no Today or Tomorrow: ' + l.slice(0, 4)));
-      assert.ok(l.every((x) => /^[A-Z][a-z]{2} \d{1,2}$/.test(x)), tag('live very stale: every label is a date, never a weekday alone: ' + l.join(' | ')));
+      assert.ok(l.every((x) => /^[A-Z][a-z]{2} \d{1,2} [A-Z][a-z]{2}$/.test(x)), tag('live very stale: every label is a date, never a weekday alone: ' + l.join(' | ')));
       assert.ok(!/Today|Tomorrow/.test(await text(p, '#sec-week .summary')), tag('and none in the sentence'));
     });
     // short of range: a 10-day run with 15 chosen shows the days it has and one end note, no phantom hatched day

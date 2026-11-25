@@ -1,12 +1,15 @@
 // Data facade: manifest, chunk loading and decoding, temporal blending, point sampling.
 // Frames are kept as Int16 (as stored); rawFieldAt blends the two bracketing steps into one reused Float32 frame
-// per (field, domain), with no-data as NaN. The pattern fields (z500, z500a) go through patternField, which moves from
+// per (field, domain), with no-data as NaN. The blend in time is a monotone cubic (data/interp.js) over the two bracketing
+// steps and one neighbour on each side, so motion has no jolt at each step; it equals the stored frame at every step and
+// stays between the two bracketing values, falling back to the linear blend at the range ends and next to a gap. The pattern fields (z500, z500a) go through patternField, which moves from
 // the single high-resolution run to the ensemble mean between 168 h and 240 h (DESIGN-SPEC 7.2); the map and the story
 // (patternSeries) share one weight, so a card at day 9 describes what the map at day 9 shows.
 import { store, bus, choice } from '../state.js';
 import { NODATA } from '../contract.js';
 import { decodeChunk } from './decode.js';
 import { toGrid, nodeLonLat, bilinear } from './grid.js';
+import { tangent, basis } from './interp.js';
 import { isLive, isMultiCase, caseForLens } from './kind.js';
 
 let manifest = null;
@@ -55,10 +58,21 @@ function bracket(steps, t) {
   let i = 0;
   while (i < n - 2 && steps[i + 1] <= t) i++;
   if (n === 1) return { i0: 0, i1: 0, w: 0 };
+  if (t - steps[i] < 1e-9) return { i0: i, i1: i, w: 0 }; // on a step: its own frame, even when a gap follows it
   if (steps[i + 1] - steps[i] > MAX_BLEND_GAP_H) return t >= steps[i + 1] - 1e-6 ? { i0: i + 1, i1: i + 1, w: 0 } : null; // a gap is not drawn through
   const w = (t - steps[i]) / (steps[i + 1] - steps[i]);
   if (w >= 1 - 1e-9) return { i0: i + 1, i1: i + 1, w: 0 };
   return { i0: i, i1: i + 1, w: w < 1e-9 ? 0 : w };
+}
+
+/** The steps beyond a bracket that the cubic blend reads: {im, ip}, each -1 when missing (range end, or a gap beyond the blend gap). */
+function neighbours(steps, b) {
+  if (b.w === 0) return { im: -1, ip: -1 };
+  const im = b.i0 - 1, ip = b.i1 + 1;
+  return {
+    im: im >= 0 && steps[b.i0] - steps[im] <= MAX_BLEND_GAP_H ? im : -1,
+    ip: ip < steps.length && steps[ip] - steps[b.i1] <= MAX_BLEND_GAP_H ? ip : -1,
+  };
 }
 
 const chunkOf = (meta, idx) => meta.chunks.find((c) => idx >= c.steps[0] && idx < c.steps[1]);
@@ -103,8 +117,9 @@ async function ensureRaw(fieldId, domain, tHours) {
   if (!meta || !meta.domains.includes(domain)) return;
   const b = bracket(meta.steps, tHours);
   if (!b) return;
-  const need = new Map();
-  for (const idx of [b.i0, b.i1]) { const c = chunkOf(meta, idx); if (c) need.set(c.id, c); }
+  const need = new Map(), nb = neighbours(meta.steps, b);
+  for (const idx of [b.i0, b.i1, nb.im, nb.ip]) {
+    if (idx < 0) continue; const c = chunkOf(meta, idx); if (c) need.set(c.id, c); }
   await Promise.all([...need.values()].map((c) => loadChunk(fieldId, domain, c)));
 }
 
@@ -140,7 +155,7 @@ export async function ensureAll(fieldId, domain) {
 
 /**
  * The field at forecast hour t on a domain: a Float32Array (ny*nx, NaN = no data) blending the field's own two
- * adjacent steps. The array is reused: it stays valid until the next call for the same field and domain.
+ * adjacent steps (a monotone cubic in time that also reads the step on each side when it is loaded; linear without them). The array is reused: it stays valid until the next call for the same field and domain.
  * Null when t is outside the field's steps or a needed frame is not loaded yet.
  * Private: what the file holds, with no ensemble blending. Callers use fieldAt / patternField.
  */
@@ -162,10 +177,22 @@ function rawFieldAt(fieldId, domain, tHours, slots = blended) {
   if (b.w === 0) {
     for (let k = 0; k < n; k++) { const a = A[k]; out[k] = a === nd ? NaN : a * scale + offset; }
   } else {
-    const w = b.w, v = 1 - w;
+    // Monotone cubic Hermite in stored units (scale and offset are applied after; a linear map keeps it monotone).
+    const st = meta.steps, nb = neighbours(st, b);
+    const P = nb.im >= 0 ? arr[nb.im] : null, Q = nb.ip >= 0 ? arr[nb.ip] : null;
+    const h = st[b.i1] - st[b.i0], hl = P ? st[b.i0] - st[nb.im] : h, hr = Q ? st[nb.ip] - st[b.i1] : h;
+    const [h00, h10, h01, h11] = basis(b.w);
+    const ih = 1 / h, ihl = 1 / hl, ihr = 1 / hr, k10 = h10 * h, k11 = h11 * h;
     for (let k = 0; k < n; k++) {
       const a = A[k], c = B[k];
-      out[k] = (a === nd || c === nd) ? NaN : (a * v + c * w) * scale + offset;
+      if (a === nd || c === nd) { out[k] = NaN; continue; }
+      const d = (c - a) * ih;
+      let m0 = d, m1 = d;
+      if (P) { const p = P[k]; if (p !== nd) m0 = tangent((a - p) * ihl, d, hl, h); }
+      if (Q) { const q = Q[k]; if (q !== nd) m1 = tangent(d, (q - c) * ihr, h, hr); }
+      let x = h00 * a + k10 * m0 + h01 * c + k11 * m1;
+      if (a < c) { if (x < a) x = a; else if (x > c) x = c; } else if (x < c) x = c; else if (x > a) x = a;
+      out[k] = x * scale + offset;
     }
   }
   slot.t = tHours; slot.ver = version;

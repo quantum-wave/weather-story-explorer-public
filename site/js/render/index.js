@@ -1,4 +1,4 @@
-// Map renderer: one canvas, three projections (Regional conic, Hemisphere stereographic, Globe orthographic), the anomaly
+// Map renderer: one canvas, four projections (Regional conic, Hemisphere stereographic, Globe orthographic, World Equal Earth), the anomaly
 // raster, contours, jet, basemap, legend, overlays, and the gestures that move them. Draws only when something changed (no
 // idle animation frames). See compose.js for the frame pipeline; globe.js and versor.js for the rotation maths.
 import { store, bus } from '../state.js';
@@ -6,8 +6,8 @@ import * as data from '../data/index.js';
 import { toGrid, bilinear } from '../data/grid.js';
 import { makeScene, needed, plan, domainFor } from './compose.js';
 import { SLICE_MS } from './sample.js';
-import { IDENTITY, clampXf, sameXf, isDefaultXf, domainBox, worldLimits, dampOver, ZOOM_MAX, padKey, NO_PAD } from './view.js';
-import { dragRotate, inertia } from './globe.js';
+import { IDENTITY, clampXf, sameXf, isDefaultXf, domainBoxAt, regionalSpinLimits, spinForDrag, worldLimits, dampOver, ZOOM_MAX, padKey, NO_PAD, NH_TILT_MAX } from './view.js';
+import { dragRotate, inertia, rotateForward, solveSpinTilt } from './globe.js';
 import { loadBasemap, basemapTier } from './basemap.js';
 import { theme as themeTokens } from './theme.js';
 import { VIEWS } from '../contract.js';
@@ -20,15 +20,15 @@ const TAP_PX = 6, TAP_MS = 600, DOUBLE_TAP_MS = 320, DOUBLE_TAP_PX = 30;
 const KEY_DEG = 5; // arrows rotate or pan by this many degrees
 const ease = (u) => 1 - (1 - u) ** 3;
 const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-export const REDRAW_KEYS = ['t', 'view', 'theme', 'lens', 'overlays', 'ground', 'range', 'focus'];
-const ROTATES = (v) => v === 'nh' || v === 'gl';
-const wrap180 = (d) => ((d + 540) % 360) - 180;
+export const REDRAW_KEYS = ['t', 'view', 'theme', 'lens', 'overlays', 'ground', 'colors', 'range', 'focus'];
+const ROTATES = (v) => v === 'nh' || v === 'gl' || v === 'wm' || v === 'np'; // every view turns: a changed rotation is redrawn, never transformed
+const wrap180 = (d) => ((((d + 180) % 360) + 360) % 360) - 180;
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 const rot3 = (r) => [r?.[0] || 0, r?.[1] || 0, r?.[2] || 0];
 const copyXf = (x) => ({ k: x.k, tx: x.tx, ty: x.ty, rot: rot3(x.rot) });
 const sameRot = (a, b) => a.rot[0] === b.rot[0] && a.rot[1] === b.rot[1] && (a.rot[2] || 0) === (b.rot[2] || 0);
 /** The part of the store that changes what a frame shows, as one string (both frame-cache keys use it). */
-const looks = (s) => `${s.view}|${s.theme}|${s.lens}|${s.ground}|${s.range}|${JSON.stringify(s.overlays)}`;
+const looks = (s) => `${s.view}|${s.theme}|${s.lens}|${s.ground}|${s.colors}|${s.range}|${JSON.stringify(s.overlays)}`;
 
 export function createRenderer(canvas) {
   const ctx = canvas.getContext('2d');
@@ -66,23 +66,48 @@ export function createRenderer(canvas) {
   const state = () => store.get();
   const viewNow = (x = live || xf) => scene.viewFor(state().view, W, H, x, pad);
   const rectSize = () => ({ cx: pad.left + (W - pad.left - pad.right) / 2, cy: pad.top + (H - pad.top - pad.bottom) / 2 });
-  /** Regional pan may go until the data domain's edge reaches the frame's edge; the other views clamp to the canvas. */
-  function boxFor(viewId, w = W, h = H) {
-    if (viewId !== 'np') return null;
-    const dom = data.getManifest()?.domains?.[VIEWS.np];
-    return dom ? domainBox(scene.viewFor(viewId, w, h, IDENTITY(), pad).base, dom) : null;
+  const npDomain = () => data.getManifest()?.domains?.[VIEWS.np] || null;
+  const baseOf = (viewId, w = W, h = H, p = pad) => scene.viewFor(viewId, w, h, IDENTITY(), p).base;
+  /** World pans inside the Equal Earth outline: its box and the free frame it was fitted into (a turn of the meridian leaves both as they are). */
+  const worldFor = (viewId, w = W, h = H, p = pad) => (viewId === 'wm' ? worldLimits(baseOf(viewId, w, h, p)) : null);
+  /**
+   * Regional: the central meridian turns only as far as the data domain still covers the canvas from side to side (regionalSpinLimits);
+   * pan goes until the turned domain's edge reaches the frame's edge. Without a manifest it neither turns nor pans past the canvas.
+   */
+  function clampRegional(x) {
+    const k = Math.min(ZOOM_MAX, Math.max(1, x.k)), dom = npDomain();
+    if (!dom) return clampXf({ ...x, rot: [0, 0, 0] }, W, H);
+    const base = baseOf('np');
+    let lam = Math.max(-90, Math.min(90, x.rot[0] || 0));
+    const t = clampXf({ ...x, k, rot: [lam, 0, 0] }, W, H, domainBoxAt(base, dom, lam));
+    const [lo, hi] = regionalSpinLimits(base, dom, k, t.tx);
+    lam = Math.max(lo, Math.min(hi, lam));
+    return clampXf({ ...x, k, tx: t.tx, rot: [lam, 0, 0] }, W, H, domainBoxAt(base, dom, lam));
   }
-  /** World pans inside the Equal Earth outline: its box and the free frame it was fitted into. */
-  const worldFor = (viewId, w = W, h = H, p = pad) => (viewId === 'wm' ? worldLimits(scene.viewFor(viewId, w, h, IDENTITY(), p).base) : null);
   const clampX = (x, viewId = state().view) => {
     if (!W) return x;
+    if (viewId === 'np') return clampRegional(x);
+    if (viewId === 'nh') x = { ...x, rot: [x.rot[0], Math.max(-NH_TILT_MAX, Math.min(NH_TILT_MAX, x.rot[1])), 0] };
+    if (viewId === 'wm') x = { ...x, rot: [wrap180(x.rot[0]), 0, 0] };
     const wl = worldFor(viewId);
-    return wl ? clampXf(x, W, H, wl.box, wl.frame) : clampXf(x, W, H, boxFor(viewId));
+    return wl ? clampXf(x, W, H, wl.box, wl.frame) : clampXf(x, W, H);
   };
-  /** A drag past a limit moves the map by a damped amount, never more than a few px. */
+  /** Regional: the most screen px a degree of turn moves any point in the frame (the conic turns about its apex, so the bottom corners move most). */
+  function pxPerDeg(x) {
+    const mv = viewNow(x), { cx, cy } = rectSize();
+    let best = 0;
+    for (const xy of [[cx, cy], [0, H], [W, H], [cx, H], [0, 0], [W, 0]]) {
+      const c = mv.invert(xy), a = c && mv.project([c[0] - 0.5, c[1]]), b = c && mv.project([c[0] + 0.5, c[1]]);
+      if (a && b) best = Math.max(best, Math.hypot(b[0] - a[0], b[1] - a[1]));
+    }
+    return best > 1e-6 ? best : 1;
+  }
+  /** A drag past a limit moves the map by a damped amount, never more than a few px (a Regional turn too, measured in px). */
   function softClamp(x) {
     const c = clampX(x);
-    return { ...x, k: c.k, tx: c.tx + dampOver(x.tx - c.tx), ty: c.ty + dampOver(x.ty - c.ty) };
+    const out = { ...x, k: c.k, tx: c.tx + dampOver(x.tx - c.tx), ty: c.ty + dampOver(x.ty - c.ty), rot: c.rot.slice() };
+    if (state().view === 'np' && x.rot[0] !== c.rot[0]) { const per = pxPerDeg(c); out.rot = [c.rot[0] + dampOver((x.rot[0] - c.rot[0]) * per) / per, 0, 0]; }
+    return out;
   }
 
   // ---------- drawing ----------
@@ -280,31 +305,43 @@ export function createRenderer(canvas) {
       const step = (tNow) => {
         const u = Math.min(1, (tNow - t0) / ms), e = ease(u);
         live = { k: from.k + (target.k - from.k) * e, tx: from.tx + (target.tx - from.tx) * e, ty: from.ty + (target.ty - from.ty) * e,
-          rot: [0, 1, 2].map((i) => from.rot[i] + (target.rot[i] - from.rot[i]) * e) };
+          rot: [0, 1, 2].map((i) => from.rot[i] + (i === 0 ? wrap180(target.rot[0] - from.rot[0]) : target.rot[i] - from.rot[i]) * e) }; // the short way round
         if (u < 1) { drawLive(); anim = requestAnimationFrame(step); }
         else { anim = 0; live = target; commit(); resolve(); }
       };
       anim = requestAnimationFrame(step);
     });
   }
-  function xfCentred(lat, lon, zoom, x0 = xf) {
+  /**
+   * The transform that puts a place in the middle of the free area at zoom `zoom`. The globe turns the place to its centre first;
+   * with `turn` every view does (Center here): the Hemisphere spins and tilts toward it (no further than 30N), World and Regional
+   * turn their central meridian to it (Regional only as far as its data covers the frame). Then the middle pans to the place.
+   */
+  function xfCentred(lat, lon, zoom, x0 = xf, turn = false) {
     const s = state(), k = zoom ?? Math.max(x0.k, 1.5);
     let rot = x0.rot;
-    if (s.view === 'gl') { // rotate the place to the middle of the globe first, then pan the middle to the middle of the free area
-      const base = scene.viewFor('gl', W, H, IDENTITY(), pad).base.rotate;
-      rot = [wrap180(-lon - base[0]), -lat - base[1], 0];
-    }
-    const mv0 = scene.viewFor(s.view, W, H, { k: 1, tx: 0, ty: 0, rot }, pad);
-    const b = mv0.project([lon, lat]);
-    if (!b) return x0;
+    const base = scene.viewFor(s.view, W, H, IDENTITY(), pad).base.rotate;
+    if (s.view === 'gl') rot = [wrap180(-lon - base[0]), -lat - base[1], 0]; // rotate the place to the middle of the globe first, then pan the middle to the middle of the free area
+    else if (turn && s.view === 'nh') rot = [wrap180(-lon - base[0]), Math.max(0, Math.min(NH_TILT_MAX, -lat - base[1])), 0];
+    else if (turn && base) rot = [wrap180(-lon - base[0]), 0, 0];
     const { cx, cy } = rectSize();
-    return clampX({ k, tx: cx - k * b[0], ty: cy - k * b[1], rot });
+    let out = x0;
+    for (let i = 0; i < 2; i++) { // Regional: a turn its limits cut short is panned from where it stopped
+      const b = scene.viewFor(s.view, W, H, { k: 1, tx: 0, ty: 0, rot }, pad).project([lon, lat]);
+      if (!b) return out;
+      out = clampX({ k, tx: cx - k * b[0], ty: cy - k * b[1], rot });
+      if (out.rot[0] === rot[0] && out.rot[1] === rot[1]) break;
+      rot = out.rot;
+    }
+    return out;
   }
 
   /**
    * Where a one-pointer drag from `from` to `to` takes the transform `b`. Globe: the point under `from` stays under `to` (versor
-   * drag, any zoom). Hemisphere: the horizontal component spins about the pole; zoomed, the vertical component pans. Regional:
-   * pan. `soft` damps what passes a pan limit (a live drag); inertia clamps hard.
+   * drag, any zoom). Hemisphere: the same with spin and tilt only (no roll): it spins about the pole and tilts its centre off it,
+   * either way across it, as far as 30N; a grab off the disc spins about the pole; zoomed, what the tilt limit leaves over pans. World and Regional: the
+   * horizontal component turns the central meridian under the pointer (World all the way round, Regional while its data covers
+   * the frame) and the vertical component pans. `soft` damps what passes a limit (a live drag); inertia clamps hard.
    */
   function dragStep(b, from, to, soft) {
     const view = state().view;
@@ -314,13 +351,34 @@ export function createRenderer(canvas) {
       return { ...b, rot: [wrap180(r1[0] - r0[0]), r1[1] - r0[1], wrap180(r1[2] - (r0[2] || 0))] };
     }
     if (view === 'nh') {
-      const c = scene.viewFor('nh', W, H, b, pad).project([0, 90]) || [W / 2, H / 2]; // the pole
-      const a0 = Math.atan2(from[1] - c[1], from[0] - c[0]);
-      const a1 = Math.atan2((b.k > 1 ? from[1] : to[1]) - c[1], to[0] - c[0]);
-      const da = wrap180(((a1 - a0) * 180) / Math.PI);
-      const x = { ...b, rot: [b.rot[0] - da, b.rot[1], b.rot[2]] };
-      if (b.k > 1) { x.ty = b.ty + to[1] - from[1]; return soft ? softClamp(x) : clampX(x); }
-      return x;
+      const mv = scene.viewFor('nh', W, H, b, pad), r0 = mv.rotation(), base = mv.base.rotate;
+      const g = mv.invert(from), h = mv.invert(to);
+      let x;
+      if (g && h) {
+        // a step that would spin the map more than 90 degrees (the place crossing the middle at the tilt limit) keeps the spin instead
+        const r1 = solveSpinTilt(g, rotateForward(r0, h), r0[1], -90 - NH_TILT_MAX, -90 + NH_TILT_MAX, r0[0], 90);
+        x = { ...b, rot: [wrap180(r1[0] - base[0]), r1[1] - base[1], 0] };
+        if (b.k > 1) { // what the tilt limit leaves over pans
+          const q = scene.viewFor('nh', W, H, x, pad).project(g);
+          if (q) { x.tx += to[0] - q[0]; x.ty += to[1] - q[1]; }
+        }
+      } else { // off the disc: spin about the pole by the change of bearing
+        const c = mv.project([0, 90]) || [W / 2, H / 2];
+        const da = wrap180(((Math.atan2(to[1] - c[1], to[0] - c[0]) - Math.atan2(from[1] - c[1], from[0] - c[0])) * 180) / Math.PI);
+        x = { ...b, rot: [wrap180(b.rot[0] - da), b.rot[1], 0] };
+      }
+      return soft ? softClamp(x) : clampX(x);
+    }
+    if (view === 'wm' || view === 'np') {
+      const base = scene.viewFor(view, W, H, IDENTITY(), pad).base;
+      const { d, g } = spinForDrag(base, b, from, to);
+      const x = { ...b, rot: [view === 'wm' ? wrap180(b.rot[0] + d) : b.rot[0] + d, 0, 0] };
+      if (view === 'np') x.rot = (soft ? softClamp(x) : clampX(x)).rot; // the turn first, so the pan below matches where it stopped
+      const q = g && scene.viewFor(view, W, H, x, pad).project(g); // a conic turn also moves the place up or down a little
+      x.ty = b.ty + (q ? to[1] - q[1] : to[1] - from[1]);
+      if (!soft) return clampX(x);
+      const c = clampX(x);
+      return { ...x, k: c.k, tx: c.tx + dampOver(x.tx - c.tx), ty: c.ty + dampOver(x.ty - c.ty) };
     }
     const x = { ...b, tx: b.tx + to[0] - from[0], ty: b.ty + to[1] - from[1] };
     return soft ? softClamp(x) : clampX(x);
@@ -358,7 +416,10 @@ export function createRenderer(canvas) {
       if (!g.at) { gestureStart = { xf: copyXf(live || xf), p: null, at: [x, y] }; return; }
       if (tapInfo) { tapInfo.moved = Math.max(tapInfo.moved, Math.hypot(x - tapInfo.x, y - tapInfo.y)); samples.push({ t: now(), x, y }); if (samples.length > 12) samples.shift(); }
       if (tapInfo && !tapInfo.multi && tapInfo.moved < TAP_PX) return; // still a tap: do not nudge the map
-      setLive(dragStep(g.xf, g.at, [x, y], true));
+      const nx = dragStep(g.xf, g.at, [x, y], true);
+      setLive(nx);
+      // the Hemisphere follows the pointer step by step, so a place held at the tilt limit slips under it rather than jumps
+      if (state().view === 'nh') gestureStart = { xf: copyXf(nx), p: null, at: [x, y] };
     }
   }
   /** Release velocity in px/s from the last ~100 ms of the drag, or zero if the finger had already stopped. */
@@ -431,13 +492,14 @@ export function createRenderer(canvas) {
     stopMotion();
     let next = x;
     if (s.view === 'gl') next = { ...x, rot: [wrap180(x.rot[0] - dirs[0] * KEY_DEG), Math.max(-90, Math.min(90, x.rot[1] - dirs[1] * KEY_DEG)), x.rot[2]] };
-    else if (s.view === 'nh') {
-      next = { ...x, rot: [wrap180(x.rot[0] - dirs[0] * KEY_DEG), x.rot[1], x.rot[2]] };
-      if (x.k > 1 && dirs[1]) next.ty = x.ty + dirs[1] * 0.1 * H;
-    } else { // Regional: the screen distance of KEY_DEG degrees at the middle of the frame
+    else if (s.view === 'nh') { // left and right spin about the pole; down tilts the centre off the pole toward the bottom of the disc, up back
+      next = { ...x, rot: [wrap180(x.rot[0] - dirs[0] * KEY_DEG), x.rot[1] - dirs[1] * KEY_DEG, x.rot[2]] };
+    } else if (dirs[0]) { // World and Regional: left and right turn the central meridian, so the view looks that way
+      next = { ...x, rot: [x.rot[0] - dirs[0] * KEY_DEG, 0, 0] };
+    } else { // up and down: the screen distance of KEY_DEG degrees at the middle of the frame
       const mv = viewNow(x), { cx, cy } = rectSize(), c = mv.invert([cx, cy]);
       if (!c) return;
-      const p = mv.project([c[0] + dirs[0] * KEY_DEG, Math.max(-85, Math.min(85, c[1] + dirs[1] * KEY_DEG))]);
+      const p = mv.project([c[0], Math.max(-85, Math.min(85, c[1] + dirs[1] * KEY_DEG))]);
       if (!p) return;
       next = { ...x, tx: x.tx - (p[0] - cx), ty: x.ty - (p[1] - cy) };
     }
@@ -490,6 +552,9 @@ export function createRenderer(canvas) {
     draw: drawNow, resize,
     setView(id) { if (state().view !== id) store.set({ view: id }); },
     centreOn(lat, lon, ms = 500, zoom = null) { if (!W) resize(); return animateTo(xfCentred(lat, lon, zoom), ms); },
+    /** Center here: turn the current view toward a place (see xfCentred) and put it mid-frame at the current zoom. */
+    centreHere(lon, lat, ms = 450) { if (!W) resize(); const x = live || xf; return animateTo(xfCentred(lat, lon, x.k, x, true), ms); },
+    /** Back to the view's own default: its opening centre, rotation, pan and zoom. */
     resetView(ms = 400) { return animateTo(IDENTITY(), ms); },
     project(ll) { if (!W) resize(); return viewNow().project(ll); },
     invert(xy) { if (!W) resize(); return viewNow().invert(xy); },
@@ -540,7 +605,7 @@ export function createRenderer(canvas) {
     },
     /**
      * Render one frame into any 2D context at width x height (CSS px, no dpr scaling): basemap, field, contours,
-     * jet; no legend, pins or focus ring. Options: t, view, theme, lens, ground, overlays-flags `flags` (default the
+     * jet; no legend, pins or focus ring. Options: t, view, theme, lens, ground, colors, overlays-flags `flags` (default the
      * store), `xf` ({k, tx, ty, rot}: the on-screen transform, so a share keeps a rotated globe), centre {lat, lon, zoom},
      * overlays [fn(ctx, project, state)], rasterScale (default 0.75). `centre` zooms to centre.zoom (default 1.5, 1 = the whole
      * view) and puts the place mid-frame where the view allows. Returns {project, invert} of the drawn view.
@@ -549,7 +614,7 @@ export function createRenderer(canvas) {
       const { width, height, overlays: ovs = [], rasterScale = 0.75 } = opts;
       const base = state();
       const s = { ...base, t: opts.t ?? base.t, view: opts.view ?? base.view, theme: opts.theme ?? base.theme, lens: opts.lens ?? base.lens,
-        ground: opts.ground ?? base.ground, range: opts.range ?? base.range,
+        ground: opts.ground ?? base.ground, colors: opts.colors ?? base.colors, range: opts.range ?? base.range,
         overlays: { ...(base.overlays || {}), ...(opts.flags || {}) } };
       const x = exportXf(opts, s, width, height);
       const mv = scene.viewFor(s.view, width, height, x);

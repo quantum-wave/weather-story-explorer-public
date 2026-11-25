@@ -226,10 +226,10 @@ export function meanAnomalySeries(z500a, z500, z500em) {
 /**
  * One cell per time, tiling [times[0], times[last]] (cell edges at the midpoints between times). `z500a` and `z500sd`
  * are {steps, values} in gpm (stored units). Each cell: {t, from, to, state, rgba, anomDam}; state is 'band' (rgba is
- * bandRGBA('z500a', dam, ground)), 'blank' (inside the neutral +-2 dam), 'none' (no clear signal: forecasts disagree)
+ * bandRGBA('z500a', dam, ground, colors)), 'blank' (inside the neutral +-2 dam), 'none' (no clear signal: forecasts disagree)
  * or 'nodata'. rgba is null unless state is 'band'.
  */
-export function trackCells(times, { z500a, z500sd, ground = 'paper' } = {}) {
+export function trackCells(times, { z500a, z500sd, ground = 'paper', colors } = {}) {
   const out = [];
   for (let i = 0; i < times.length; i++) {
     const t = times[i];
@@ -241,7 +241,7 @@ export function trackCells(times, { z500a, z500sd, ground = 'paper' } = {}) {
       cell.anomDam = dam;
       if (signalAt({ anomDam: dam, spreadDam: sd == null ? NaN : sd * SPREAD_TO_DAM, hasSpread: sd != null }) === 'none') cell.state = 'none';
       else {
-        const c = bandRGBA('z500a', dam, ground);
+        const c = bandRGBA('z500a', dam, ground, colors);
         if (c[3] === 0) cell.state = 'blank'; else { cell.state = 'band'; cell.rgba = c; }
       }
     }

@@ -185,7 +185,12 @@ export function mountBriefing(app) {
     addEventListener('resize', onResize); s.offs.push(() => removeEventListener('resize', onResize));
     const onKey = (e) => handleKey(e, s);
     window.addEventListener('keydown', onKey, true); s.offs.push(() => window.removeEventListener('keydown', onKey, true));
-    const un1 = store.subscribe((_s, patch) => { if (patch && 't' in patch) timeChanged(s); }); s.offs.push(un1);
+    const un1 = store.subscribe((_s, patch) => {
+      if (!patch) return;
+      if ('t' in patch) timeChanged(s);
+      // the strip is painted in the map colours and the theme's ground: repaint it when either changes mid-briefing
+      if ('colors' in patch || 'theme' in patch) { const b = s.player.beat(); if (b && b.strip) drawStrip(s, b, true); }
+    }); s.offs.push(un1);
     s.offs.push(player.on('beat', ({ index, beat }) => showBeat(s, index, beat)));
     s.offs.push(player.on('tick', ({ t, progress }) => { card.setProgress(progress); zoneCaption(s, t); }));
     s.offs.push(player.on('state', ({ state }) => { card.setState(state); if (state === 'ended') { card.setProgress(1); card.setDate(''); remember(s); paintPill(); } }));
@@ -300,7 +305,7 @@ export function mountBriefing(app) {
     const width = Math.max(200, Math.floor((el?.clientWidth || 340) - (cs ? parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) : 28)));
     const first7 = days.slice(0, 7);
     let svg;
-    try { svg = app.story.stripSVG(first7, days.series, { compact: true, range: 7, phone: isPhone(), width, activeDay: active >= 0 && active < 7 ? active : undefined, ground: store.get().theme === 'light' ? 'paper' : 'night', hasMean: !!s.inp?.hasMean }); } catch { svg = null; }
+    try { svg = app.story.stripSVG(first7, days.series, { compact: true, range: 7, phone: isPhone(), width, activeDay: active >= 0 && active < 7 ? active : undefined, ground: store.get().theme === 'light' ? 'paper' : 'night', colors: store.get().colors, hasMean: !!s.inp?.hasMean }); } catch { svg = null; }
     if (!svg) { s.card.setStrip(''); return; }
     // on the card the strip is a picture, not controls: one image whose text alternative names the days it shows, and no
     // tap targets (a rect with no role may not carry an aria-label: axe aria-prohibited-attr)

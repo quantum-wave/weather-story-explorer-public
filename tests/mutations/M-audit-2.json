@@ -1,13 +1,13 @@
 {
  "id": "audit-2",
- "file": "site/js/story/strip.js",
- "find": "if (noData) el('rect',",
- "replace": "if (true) el('rect',",
+ "file": "site/js/story/daytable.js",
+ "find": "if (x.noData) b.classList.add('hatch-nodata');",
+ "replace": "if (true) b.classList.add('hatch-nodata');",
  "checks": [
   "S-STORY",
   "S-HONEST",
   "S-SAMPLE"
  ],
  "expect": "killed",
- "note": "AUDIT-TESTS row 1 and section 1: hatching every Your-week day passed S-STORY, S-HONEST and S-SAMPLE before W2-06 (known-survivor). Re-targeted to strip.js and now killed by the hatch and column-count assertions (columns equal days with data, zero .hatch-nodata)."
+ "note": "AUDIT-TESTS row 1 and section 1: hatching every Your-week day passed S-STORY, S-HONEST and S-SAMPLE before W2-06 (known-survivor). Targets the card's day table (daytable.js) and is killed by the hatch and column-count assertions (columns equal days with data, zero .hatch-nodata)."
 }

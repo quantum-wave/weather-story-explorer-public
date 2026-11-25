@@ -23,6 +23,10 @@ export const VIEWPORTS = {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const safe = (s) => String(s).replace(/[^A-Za-z0-9._-]+/g, '_');
 
+// A card's day table (story/daytable.js) scrolls sideways inside its wrapper whenever its days do not fit, on every stop
+// that shows a card: a scroller by design, not a layout fault.
+const ALWAYS_SCROLLERS = ['.strip-wrap.dt-scroll'];
+
 /** The idle gate: the app has booted, fonts are loaded, and two screenshots 120 ms apart are byte-identical. */
 export async function settle(page, { tries = 10 } = {}) {
   await page.waitFor(`document.fonts.status === 'loaded' && (!window.__wse || window.__wse.ready === true && (window.__wse.storyReady === true || !!window.__wse.error))`, { timeout: 30000 });
@@ -109,7 +113,7 @@ export async function runTour(opts = {}) {
         const snap = async (name) => {
           const { png, stable } = await settle(page);
           const key = safe(name ? `${stop.id}--${name}` : stop.id) + `--${vpName}`;
-          const lay = await runLayoutAssertions(page, { phone: vpName === 'phone', allowOverlap: stop.allowOverlap || [], allowTarget: stop.allowTarget || [], scrollers: stop.scrollers || [] });
+          const lay = await runLayoutAssertions(page, { phone: vpName === 'phone', allowOverlap: stop.allowOverlap || [], allowTarget: stop.allowTarget || [], scrollers: [...(stop.scrollers || []), ...ALWAYS_SCROLLERS] });
           for (const o of lay.allowedTargets || []) console.log(`  [5 target, allowed by ${stop.id}] ${describeOffender(o)}`);
           const newPath = path.join(outDir, 'new', key + '.png');
           fs.writeFileSync(newPath, png);

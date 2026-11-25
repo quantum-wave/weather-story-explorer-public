@@ -152,16 +152,30 @@ export function buildLensGuide(L, ctx = {}) {
 const fmtLocal = (ms) => { try { return new Intl.DateTimeFormat('en-US', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(new Date(ms)); } catch { return ''; } };
 const fmtUTC = (ms) => { const d = new Date(ms), p = (n) => String(n).padStart(2, '0'); return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())} UTC`; };
 
-/** "About this data" (5.2 item 7) as DOM. */
-export function aboutData(m, { now = Date.now() } = {}) {
+/** The "About this data" Style and Constructions rows for the map's colour family ('soft' | 'reference'; anything else is Soft,
+ *  as in render/palette.js colorsOf). Pure, so the provenance wording is unit-tested for both families. */
+export function aboutStyleRows(colors) {
+  if (colors === 'reference') {
+    return [
+      ['Style', 'ECMWF colours (Map colors: Reference), 6 dam height lines (US convention)'],
+      ['Constructions', 'Colours past ±40 dam and every colour on the Night ground are our own construction, not ECMWF’s.'],
+    ];
+  }
+  return [
+    ['Style', 'Soft colours, softened from ECMWF’s (Map colors: Soft), 6 dam height lines (US convention)'],
+    ['Constructions', 'Every map colour, on Paper and on Night, is our own construction, softened from ECMWF’s colours; none is ECMWF’s own. Map colors: Reference shows ECMWF’s colours.'],
+  ];
+}
+
+/** "About this data" (5.2 item 7) as DOM. `colors` is the store's map colour family. */
+export function aboutData(m, { now = Date.now(), colors } = {}) {
   if (!m) return null;
   const rows = [];
   const r = runMs(m);
   if (m.model) rows.push(['Model', m.model]);
   if (r === r) rows.push(['Run', `${fmtLocal(r)} (${fmtUTC(r)})${isLive(m) ? `, ${Math.max(0, Math.floor(ageHours(m, now)))} h old` : ''}`]);
   if (m.climatology?.label) rows.push(['Normal', `${m.climatology.label}${m.climatology.source ? ` (${m.climatology.source})` : ''}`]);
-  rows.push(['Style', 'ECMWF colours, 6 dam height lines (US convention)']);
-  rows.push(['Constructions', 'Colours past ±40 dam and every colour on the Night ground are our own construction, not ECMWF’s.']);
+  rows.push(...aboutStyleRows(colors));
   if (m.attribution) rows.push(['Licence', m.attribution]);
   if (!isLive(m)) rows.push(['Status', isMultiCase(m) ? 'Past weather standing in for a forecast: not live.' : 'Recorded forecast, not live.']);
   rows.push(['Privacy', 'Your people and places stay in this browser; nothing about them is sent anywhere.']);
@@ -225,7 +239,7 @@ function guideView() {
   const L = lensOf(ctxApp.store.get().lens ?? 'z') || lensOf('z');
   const rs = runState(), fy = forYouNow();
   const el = buildLensGuide(L, { forYou: fy.text, sure: rs.sure, zoneCaption: rs.zone?.caption || '', onSure: () => show('sure') });
-  const about = aboutData(rs.m);
+  const about = aboutData(rs.m, { colors: ctxApp.store.get().colors });
   if (about) el.append(about);
   el.append(h('button', { type: 'button', class: 'gd-link gd-tips', onclick: () => { try { ctxApp.coach?.reset?.(); } catch { /* no coach */ } current?.sheet.close('close'); }, text: 'Show the tips again' }));
   return el;

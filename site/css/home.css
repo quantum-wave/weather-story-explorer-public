@@ -21,6 +21,7 @@
 
 /* ---------- cards ---------- */
 .card-head { min-height: 44px; }
+.card-words { cursor: pointer; }
 .card .confidence { margin: var(--s1) 0 0; font: 400 13px/17px var(--font-ui); color: var(--ink-2); }
 .card .card-note { margin: var(--s1) 0 0; font: 400 13px/17px var(--font-ui); color: var(--ink-2); text-wrap: pretty; }
 .card .card-note.end-cell { border-left: 2px solid var(--hairline); padding-left: var(--s2); }
@@ -29,24 +30,62 @@
 .card .retry-btn { align-self: flex-start; }
 .card[data-state="too-far"] .summary, .card[data-state="broad"] .summary { font-size: 17px; line-height: 23px; }
 .card .row-btn.trip-edit { align-self: flex-start; margin-left: calc(-1 * var(--s2)); }
-/* a finger on a strip pans the panel like anywhere else; home.js steps the sheet only at the scroll edge (never block vertical pan) */
+/* a finger on a day table pans the panel like anywhere else; home.js steps the sheet only at the scroll edge (never block vertical pan) */
 .strip-wrap { touch-action: pan-x pan-y; }
-/* labels and notes sit over the tappable columns: a tap on a word is a tap on its day */
-.strip text, .strip path, .strip polygon, .strip line { pointer-events: none; }
-/* the strip and what is pinned over it share one grid cell; the key, when it leaves the SVG, is the row under it */
-.strip-frame { display: grid; grid-template-columns: minmax(0, 1fr); margin-top: var(--s1); --strip-ground: var(--card); }
-.card.active .strip-frame { --strip-ground: var(--card-active); }
-.strip-frame > .strip-wrap { grid-area: 1 / 1; margin-top: 0; min-width: 0; }
-/* the expanded strip scrolls sideways and comes to rest on whole columns (one snap point per column, home.js) */
-.strip-wrap.expanded { position: relative; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; scroll-snap-type: x mandatory; }
-.strip-wrap.expanded svg { max-width: none; }
-.strip-snap { position: absolute; top: 0; height: 1px; scroll-snap-align: start; pointer-events: none; }
-/* "normal", pinned to the right edge on the line while the days scroll under it: an axis label on the card's ground */
-.strip-pin { grid-area: 1 / 1; align-self: start; justify-self: end; z-index: 1; pointer-events: none; padding: 0 2px 0 6px; font: 400 12px/16px var(--font-ui); color: var(--ink-2); background: var(--strip-ground); border-radius: 3px; box-shadow: -6px 0 6px -2px var(--strip-ground); }
-.strip-key-out { grid-row: 2; margin: var(--s1) 0 0; font: 400 12px/16px var(--font-ui); color: var(--ink-2); }
-.strip-key-out .strip-key { display: block; text-wrap: pretty; }
-.strip-end:focus-visible, .strip-day:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
-#home .strip-collapse { align-self: flex-start; margin-left: calc(-1 * var(--s2)); }
+.strip-frame { display: grid; grid-template-columns: minmax(0, 1fr); margin: var(--s2) 0 var(--s1); }
+.strip-frame > .strip-wrap { margin-top: 0; min-width: 0; }
+/* ---------- the day table (story/daytable.js): one column per day, the days that do not fit scroll sideways ---------- */
+.strip-wrap.dt-scroll { overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: thin; padding-bottom: 4px; }
+/* as wide as its tracks, the empty end track of a table that scrolls included (an empty track adds no scrollable overflow by itself) */
+.daytable { display: grid; align-items: stretch; width: max-content; min-width: 100%; }
+.dt-has-bands .dt-day { padding-top: 8px; }
+/* a band clips its words (clip, not hidden: no scroll container, so the sticky words still follow the table's scroll): words
+   wider than a narrow band, even hidden by .dt-band-tight, never widen the table into sideways scroll room */
+.dt-band { grid-row: 1; min-width: 0; overflow: clip; padding: 4px 0; border-top: 1px dashed var(--ink-2); font: 400 12px/16px var(--font-ui); color: var(--ink-2); }
+.dt-band-hatch { border-top: 2px solid var(--hairline); }
+.dt-band + .dt-band { margin-left: 4px; }
+.dt-band-text { position: sticky; left: 0; display: inline-block; padding-left: 8px; white-space: nowrap; }
+.dt-band-tight .dt-band-text { visibility: hidden; }
+/* the days before the first band: a plain rule in the band row, the solid part of the ruler */
+.dt-lead { grid-row: 1; align-self: start; margin-top: 0; margin-right: 4px; border-top: 1px solid var(--hairline); }
+.dt-day { grid-row: 1; position: relative; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 2px; margin: 0; border: 0; border-radius: 8px; background: none; color: var(--ink); font: inherit; text-align: center; cursor: pointer; scroll-snap-align: start; -webkit-tap-highlight-color: transparent; transition: background-color 120ms ease-out; }
+.dt-has-bands .dt-day { grid-row: 2; }
+/* hairline rules between the days, inset from top and bottom */
+.dt-day + .dt-day::before { content: ''; position: absolute; left: 0; top: 16px; bottom: 16px; border-left: 1px solid var(--hairline); }
+.dt-day:hover { background: var(--card-active); }
+.dt-day.is-active { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+.dt-day.is-active::before, .dt-day.is-active + .dt-day::before, .dt-day:hover::before, .dt-day:hover + .dt-day::before { border-left-color: transparent; }
+.strip-day:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+.dt-head { display: flex; flex-direction: column; align-items: center; max-width: 100%; }
+.dt-name { font: 600 13px/16px var(--font-ui); white-space: nowrap; }
+.dt-date { font: 400 12px/16px var(--font-ui); color: var(--ink-2); white-space: nowrap; }
+.dt-iconbox { display: block; width: 32px; height: 32px; color: var(--ink); }
+.dt-icon { display: block; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.dt-icon .dt-fill { fill: color-mix(in srgb, currentColor 16%, transparent); }
+.dt-icon .dt-thin { stroke-width: 1; opacity: .55; }
+.dt-icon-unsure circle { fill: currentColor; }
+.dt-temps { display: flex; flex-direction: column; align-items: center; min-height: 44px; font-variant-numeric: tabular-nums; }
+.dt-hi { font: 600 20px/24px var(--font-ui); }
+.dt-lo { font: 400 14px/20px var(--font-ui); color: var(--ink-2); }
+.dt-aloft { margin-top: 4px; font: 400 12px/16px var(--font-ui); color: var(--ink-2); }
+.dt-rain { display: inline-flex; align-items: center; gap: 2px; min-height: 16px; font: 500 12px/16px var(--font-ui); color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.dt-drop { fill: currentColor; }
+/* how sure the timing is: three dots, filled to the day's confidence (high 3, medium 2, low 1); none for pattern only or a sample */
+.dt-sure { display: flex; gap: 4px; height: 6px; }
+.dt-sure i { width: 6px; height: 6px; box-sizing: border-box; border-radius: 50%; border: 1px solid var(--ink-2); }
+.dt-sure i.on { background: var(--ink-2); }
+/* the passed part of today: the grey part of a thin bar across the top of its column */
+.dt-passed { position: absolute; top: 4px; left: 12px; right: 12px; height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--ink) 8%, transparent); overflow: hidden; }
+.dt-passed i { display: block; height: 100%; background: var(--ink-2); opacity: .55; }
+/* less certain days look it: icons fade with the confidence, and the later zones carry the timeline's textures (never on the words) */
+.dt-day[data-level="medium"] .dt-iconbox { opacity: .85; }
+.dt-day[data-level="low"] .dt-iconbox { opacity: .65; }
+.dt-day.dt-dashed .dt-iconbox { opacity: .6; }
+.dt-day.dt-hatch .dt-iconbox, .dt-day[data-level="pattern-only"] .dt-iconbox { opacity: .45; }
+.dt-day.dt-hatch { background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--ink) 9%, transparent) 0 1px, transparent 1px 8px); }
+/* rows no column fills are left out: a run without rain, a sample that claims no confidence, days without temperatures */
+.dt-no-rain .dt-rain, .dt-no-sure .dt-sure, .dt-no-temps .dt-temps { display: none; }
+@media (prefers-reduced-motion: reduce) { .dt-day { transition: none; } }
 
 /* ---------- trips: an ended trip is one muted row ---------- */
 .trip-over { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); min-height: 44px; padding: 0 var(--s4); color: var(--ink-2); border: 1px dashed var(--hairline); border-radius: var(--r-card); }
@@ -75,7 +114,7 @@ button.empty:hover .empty-add { border-color: var(--ink-2); }
   #home-body > section, #home-body > #sec-notes { padding-inline: var(--s4); }
   /* cards run edge to edge (their tint and rules), their text keeps the 16 px gutter */
   #sec-week .card, #sec-trips .card, .person .card { border-inline: 0; border-radius: 0; margin-inline: calc(-1 * var(--s4)); padding-inline: var(--s4); }
-  /* the strip keeps the card's 16 px text column: seven 44 px columns (308) and the 50 px end cell are 358 px, exactly a 390 px phone's column */
+  /* the day table keeps the card's 16 px text column (358 px on a 390 px phone: five 66.8 px columns and the edge of the sixth) */
   /* the peek: the sentence is never clamped and the whole peek stays under 180 px (the 44 px handle, the place, the sentence) */
   #app[data-snap="peek"] .focus-card .summary { display: block; -webkit-line-clamp: unset; overflow: visible; font-size: 17px; line-height: 22px; }
   #app[data-snap="peek"] .focus-card .dayline { display: none; }

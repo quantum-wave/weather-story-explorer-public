@@ -17,7 +17,10 @@ const env = {
 /** Test hook: replace the scheduler, clock, motion preference or data source ({fieldSteps, caseOf, ensure}). */
 export function configure(patch) { Object.assign(env, patch); }
 
-const SHORT_SPAN_H = 60; // a case this short (sample case A, 36 h) plays at 3 h/s
+const SHORT_SPAN_H = 60; // a case this short (sample case A, 36 h) plays at 1.5 h/s
+// Speeds in forecast hours per second: Slow, Normal (the default), Fast. Normal shows one 6-hourly step a second, slow enough
+// to follow a trough; a short case plays at a quarter of that so its 36 h still last a while.
+const SPEEDS_LONG = Object.freeze([3, 6, 12]), SPEEDS_SHORT = Object.freeze([0.75, 1.5, 3]);
 let cache = null; // {key, steps, lo, hi}
 let rafId = 0, last = 0, lastPrefetch = 0;
 let tween = null; // {from, to, start, ms, resolve}
@@ -50,7 +53,7 @@ export function refresh() {
   const { lo, hi } = cache;
   const s = store.get();
   if (!speedChosen) {
-    const want = hi - lo <= SHORT_SPAN_H ? 3 : 12;
+    const want = speeds()[1];
     if (s.speed !== want) store.set({ speed: want });
   }
   if (hi > lo && (s.t < lo || s.t > hi)) store.set({ t: clamp(s.t, lo, hi) });
@@ -61,7 +64,7 @@ export function range() { const { lo, hi } = info(); return [lo, hi]; }
 /** Sorted data steps of the active case. */
 export function steps() { return info().steps.slice(); }
 /** Speed choices for the active range (forecast hours per second). */
-export function speeds() { const [lo, hi] = range(); return hi - lo <= SHORT_SPAN_H ? [1.5, 3, 6] : [6, 12, 24]; }
+export function speeds() { const [lo, hi] = range(); return (hi - lo <= SHORT_SPAN_H ? SPEEDS_SHORT : SPEEDS_LONG).slice(); }
 /** The named speed menu: Slow, Normal, Fast with the forecast hours per second each stands for (UX-31). */
 export function speedChoices() { const names = ['Slow', 'Normal', 'Fast']; return speeds().map((value, i) => ({ name: names[i], value })); }
 export function reducedMotion() { return env.reduced(); }

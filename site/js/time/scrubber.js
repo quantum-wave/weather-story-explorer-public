@@ -129,7 +129,7 @@ export function mountScrubber(root) {
   // The track: one cell per time, each coloured bandRGBA of the pattern at the focused place.
   function renderTrack() {
     const times = trackTimes(clock.steps()).filter((t) => t >= lo - 1e-9 && t <= hi + 1e-9);
-    const cs = trackCells(times, { z500a: pattern?.z500a, z500sd: pattern?.z500sd, ground: groundOf() });
+    const cs = trackCells(times, { z500a: pattern?.z500a, z500sd: pattern?.z500sd, ground: groundOf(), colors: store.get().colors });
     cells.replaceChildren();
     for (const c of cs) {
       const e = el('i', 'tl-cell');
@@ -361,7 +361,7 @@ export function mountScrubber(root) {
     update();
     if ('view' in patch || 'sample' in patch || 'lens' in patch || 'range' in patch || 'expanded' in patch) schedule();
     if ('focus' in patch || 'sample' in patch || 'lens' in patch) schedulePattern();
-    if ('theme' in patch || 'ground' in patch) renderTrack();
+    if ('theme' in patch || 'ground' in patch || 'colors' in patch) renderTrack();
     if ('speed' in patch) renderSpeedMenu();
   });
   const offs = [

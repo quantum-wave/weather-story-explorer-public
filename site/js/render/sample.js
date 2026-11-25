@@ -12,7 +12,7 @@
 //     unless no field exists at all beneath the edge, and then the edge feathers to the ground).
 // The raster loop interpolates grid coordinates inline from the view's 8 px inverse mesh. It keeps no per-pixel lookup array:
 // its only buffers are the output pixels, two rows of band indices and two column/row counters.
-import { PALETTES, edgeHairline } from './palette.js';
+import { PALETTES, edgeHairline, bandRGBs, colorsOf } from './palette.js';
 import { toGrid } from '../data/grid.js';
 import { chartTokens } from './chart-tokens.js';
 
@@ -155,13 +155,13 @@ export function makeBander(id) {
 const pack = (r, g, b, a) => ((a << 24) | (b << 16) | (g << 8) | r) >>> 0;
 const hexRGB = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
 
-/** One packed RGBA per interval (0 for the unshaded gap), and the hairline ink per interval edge (or null). Cached per palette and ground. */
+/** One packed RGBA per interval (0 for the unshaded gap), and the hairline ink per interval edge (or null). Cached per palette, ground and colour family. */
 const tableCache = new Map();
-export function bandTables(id, ground) {
-  const key = `${id}|${ground}`;
+export function bandTables(id, ground, family) {
+  const fam = colorsOf(family), key = `${id}|${ground}|${fam}`;
   let T = tableCache.get(key);
   if (T) return T;
-  const p = PALETTES[id], rgb = ground === 'night' ? p.rgb.night : p.rgb.paper, nI = p.neutralInterval;
+  const p = PALETTES[id], rgb = bandRGBs(id, ground, fam), nI = p.neutralInterval;
   const colors = new Uint32Array(p.edges.length + 1), rgbs = [];
   for (let j = 0; j < colors.length; j++) {
     if (j === nI) { colors[j] = 0; rgbs.push(null); continue; } // the unshaded interval (the gap, or everything below a sequential palette's first edge)
@@ -170,7 +170,7 @@ export function bandTables(id, ground) {
   }
   // sequential palettes: interval 0 is below the first edge (unshaded), the neutral interval is 0 (p.neutralInterval)
   const major = p.edges.map((e, j) => {
-    const h = edgeHairline(id, ground, e);
+    const h = edgeHairline(id, ground, e, fam);
     return h ? { rgb: hexRGB(h.color), a: h.alpha, edge: e, j } : null;
   });
   const hasMajor = major.some(Boolean);
@@ -267,7 +267,7 @@ function fastValue(LS, x, cubic) {
  *   mv, W, H, rw, rh, u32,
  *   layers: [{domId, dom, vals, feather?: bool}, ...]  primary (finest) first; later layers are underlays,
  *   factor: field units -> palette units (z500a: 0.1, gpm -> dam),
- *   palette: id, ground: 'paper' | 'night',
+ *   palette: id, ground: 'paper' | 'night', colors: 'soft' | 'reference' (absent: Soft),
  *   bicubic: bool,
  *   hairlines: bool,
  *   doubt: null | {layers: [...same shape], limit: spread in field units at which the hatch starts (60 gpm = 6 dam)},
@@ -280,7 +280,7 @@ export class RasterJob {
     this.y = 0; this.cancelled = false; this.doneAll = false; this.rowMs = 0.05;
     this.sx = W / rw; this.sy = H / rh; this.scale = rw / W;
     this.bander = makeBander(palette);
-    this.T = bandTables(palette, ground);
+    this.T = bandTables(palette, ground, spec.colors);
     const tk = chartTokens(ground), hx = hexRGB(tk.hatch.color);
     this.hatchInk = { r: hx[0], g: hx[1], b: hx[2], rgb: hx, solo: pack(hx[0], hx[1], hx[2], Math.round(tk.hatch.alpha * 255)), a: tk.hatch.alpha, pitch: tk.hatch.pitch, width: tk.hatch.width };
     const prep = (L, slot) => { const M = mv.mesh?.(L.domId, L.dom) ?? meshFromInvert(mv, L.domId, L.dom); return { M, kinds: kindsOf(M, spec.pool, slot), mgi: M.mgi, mgj: M.mgj, mw: M.mw, mh: M.mh, step: M.step, invStep: 1 / M.step, kRow: 0, gi: 0, gj: 0, fHi: L.dom.nx - 1 - FEATHER_DEG / Math.abs(L.dom.dlon), gHi: L.dom.ny - 1 - FEATHER_DEG / Math.abs(L.dom.dlat), rowGi: new Float64Array(M.mw + 1), rowGj: new Float64Array(M.mw + 1), dom: L.dom, nx: L.dom.nx, ny: L.dom.ny, vals: L.vals, feather: !!L.feather, fx: FEATHER_DEG / Math.abs(L.dom.dlon), fy: FEATHER_DEG / Math.abs(L.dom.dlat) }; };

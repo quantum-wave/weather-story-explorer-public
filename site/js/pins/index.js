@@ -303,7 +303,7 @@ export function createPins({ storage, gazetteer = gaz, eventBus = bus, today = (
     let city = opts.city ? gaz.snapshotCity(opts.city) : null;
     if (!city) {
       const found = await gazetteer.search(query, 1);
-      city = found[0] ? gaz.snapshotCity(found[0]) : null;
+      city = found[0] && !found[0].fuzzy ? gaz.snapshotCity(found[0]) : null; // a typo guess is offered in the picker, never added by itself
     }
     if (!city) return { ok: false, reason: 'no-city', query, parsed: p };
     if (p.kind === 'home') {

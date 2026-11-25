@@ -1,5 +1,7 @@
 // S-COLOR: a colour always means the same number. Measured on RENDERED PIXELS (a canvas the real compose() drew), on both
 // chart grounds (DESIGN-SPEC 4.2, 14.3 "Band colour"; Josh point 7: use the standard colours).
+// The probes below render the Reference colour family (Display menu "Map colors": Reference), whose Paper tables are the sourced
+// ECMWF hex; the default Soft family is a construction from it, and S-SOFT measures its rendered pixels the same way.
 //
 //   - Paper: the ECMWF 500 hPa anomaly legend hex for hex, written out below from REF-20's closed form (not read from the
 //     module): positive band k is rgb(254, 164 - 8(k-1), 0), negative band k is rgb(0, 227 - 12(k-1), 254), 2 dam wide each.
@@ -31,7 +33,7 @@ const NIGHT_GROUNDS = ['#12161B', '#1C2127'].map(rgbOf);
 const SETUP = `(() => {
   if (window.__ft) return true;
   const ft = window.__ft = { scene: null, last: null };
-  ft.render = async ({ ground, t, view = 'np', W = 1000, H = 600, lens = 'z', overlays = { contours: false, marks: false }, theme = 'light' }) => {
+  ft.render = async ({ ground, t, view = 'np', W = 1000, H = 600, lens = 'z', overlays = { contours: false, marks: false }, theme = 'light', colors = 'reference' }) => {
     const { makeScene } = await import('/js/render/compose.js');
     ft.scene ||= makeScene();
     // Probes are read where the field alone is drawn: coast and border ink over a band is by design (S-LINEART measures it).
@@ -44,7 +46,7 @@ const SETUP = `(() => {
     const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     const ctx = cv.getContext('2d', { willReadFrequently: true });
     const mv = ft.scene.viewFor(view, W, H);
-    ft.scene.compose(ctx, mv, { s: { t, view, lens, ground, theme, overlays }, dpr: 1, quality: 'rest', alpha: 1, force: true });
+    ft.scene.compose(ctx, mv, { s: { t, view, lens, ground, theme, overlays, colors }, dpr: 1, quality: 'rest', alpha: 1, force: true });
     ft.last = { ctx, mv, W, H };
     bm.setBasemap(ft.geo);
     return true;
@@ -67,7 +69,7 @@ export async function run({ page, baseUrl, assert }) {
   const sameRGB = (a, b) => a.slice(0, 3).every((v, i) => v === b[i]);
 
   // ---- the colormap entry points kept for old callers are the same bands (no table of their own any more) ----
-  const cm = await page.eval(`import('/js/render/colormap.js').then((m) => ({ a69: m.anomalyRGBA(6.9, 'light'), n13: m.anomalyRGBA(-13, 'light'), g1: m.anomalyRGBA(1, 'light'), nan: m.anomalyRGBA(NaN, 'light'), jet: m.jetRGBA(35, 'light'), deep: m.jetRGBA(20), stops: m.STOPS.length }))`);
+  const cm = await page.eval(`import('/js/render/colormap.js').then((m) => ({ a69: m.anomalyRGBA(6.9, 'light', 'reference'), n13: m.anomalyRGBA(-13, 'light', 'reference'), g1: m.anomalyRGBA(1, 'light'), nan: m.anomalyRGBA(NaN, 'light'), jet: m.jetRGBA(35, 'light', 'reference'), deep: m.jetRGBA(20), stops: m.STOPS.length }))`);
   assert.equal(toHex(cm.a69), '#fe9400'); assert.equal(cm.a69[3], 255, 'opaque');
   assert.equal(toHex(cm.n13), '#00a7fe');
   assert.equal(cm.g1[3], 0, '+1 dam draws nothing'); assert.equal(cm.nan[3], 0);
@@ -121,7 +123,7 @@ export async function run({ page, baseUrl, assert }) {
   await page.eval(`window.__ft.render({ ground: 'night', t: 0, lens: null })`);
   const nGround = await pxAt(probe('band+1dam'));
   await page.eval(`window.__ft.render({ ground: 'night', t: 0 })`);
-  const nightTable = await page.eval(`import('/js/render/palette.js').then((m) => ({ pos: m.bandRGBA('z500a', 6.9, 'night'), neg: m.bandRGBA('z500a', -13, 'night'), eleven: m.bandRGBA('z500a', 11, 'night') }))`);
+  const nightTable = await page.eval(`import('/js/render/palette.js').then((m) => ({ pos: m.bandRGBA('z500a', 6.9, 'night', 'reference'), neg: m.bandRGBA('z500a', -13, 'night', 'reference'), eleven: m.bandRGBA('z500a', 11, 'night', 'reference') }))`);
   const night = {};
   for (const n of ['band+6.9dam', 'band-13dam', 'band+1dam', 'band+11dam']) night[n] = await pxAt(probe(n));
   assert.equal(toHex(night['band+6.9dam'].px), '#fe9400', 'Night keeps the orange arm exactly');

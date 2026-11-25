@@ -26,7 +26,8 @@ export async function run({ page, baseUrl, assert, dataDir }) {
   const want = [Math.min(...own), Math.max(...own)];
   assert.deepEqual(await page.eval('__T.clock.range()'), want, 'range is the active lens steps');
   const span = want[1] - want[0];
-  if (span <= 60) assert.equal(await page.eval('__wse.store.get().speed'), 3, 'a short case plays at 3 h/s');
+  if (span <= 60) assert.equal(await page.eval('__wse.store.get().speed'), 1.5, 'a short case plays at 1.5 h/s (Normal)');
+  else assert.equal(await page.eval('__wse.store.get().speed'), 6, 'a long case plays at 6 h/s (Normal)');
 
   // 2 s of play
   await page.eval('__T.clock.seek(' + want[0] + ')');

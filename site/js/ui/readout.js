@@ -84,6 +84,7 @@ export function mountReadout(app) {
     if (at.pinned) {
       kids.push(h('div', { class: 'rdo-act' },
         h('button', { type: 'button', class: 'rdo-add', onclick: addHere, text: 'Add a place here' }),
+        h('button', { type: 'button', class: 'rdo-centre', onclick: centreHere, text: 'Center here' }),
         h('button', { type: 'button', class: 'rdo-x', onclick: () => hide(true), text: 'Close' })));
     }
     card.replaceChildren(...kids);
@@ -133,6 +134,14 @@ export function mountReadout(app) {
     try { const { gazetteer } = await import('../pins/gazetteer.js'); const c = await gazetteer.nearest(lat, lon); text = c ? gazetteer.cityLabel(c) : ''; } catch { /* the sheet opens empty */ }
     hide(false);
     if (!app.openAddSheet({ kind: 'place', text })) app.toast?.({ text: 'Adding a place from the map is not available yet.' });
+  }
+
+  /** Turn the map so this point is in the middle (Reset view, or 0 on the focused map, goes back). */
+  function centreHere() {
+    if (!at || typeof renderer.centreHere !== 'function') return;
+    const { lat, lon } = at;
+    hide(true);
+    renderer.centreHere(lon, lat);
   }
 
   // a tap (the renderer's own tap: a drag, pinch and double tap are not taps) pins the card at the point

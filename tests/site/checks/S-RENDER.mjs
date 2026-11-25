@@ -33,9 +33,13 @@ async function runBase({ page, baseUrl, assert }) {
   assert.ok(lightShare > 0.2, `light theme draws on the light Paper ground: ${(lightShare * 100).toFixed(0)}% of pixels are light`);
 
   // jet lens (its field is in case B of the sample, case A of the synthetic fixture: choosing the lens shows that case)
-  img = await shoot(page, { view: 'np', lens: 'j', theme: 'dark', t: stepOf('ws250') }, 'render-jet');
+  // in the Reference colour family (ECMWF's own), then in the default Soft family (the same yellow-greens with less chroma)
+  img = await shoot(page, { view: 'np', lens: 'j', theme: 'dark', t: stepOf('ws250'), colors: 'reference' }, 'render-jet');
   const green = (() => { let n = 0, g = 0; for (let y = 0; y < 360; y++) for (let x = 0; x < W; x++) { const i = (y * img.w + x) * img.ch; n++; if (img.px[i + 1] > 150 && img.px[i + 2] < 90) g++; } return g / n; })();
-  assert.ok(green > 0.003, `jet draws ECMWF's yellow-green bands: ${(green * 100).toFixed(2)}% of pixels`);
+  assert.ok(green > 0.003, `jet draws ECMWF's yellow-green bands (Reference): ${(green * 100).toFixed(2)}% of pixels`);
+  img = await shoot(page, { view: 'np', lens: 'j', theme: 'dark', t: stepOf('ws250'), colors: 'soft' }, 'render-jet-soft');
+  const softGreen = (() => { let n = 0, g = 0; for (let y = 0; y < 360; y++) for (let x = 0; x < W; x++) { const i = (y * img.w + x) * img.ch; n++; if (img.px[i + 1] > 120 && img.px[i + 1] > img.px[i + 2] + 30 && img.px[i + 1] >= img.px[i] - 10) g++; } return g / n; })();
+  assert.ok(softGreen > 0.003, `jet draws softened yellow-green bands (Soft): ${(softGreen * 100).toFixed(2)}% of pixels`);
 
   // no confidence fade: a band's colour does not depend on the spread, so late-lead colours are as saturated as early ones
   const sp = await page.eval('window.__wp2.data.sampleDomainSpread() && Array.from(window.__wp2.data.sampleDomainSpread().values)');

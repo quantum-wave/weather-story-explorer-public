@@ -55,10 +55,10 @@ test('z500a: alpha 0 inside +-2 dam, opaque bands elsewhere at every magnitude',
   const { bandRGBA } = await load('render/palette.js');
   for (const v of [-2, -1.99, -0.5, 0, 0.5, 1.99, 2]) for (const g of ['paper', 'night']) assert.equal(bandRGBA('z500a', v, g)[3], 0, `${v} ${g}`);
   for (const v of [-2.01, 2.01, -9, 9, -24, 24, -39.9, 39.9, -45, 45, -80, 80]) for (const g of ['paper', 'night']) assert.equal(bandRGBA('z500a', v, g)[3], 255, `${v} ${g}`);
-  assert.deepEqual(bandRGBA('z500a', -3, 'paper'), [0, 0xe3, 0xfe, 255]);
-  assert.deepEqual(bandRGBA('z500a', 3, 'paper'), [0xfe, 0xa4, 0, 255]);
-  assert.deepEqual(bandRGBA('z500a', -39, 'paper'), [0, 0x0b, 0xfe, 255]);
-  assert.deepEqual(bandRGBA('z500a', 39, 'paper'), [0xfe, 0x14, 0, 255]);
+  assert.deepEqual(bandRGBA('z500a', -3, 'paper', 'reference'), [0, 0xe3, 0xfe, 255]);
+  assert.deepEqual(bandRGBA('z500a', 3, 'paper', 'reference'), [0xfe, 0xa4, 0, 255]);
+  assert.deepEqual(bandRGBA('z500a', -39, 'paper', 'reference'), [0, 0x0b, 0xfe, 255]);
+  assert.deepEqual(bandRGBA('z500a', 39, 'paper', 'reference'), [0xfe, 0x14, 0, 255]);
 });
 
 test('bandIndex edge cases: exactly +-2, no data, ties toward zero, beyond the range', async () => {
@@ -164,13 +164,13 @@ test('Night: every band >= 3:1 on both Night grounds, lightness monotone per arm
   assert.equal(z.nightConstruction, true);
 });
 
-test('Night bandRGBA: z500a +30 dam is identical on both grounds, -30 is lifted', async () => {
+test('Night bandRGBA (Reference): z500a +30 dam is identical on both grounds, -30 is lifted', async () => {
   const { bandRGBA } = await load('render/palette.js');
-  assert.deepEqual(bandRGBA('z500a', 30.5, 'night'), bandRGBA('z500a', 30.5, 'paper'));
-  assert.notDeepEqual(bandRGBA('z500a', -39, 'night'), bandRGBA('z500a', -39, 'paper'));
+  assert.deepEqual(bandRGBA('z500a', 30.5, 'night', 'reference'), bandRGBA('z500a', 30.5, 'paper', 'reference'));
+  assert.notDeepEqual(bandRGBA('z500a', -39, 'night', 'reference'), bandRGBA('z500a', -39, 'paper', 'reference'));
 });
 
-test('band-edge hairline is at least 1.5:1 against both adjacent bands at every major edge on Paper', async () => {
+test('band-edge hairline (Reference) is at least 1.5:1 against both adjacent bands at every major edge on Paper', async () => {
   const { PALETTES, bandIndex, edgeHairline } = await load('render/palette.js');
   const { CHART } = await load('render/chart-tokens.js');
   const p = PALETTES.z500a, tok = CHART.paper.bandEdge;
@@ -178,7 +178,7 @@ test('band-edge hairline is at least 1.5:1 against both adjacent bands at every 
   const report = [];
   for (const e of p.majorEdges) {
     const below = rgb(p.paper[bandIndex('z500a', e - 0.001)]), above = rgb(p.paper[bandIndex('z500a', e + 0.001)]);
-    const h = edgeHairline('z500a', 'paper', e);
+    const h = edgeHairline('z500a', 'paper', e, 'reference');
     const ink = rgb(h.color);
     for (const band of [below, above]) {
       const c = contrast(over(ink, h.alpha, band), band);
@@ -190,9 +190,9 @@ test('band-edge hairline is at least 1.5:1 against both adjacent bands at every 
   // the token ink alone does not clear 1.5:1 on the deepest blue edge: that is why the light variant exists
   const deep = rgb(p.paper[bandIndex('z500a', -39)]);
   assert.ok(contrast(over(rgb(tok.color), tok.alpha, deep), deep) < 1.5);
-  assert.equal(edgeHairline('z500a', 'paper', -40).color, CHART.paper.bandEdgeLight.color);
-  assert.equal(edgeHairline('z500a', 'paper', 10).color, tok.color);
-  assert.equal(edgeHairline('z500a', 'paper', 7), null, 'only major edges carry a hairline');
+  assert.equal(edgeHairline('z500a', 'paper', -40, 'reference').color, CHART.paper.bandEdgeLight.color);
+  assert.equal(edgeHairline('z500a', 'paper', 10, 'reference').color, tok.color);
+  assert.equal(edgeHairline('z500a', 'paper', 7, 'reference'), null, 'only major edges carry a hairline');
   assert.ok(report.length === 16, report.join(' '));
 });
 
@@ -220,7 +220,7 @@ test('describe: section 5.4 readout words, including the no-clear-signal form', 
 
 test('legendSpec z500a: the section 5.1 words (snapshot)', async () => {
   const { legendSpec } = await load('render/palette.js');
-  const s = legendSpec('z500a', 'paper', -30, 30);
+  const s = legendSpec('z500a', 'paper', -30, 30, 'metric', 'reference');
   assert.equal(s.title, 'Pressure pattern aloft, vs normal');
   assert.equal(s.subtitle, 'Height of the 500 hPa surface, about 5.5 km up, compared with the usual for this date.');
   assert.equal(s.unit, 'dam (tens of metres)');
@@ -237,12 +237,12 @@ test('legendSpec z500a: the section 5.1 words (snapshot)', async () => {
   assert.equal(s.stops[0].from, -30); assert.equal(s.stops.at(-1).to, 30);
   assert.equal(s.stops[0].color, '#0047fe', '-30..-28');
   assert.equal(s.stops.at(-1).color, '#fe3c00', '28..30');
-  const wide = legendSpec('z500a', 'night', -42, 42);
+  const wide = legendSpec('z500a', 'night', -42, 42, 'metric', 'reference');
   assert.deepEqual(wide.ticks.map((t) => t.value).filter((v) => Math.abs(v) === 40), [-40, 40], '+-40 present when the range reaches it');
   const narrow = legendSpec('z500a', 'paper', -12, 12);
   assert.deepEqual(narrow.ticks.map((t) => t.value), [-10, -2, 2, 10]);
-  assert.notEqual(legendSpec('z500a', 'night', -30, 30).stops[0].color, s.stops[0].color, 'Night lifts the blue arm');
-  assert.equal(legendSpec('z500a', 'night', -30, 30).stops.at(-1).color, s.stops.at(-1).color, 'and keeps the orange arm');
+  assert.notEqual(legendSpec('z500a', 'night', -30, 30, 'metric', 'reference').stops[0].color, s.stops[0].color, 'Night lifts the blue arm');
+  assert.equal(legendSpec('z500a', 'night', -30, 30, 'metric', 'reference').stops.at(-1).color, s.stops.at(-1).color, 'and keeps the orange arm');
   for (const id of IDS) { const l = legendSpec(id, 'paper', 0, 50); assert.ok(l.title && l.unit && Array.isArray(l.ticks) && Array.isArray(l.stops), id); }
 });
 
@@ -254,24 +254,27 @@ test('bandLUT and LENS_FIELDS', async () => {
   assert.equal(lut[40], 0, 'v = 0 is transparent');
   assert.equal(lut[0], pack(bandRGBA('z500a', -40, 'paper')));
   assert.equal(lut[80], pack(bandRGBA('z500a', 40, 'paper')));
-  assert.equal(lut[60], pack(bandRGBA('z500a', 20, 'night')) , 'orange arm identical on Night');
+  assert.equal(bandLUT('z500a', 'paper', 81, -40, 40, 'reference')[60], pack(bandRGBA('z500a', 20, 'night', 'reference')), 'Reference: orange arm identical on Night');
+  assert.equal(lut[60], pack(bandRGBA('z500a', 20, 'paper', 'soft')), 'the default LUT is Soft');
   assert.deepEqual(Object.keys(LENS_FIELDS).sort(), ['a', 'c', 'j', 'r', 's', 'z']);
   assert.deepEqual(LENS_FIELDS.z, { fill: 'z500a', lines: 'z500' });
   for (const k of Object.keys(LENS_FIELDS)) assert.ok(PALETTES[LENS_FIELDS[k].fill], k);
 });
 
-test('chart tokens equal section 10.1 for both grounds', async () => {
+test('chart tokens equal section 10.1 for both grounds, with heavier basemap lines', async () => {
   const { CHART, chartTokens } = await load('render/chart-tokens.js');
   assert.equal(chartTokens('paper'), CHART.paper); assert.equal(chartTokens('night'), CHART.night);
   assert.equal(chartTokens('anything'), CHART.paper, 'unknown ground falls back to Paper');
   const P = CHART.paper, N = CHART.night;
   assert.deepEqual([P.ocean, P.land, N.ocean, N.land], ['#F6F7F9', '#E9E6E0', '#12161B', '#1C2127']);
-  assert.deepEqual(P.coast, { color: '#1A1D21', alpha: 1, width: 1, casing: '#FFFFFF', casingAlpha: 0.7, casingWidth: 2.5 });
-  assert.deepEqual(N.coast, { color: '#E6E9ED', alpha: 1, width: 1, casing: '#0B0D10', casingAlpha: 0.7, casingWidth: 2.5 });
-  assert.deepEqual(P.border, { color: '#1A1D21', alpha: 0.7, width: 1, casing: '#FFFFFF', casingAlpha: 0.9, casingWidth: 2.25 });
-  assert.deepEqual(N.border, { color: '#E6E9ED', alpha: 0.7, width: 1, casing: '#0B0D10', casingAlpha: 0.9, casingWidth: 2.25 });
-  assert.deepEqual(P.stateLine, { color: '#1A1D21', alpha: 0.4, width: 0.75 });
-  assert.deepEqual(N.stateLine, { color: '#E6E9ED', alpha: 0.4, width: 0.75 });
+  // Coast, border and state-line weights are heavier than the section 10.1 table (outlines were hard to see over the bands):
+  // a 3 px casing at 0.9 under both, a 1.25 px border core at 0.85, state lines at 0.5 (chart-tokens.js says why).
+  assert.deepEqual(P.coast, { color: '#1A1D21', alpha: 1, width: 1, casing: '#FFFFFF', casingAlpha: 0.9, casingWidth: 3 });
+  assert.deepEqual(N.coast, { color: '#E6E9ED', alpha: 1, width: 1, casing: '#0B0D10', casingAlpha: 0.9, casingWidth: 3 });
+  assert.deepEqual(P.border, { color: '#1A1D21', alpha: 0.85, width: 1.25, casing: '#FFFFFF', casingAlpha: 0.9, casingWidth: 3 });
+  assert.deepEqual(N.border, { color: '#E6E9ED', alpha: 0.85, width: 1.25, casing: '#0B0D10', casingAlpha: 0.9, casingWidth: 3 });
+  assert.deepEqual(P.stateLine, { color: '#1A1D21', alpha: 0.5, width: 0.75 });
+  assert.deepEqual(N.stateLine, { color: '#E6E9ED', alpha: 0.5, width: 0.75 });
   assert.deepEqual(P.graticule, { color: '#1A1D21', alpha: 0.12, width: 0.5 });
   assert.deepEqual(N.graticule, { color: '#E6E9ED', alpha: 0.14, width: 0.5 });
   assert.deepEqual(P.contour, { color: '#111417', width: 1, boldWidth: 2, casing: null, casingAlpha: 0, casingWidth: 0 });

@@ -42,11 +42,17 @@ export async function run({ page, baseUrl, assert, fixture }) {
   // home card: a summary sentence and one tappable column per day with data
   const card = await page.eval(`(() => { const c = document.querySelector('#sec-week .card'); return {
     summary: c.querySelector('.summary').textContent, days: c.querySelectorAll('.strip-day').length,
-    hatchNoData: c.querySelectorAll('.hatch-nodata').length, text: c.textContent,
-    normalHits: (${NORMAL_HITS})(c.querySelector('svg.strip')), normal: !!c.querySelector('text.strip-normal'), nosignal: c.querySelectorAll('rect.slice.nosignal').length }; })()`);
-  // the home card as a person sees it (1440 x 900): "normal" never sits on the neutral band or the wave
-  assert.deepEqual(card.normalHits, [], tag('home card: "normal" clear of the no-signal band and the curve'));
-  if (fixture === 'recorded') assert.ok(card.nosignal >= 1 && card.normal, tag('the recorded week has its no-signal band and still a "normal" label: ' + JSON.stringify([card.nosignal, card.normal])));
+    hatchNoData: c.querySelectorAll('.hatch-nodata').length, text: c.textContent, wave: !!c.querySelector('svg.strip'),
+    nosignal: c.querySelectorAll('.dt-iconbox[data-icon="unsure"]').length,
+    noSignalDays: __wse.ui.home.stories.get('home').days.filter((d) => d.signal === 'none' && d.wet === 'none' && !/warmer|cooler/.test(d.airMass)).length,
+    disagree: __wse.ui.home.stories.get('home').days.map((d, i) => d.signal === 'none' ? c.querySelectorAll('.strip-day[data-day="' + i + '"] .dt-sure i.on').length : -1).filter((x) => x >= 0) }; })()`);
+  // the home card is the day table: the pattern wave is drawn by the strip tests below, not on the card; a day whose
+  // forecasts disagree (and that has no rain or air mass to show) carries the "no clear signal" icon, never a confident one
+  assert.equal(card.wave, false, tag('home card: the day table, no wave'));
+  assert.equal(card.nosignal, card.noSignalDays, tag('every no-signal day shows the unsure icon: ' + JSON.stringify([card.nosignal, card.noSignalDays])));
+  // a day whose forecasts disagree never claims more than the lowest confidence, whatever its icon (rain has its own field)
+  assert.ok(card.disagree.every((x) => x <= 1), tag('no-signal days show at most one confidence dot: ' + JSON.stringify(card.disagree)));
+  if (fixture === 'recorded') assert.ok(card.disagree.length >= 1, tag('the recorded week has its no-signal days: ' + JSON.stringify(card.disagree)));
   assert.equal(card.days, exp.n, tag(`columns equal days with data: ${card.days} vs ${exp.n}`));
   assert.equal(card.hatchNoData, 0, tag('no hatched day'));
   assert.ok(!/No data past/i.test(card.text), tag('no "No data past": ' + card.text));

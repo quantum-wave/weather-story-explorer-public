@@ -1,4 +1,5 @@
 // Pure text helpers for shares: valid-time strings, default headline, confidence words, footer, series interpolation.
+import { nearestHour } from '../ui/datestamp.js';
 
 const REGION = { np: 'North Pacific', nh: 'Northern Hemisphere', gl: 'Global', wm: 'World' };
 export const regionName = (view) => REGION[view] || REGION.np;
@@ -19,6 +20,16 @@ export function formatValid(date, { timeZone, year = false } = {}) {
   const mm = date.getUTCMinutes();
   const utc = `${hh}${mm ? ':' + String(mm).padStart(2, '0') : ''}Z`;
   return { dayLabel, short: `${dayLabel}, ${clock}`, local: `${dayLabel}, ${clock} ${p.timeZoneName} (${utc})`, utc };
+}
+
+/**
+ * The GIF frames' two-line stamp ({day:'Tue 17 Nov', hour:'11 pm PST (07Z)'}): the valid time rounded to the nearest local hour,
+ * as the on-screen date stamp reads while playing (ui/datestamp.js), so the words change once an hour, not every frame. The
+ * still image keeps the minute the paused timeline shows (shareMeta uses formatValid directly).
+ */
+export function gifStamp(date, opts = {}) {
+  const v = formatValid(nearestHour(date), opts);
+  return { day: v.dayLabel, hour: v.local.slice(v.dayLabel.length + 2) };
 }
 
 /** Default headline (SPEC section 7): a factual label, never a person's name. */

@@ -10,11 +10,12 @@ export const CHART = deepFreeze({
     ground: 'paper',
     ocean: '#F6F7F9',
     land: '#E9E6E0',
-    coast: { color: '#1A1D21', alpha: 1, width: 1, casing: '#FFFFFF', casingAlpha: 0.7, casingWidth: 2.5 },
-    // casingAlpha 0.9, not the 0.7 of the spec table: S-LINEART measured only 2.8:1 for the border core against its halo on the
-    // deepest blue at 0.7 (W3-02); the coast keeps 0.7 (its core is opaque).
-    border: { color: '#1A1D21', alpha: 0.7, width: 1, casing: '#FFFFFF', casingAlpha: 0.9, casingWidth: 2.25 },
-    stateLine: { color: '#1A1D21', alpha: 0.4, width: 0.75 },
+    // Heavier than the spec table (outlines drowned in the bands: "still hard to see country outlines"): both lines sit on a 3 px casing
+    // at 0.9 (the table: 2.25-2.5 px at 0.7); the border core is 1.25 px at 0.85 (table: 1 px at 0.7). The coast core stays 1 px: at
+    // 1.25 px S-LINEART measured the Hemisphere Night coast under 4.5:1 on both sides at one sample in eight. State lines 0.5 (table 0.4).
+    coast: { color: '#1A1D21', alpha: 1, width: 1, casing: '#FFFFFF', casingAlpha: 0.9, casingWidth: 3 },
+    border: { color: '#1A1D21', alpha: 0.85, width: 1.25, casing: '#FFFFFF', casingAlpha: 0.9, casingWidth: 3 },
+    stateLine: { color: '#1A1D21', alpha: 0.5, width: 0.75 },
     graticule: { color: '#1A1D21', alpha: 0.12, width: 0.5 },
     contour: { color: '#111417', width: 1, boldWidth: 2, casing: null, casingAlpha: 0, casingWidth: 0 },
     contextContour: { color: '#111417', alpha: 0.35, width: 1 },
@@ -31,9 +32,9 @@ export const CHART = deepFreeze({
     ground: 'night',
     ocean: '#12161B',
     land: '#1C2127',
-    coast: { color: '#E6E9ED', alpha: 1, width: 1, casing: '#0B0D10', casingAlpha: 0.7, casingWidth: 2.5 },
-    border: { color: '#E6E9ED', alpha: 0.7, width: 1, casing: '#0B0D10', casingAlpha: 0.9, casingWidth: 2.25 },
-    stateLine: { color: '#E6E9ED', alpha: 0.4, width: 0.75 },
+    coast: { color: '#E6E9ED', alpha: 1, width: 1, casing: '#0B0D10', casingAlpha: 0.9, casingWidth: 3 },
+    border: { color: '#E6E9ED', alpha: 0.85, width: 1.25, casing: '#0B0D10', casingAlpha: 0.9, casingWidth: 3 },
+    stateLine: { color: '#E6E9ED', alpha: 0.5, width: 0.75 },
     graticule: { color: '#E6E9ED', alpha: 0.14, width: 0.5 },
     contour: { color: '#E6E9ED', width: 1, boldWidth: 2, casing: '#0B0D10', casingAlpha: 0.7, casingWidth: 2.5 },
     contextContour: { color: '#E6E9ED', alpha: 0.4, width: 1 },

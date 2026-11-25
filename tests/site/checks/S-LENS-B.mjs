@@ -20,7 +20,7 @@ const same = (a, b, tol = 0) => a.slice(0, 3).every((v, i) => Math.abs(v - b[i])
 const SETUP = `(() => {
   if (window.__fb) return true;
   const fb = window.__fb = { scene: null, last: null };
-  fb.render = async ({ ground, t, view = 'np', W = 1000, H = 600, lens, overlays = { contours: false }, theme = 'light' }) => {
+  fb.render = async ({ ground, t, view = 'np', W = 1000, H = 600, lens, overlays = { contours: false }, theme = 'light', colors = 'reference' }) => {
     const { makeScene } = await import('/js/render/compose.js');
     fb.scene ||= makeScene();
     const bm = await import('/js/render/basemap.js');
@@ -32,7 +32,7 @@ const SETUP = `(() => {
     const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     const ctx = cv.getContext('2d', { willReadFrequently: true });
     const mv = fb.scene.viewFor(view, W, H);
-    fb.scene.compose(ctx, mv, { s: { t, view, lens, ground, theme, overlays }, dpr: 1, quality: 'rest', alpha: 1, force: true });
+    fb.scene.compose(ctx, mv, { s: { t, view, lens, ground, theme, overlays, colors }, dpr: 1, quality: 'rest', alpha: 1, force: true });
     fb.last = { ctx, mv, W, H, t };
     bm.setBasemap(fb.geo);
     return { labels: fb.scene.stats.labelCount };

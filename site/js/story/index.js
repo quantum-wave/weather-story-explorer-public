@@ -1,6 +1,7 @@
-// Story functions (DESIGN-SPEC sections 3, 7.2, 7.3, 15): day classes, local-day binning, coverage, the sentence builders
-// and the strip. classifyDay and daysFromSeries are pure; buildDays and notability read the data facade. All wording
-// lives in phrases.js, all confidence logic in confidence.js, local-day arithmetic in localday.js, drawing in strip.js.
+// Story functions (DESIGN-SPEC sections 3, 7.2, 7.3, 15): day classes, local-day binning, coverage, the sentence builders,
+// the strip and the day table. classifyDay and daysFromSeries are pure; buildDays and notability read the data facade. All wording
+// lives in phrases.js, all confidence logic in confidence.js, local-day arithmetic in localday.js, drawing in strip.js
+// (the pattern wave) and daytable.js (the cards' day columns).
 //
 // buildDays returns the day classes as an array (so existing callers keep working) that also carries
 // `.days` (the same array), `.series` (with `.windows`) and `.coverage`: {requested, withData, firstDate, lastDate,
@@ -13,6 +14,7 @@ import * as P from './phrases.js';
 import { signalAt, confidenceAt } from './confidence.js';
 import { offsetMinutes, viewerOffsetMinutes, localDate, dayWindowsAt, weekdayShort as wkShort } from './localday.js';
 import { stripSVG as drawStrip } from './strip.js';
+export { dayTable, cellsFor, fitNames, fitBands } from './daytable.js';
 
 export { reasonPhrase, tripState, tripLine, weekTitle, coverageNote, laterDaysNote, daysOfData, summaryConfidence } from './phrases.js';
 export { zones, zoneAt, signalAt, confidenceAt, CAPTIONS, NO_CLEAR_SIGNAL } from './confidence.js';
@@ -374,7 +376,7 @@ export function notability(lat, lon) {
 
 /**
  * The strip (DESIGN-SPEC section 3.3). Legacy call `stripSVG(days, series, 'dark' | 'light', {width, activeDay, label})`
- * and the new `stripSVG(days, series, {compact, range, phone, width, activeDay, label, ground})` both work; the
+ * and the new `stripSVG(days, series, {compact, range, phone, width, activeDay, label, ground, colors})` both work; the
  * drawing is story/strip.js.
  */
 export function stripSVG(days, series = days?.series, themeOrOpts = 'dark', opts = {}) {

@@ -9,6 +9,9 @@ const NH_CLIP = 75;
 export const ZOOM_MIN = 1, ZOOM_MAX = 8;
 export const GL_ROTATE = [140, -35, 0]; // the globe opens centred on 140W, 35N: the North Pacific and North America
 export const WM_ROTATE = [150, 0]; // World: the Pacific (150W) at the middle, so San Francisco and the date line both stay on screen
+export const NP_ROTATE = [150, 0]; // Regional: the conic's central meridian at 150W
+export const NH_TILT_MAX = 60; // Hemisphere: the centre may tilt off the pole, either way across it, down to 30N (xf.rot[1] -60..60)
+export const NP_SPIN_MAX = 90; // Regional: the central meridian moves at most this far from 150W (the data domain bounds it sooner)
 export const OVERSHOOT_MAX = 22; // px a drag past a pan limit can move the map (spec: at most 24)
 
 const boxPoints = (lon0, lon1, lat0, lat1) => {
@@ -32,7 +35,8 @@ export function baseProjection(viewId, W, H, inset = NO_PAD) {
   const fit = [[x0, y0], [Math.max(x0 + 1, x1), Math.max(y0 + 1, y1)]];
   let p, rotate = null;
   if (viewId === 'np') {
-    p = d3.geoConicConformal().parallels([30, 60]).rotate([150, 0]).center([0, 45]);
+    rotate = [NP_ROTATE[0], 0, 0]; // turning the central meridian (xf.rot[0]) recentres the conic along longitude
+    p = d3.geoConicConformal().parallels([30, 60]).rotate(rotate).center([0, 45]);
     if (W >= H) {
       // Landscape: 160E-60W, 15-72N.
       p.fitExtent(fit, boxPoints(-200, -60, 15, 72));
@@ -47,8 +51,9 @@ export function baseProjection(viewId, W, H, inset = NO_PAD) {
     p = d3.geoStereographic().rotate(rotate).clipAngle(NH_CLIP);
     p.fitExtent(fit, { type: 'Sphere' });
   } else if (viewId === 'wm') {
-    // World: the flat Equal Earth map of the whole sphere. Pan and zoom only; no rotation.
-    p = d3.geoEqualEarth().rotate(WM_ROTATE);
+    // World: the flat Equal Earth map of the whole sphere. xf.rot[0] moves its central meridian; it never tilts.
+    rotate = [WM_ROTATE[0], 0, 0];
+    p = d3.geoEqualEarth().rotate(rotate);
     p.fitExtent(fit, { type: 'Sphere' });
   } else {
     // Globe: orthographic, free rotation. The far side is clipped (clipAngle) and project() returns null there.
@@ -82,6 +87,95 @@ export function domainBox(base, dom) {
   b = x0 <= x1 ? [x0, y0, x1, y1] : null;
   base.boxes.set(key, b);
   return b;
+}
+
+/**
+ * Screen box [x0, y0, x1, y1] of a data domain's outline in the un-zoomed view with its central meridian turned by `lam` degrees
+ * (Regional recentring). lam 0 is domainBox. Cached per base, at most 96 turns.
+ */
+export function domainBoxAt(base, dom, lam) {
+  if (!lam) return domainBox(base, dom);
+  const key = `${dom.lon0}|${dom.lat0}|${dom.nx}|${dom.ny}|${lam.toFixed(4)}`;
+  let b = base.boxes.get(key);
+  if (b !== undefined) return b;
+  const mv = new MapView(base, { k: 1, tx: 0, ty: 0, rot: [lam, 0, 0] }).apply();
+  const lon1 = dom.lon0 + (dom.nx - 1) * dom.dlon, lat1 = dom.lat0 + (dom.ny - 1) * dom.dlat;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let i = 0; i <= 32; i++) {
+    const lon = dom.lon0 + ((lon1 - dom.lon0) * i) / 32, lat = dom.lat0 + ((lat1 - dom.lat0) * i) / 32;
+    for (const ll of [[lon, dom.lat0], [lon, lat1], [dom.lon0, lat], [lon1, lat]]) {
+      const q = mv._project(ll);
+      if (!q) continue;
+      x0 = Math.min(x0, q[0]); y0 = Math.min(y0, q[1]); x1 = Math.max(x1, q[0]); y1 = Math.max(y1, q[1]);
+    }
+  }
+  b = x0 <= x1 ? [x0, y0, x1, y1] : null;
+  if (base.boxes.size > 96) for (const k of base.boxes.keys()) { if (k.split('|').length === 5) { base.boxes.delete(k); break; } }
+  base.boxes.set(key, b);
+  return b;
+}
+
+/**
+ * Regional: how far the central meridian may turn (xf.rot[0], degrees) at zoom k and pan tx, as [lo, hi]. The data domain's screen
+ * box must still cover the canvas from side to side, the rule the pan follows (domainBox), so a turn stops where a pan would. The
+ * turn is also kept where the conic draws the domain without folding it round its apex (every place within 90 degrees of
+ * straight down from the apex, 125 degrees of longitude from the central meridian), where the box test holds. Always holds 0.
+ */
+export function regionalSpinLimits(base, dom, k, tx) {
+  const key = `spin|${dom.lon0}|${dom.nx}|${k.toFixed(4)}|${tx.toFixed(2)}`;
+  const hit = base.boxes.get(key);
+  if (hit) return hit;
+  const W = base.W, n = base.proj.parallels ? coneConstant(base.proj.parallels()) : 1, reach = Math.min(179, 90 / n);
+  const relW = wrap180(dom.lon0 + base.rotate[0]), relE = relW + (dom.nx - 1) * dom.dlon;
+  const far = [Math.max(-NP_SPIN_MAX, -reach - relW), Math.min(NP_SPIN_MAX, reach - relE)];
+  const covers = (lam) => { const b = domainBoxAt(base, dom, lam); return !!b && k * b[0] + tx <= 1e-6 && k * b[2] + tx >= W - 1e-6; };
+  const edge = (end) => {
+    if (end === 0 || !covers(0)) return 0;
+    if (covers(end)) return end;
+    let a = 0, b = end;
+    for (let i = 0; i < 24; i++) { const m = (a + b) / 2; if (covers(m)) a = m; else b = m; }
+    return a;
+  };
+  const out = [edge(Math.min(0, far[0])), edge(Math.max(0, far[1]))];
+  if (base.boxes.size > 160) for (const k2 of base.boxes.keys()) { if (k2.startsWith('spin|')) { base.boxes.delete(k2); break; } }
+  base.boxes.set(key, out);
+  return out;
+}
+/** The cone constant n of a conformal conic with standard parallels [p1, p2] (degrees): a turn of d degrees turns the map by n * d. */
+const coneConstant = ([p1, p2]) => {
+  const a = p1 * RAD, b = p2 * RAD, t = (p) => Math.tan(Math.PI / 4 + p / 2);
+  return Math.abs(a - b) < 1e-9 ? Math.sin(a) : Math.log(Math.cos(a) / Math.cos(b)) / Math.log(t(b) / t(a));
+};
+
+/**
+ * Regional and World: the turn of the central meridian (degrees, added to xf.rot[0]) that keeps the place grabbed at screen point
+ * `from` under the pointer's x at `to`, and that place ({d, g}; g null for a grab off the map). World (Equal Earth) moves a point
+ * along its own row, x linear in longitude, so one step is exact; the Regional conic turns it about the apex and is solved by
+ * bisection. A grab off the map turns by the scale along the central meridian's row.
+ */
+export function spinForDrag(base, xf, from, to) {
+  const r0 = xf.rot?.[0] || 0, mv = new MapView(base, xf).apply();
+  let g = mv._invert(from);
+  const onMap = !!g;
+  if (!g) { g = mv._invert([base.W / 2, from[1]]) || mv._invert([base.W / 2, base.H / 2]); if (!g) return { d: 0, g: null }; }
+  const lat = Math.max(-80, Math.min(80, g[1])), mid = -(base.rotate[0] + r0);
+  const at = (d, lon = g[0]) => new MapView(base, { ...xf, rot: [r0 + d, 0, 0] }).apply()._project([lon, lat]);
+  const xAt = (d, lon) => { const q = at(d, lon); return q ? q[0] : NaN; };
+  const per = xAt(0, mid + 0.5) - xAt(0, mid - 0.5); // px per degree along the row, at the central meridian
+  if (!(Math.abs(per) > 1e-9)) return { d: 0, g: null };
+  let d = (to[0] - from[0]) / per; // World: exact, x is linear in longitude along a row
+  if (base.viewId === 'np' && onMap) {
+    // the conic turns a point about its apex: x rises with the turn while the point stays within 170 degrees of the central meridian
+    const rel = wrap180(g[0] + base.rotate[0] + r0), lo = Math.max(-NP_SPIN_MAX * 2, -170 - rel), hi = Math.min(NP_SPIN_MAX * 2, 170 - rel);
+    const target = xAt(0) + (to[0] - from[0]);
+    if (target <= xAt(lo)) d = lo; else if (target >= xAt(hi)) d = hi;
+    else {
+      let a = lo, b = hi;
+      for (let i = 0; i < 40 && b - a > 1e-6; i++) { const m = (a + b) / 2; if (xAt(m) < target) a = m; else b = m; }
+      d = (a + b) / 2;
+    }
+  }
+  return { d, g: onMap ? [g[0], g[1]] : null };
 }
 
 /**
@@ -135,6 +229,7 @@ export const IDENTITY = () => ({ k: 1, tx: 0, ty: 0, rot: [0, 0, 0] });
 export const isDefaultXf = (x) => x.k === 1 && Math.abs(x.tx) < 0.5 && Math.abs(x.ty) < 0.5 && Math.abs(x.rot[0]) < 0.05 && Math.abs(x.rot[1]) < 0.05 && Math.abs(x.rot[2] || 0) < 0.05;
 
 const RAD = Math.PI / 180;
+const wrap180 = (d) => ((((d + 180) % 360) + 360) % 360) - 180;
 const centreVec = (r) => { // the unit vector of the view centre [-lambda, -phi]
   const la = -r[1] * RAD, lo = -r[0] * RAD;
   return [Math.sin(la), Math.cos(la) * Math.cos(lo), Math.cos(la) * Math.sin(lo)];
@@ -155,11 +250,12 @@ export class MapView {
     this.lookups = new Map(); this.nodeCache = new Map(); this.meshes = new Map();
     this.apply();
   }
-  /** The absolute d3 rotation of this view (nh and gl), or null. */
+  /** The absolute d3 rotation of this view. Regional and World turn about the pole only (lambda); the Hemisphere also tilts (phi). */
   rotation() {
     const { rotate } = this.base, { rot } = this.xf;
     if (!rotate) return null;
-    if (this.viewId === 'nh') return [rotate[0] + rot[0], Math.max(-90, Math.min(-45, rotate[1] + rot[1]))];
+    if (this.viewId === 'np' || this.viewId === 'wm') return [rotate[0] + rot[0], 0, 0];
+    if (this.viewId === 'nh') return [rotate[0] + rot[0], Math.max(-90 - NH_TILT_MAX, Math.min(-90 + NH_TILT_MAX, rotate[1] + rot[1]))];
     return [rotate[0] + rot[0], Math.max(-90, Math.min(90, rotate[1] + rot[1])), (rotate[2] || 0) + rot[2]];
   }
   /** (Re)apply this view's transform to the shared projection. */
@@ -171,7 +267,8 @@ export class MapView {
       if (this.viewId === 'nh') {
         const la = (-r[1] * RAD), lo = (-r[0] * RAD); // the projection centre, for the clip test
         this._clip = [Math.sin(la), Math.cos(la) * Math.cos(lo), Math.cos(la) * Math.sin(lo), Math.cos(NH_CLIP * RAD)];
-      } else this._clip = [...centreVec(r), 1e-9]; // gl: the near hemisphere
+      } else if (this.viewId === 'gl') this._clip = [...centreVec(r), 1e-9]; // gl: the near hemisphere
+      else this._clip = null; // np and wm show every point they project
     }
     proj.scale(scale * k).translate([translate[0] * k + tx, translate[1] * k + ty]);
     return this;

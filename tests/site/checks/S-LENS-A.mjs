@@ -32,7 +32,7 @@ export const SETUP = `(() => {
   const hexRGB = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
   fl.hexRGB = hexRGB;
   const grab = (ctx, W, H) => ctx.getImageData(0, 0, W, H).data;
-  fl.render = async ({ ground = 'paper', t, lens, view = 'np', W = 1000, H = 600, overlays = { contours: false }, fields = [], xf }) => {
+  fl.render = async ({ ground = 'paper', t, lens, view = 'np', W = 1000, H = 600, overlays = { contours: false }, fields = [], xf, colors = 'reference' }) => {
     const { makeScene } = await import('/js/render/compose.js');
     fl.scene ||= makeScene();
     const bm = await import('/js/render/basemap.js');
@@ -47,7 +47,7 @@ export const SETUP = `(() => {
     ctx.fillText = (s, ...a) => { texts.push(String(s)); const tf = ctx.getTransform(); calls.push({ k: 'text', text: String(s), tf: [tf.a, tf.b, tf.c, tf.d, tf.e, tf.f], font: ctx.font, y: Number(a[1]) || 0 }); return ft(s, ...a); };
     ctx.drawImage = (...a) => { calls.push({ k: 'image' }); return di(...a); };
     const mv = xf ? fl.scene.viewFor(view, W, H, xf) : fl.scene.viewFor(view, W, H);
-    fl.scene.compose(ctx, mv, { s: { t, view, lens, ground, theme: ground === 'night' ? 'dark' : 'light', overlays }, dpr: 1, quality: 'rest', alpha: 1, force: true });
+    fl.scene.compose(ctx, mv, { s: { t, view, lens, ground, theme: ground === 'night' ? 'dark' : 'light', overlays, colors }, dpr: 1, quality: 'rest', alpha: 1, force: true });
     bm.setBasemap(fl.geo);
     fl.last = { ctx, mv, W, H, t, view, data: grab(ctx, W, H), texts, calls };
     return texts;
@@ -334,7 +334,7 @@ export async function run({ page, baseUrl, assert, fixture }) {
   await render({ t: 0, lens: 'j', ground: 'night' });
   const nj = await windows('ws250', 1, 30.8, 34.2, 1);
   assert.ok(nj.length >= 3, 'Night has a 35 m/s area');
-  const nightHex = await page.eval(`import('/js/render/palette.js').then((m) => m.bandRGBA('ws250', 35, 'night'))`);
+  const nightHex = await page.eval(`import('/js/render/palette.js').then((m) => m.bandRGBA('ws250', 35, 'night', 'reference'))`);
   const nightExact = await exact(nj, 1, toHex(nightHex));
   assert.ok(nightExact >= nj.length * 0.8, `Night draws the Night table's first jet band ${toHex(nightHex)} (${nightExact} of ${nj.length})`);
   assert.deepEqual(page.errors(), [], 'console errors: ' + JSON.stringify(page.errors()));

@@ -65,6 +65,7 @@
 .rdo-step { font-style: normal; color: var(--g-text-2); }
 .rdo-act { display: flex; align-items: center; gap: 4px; margin: 8px -6px -4px 0; border-top: 1px solid var(--g-rule); padding-top: 4px; }
 .rdo-add { flex: 1 1 auto; min-height: 44px; padding: 0 4px 0 0; text-align: left; background: none; border: 0; color: var(--g-text); font: 600 14px/18px var(--font-ui, system-ui, sans-serif); text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; cursor: pointer; }
+.rdo-centre { flex: none; min-height: 44px; padding: 0 8px; background: none; border: 0; color: var(--g-text); font: 500 14px/18px var(--font-ui, system-ui, sans-serif); cursor: pointer; border-radius: 8px; white-space: nowrap; }
 .rdo-x { flex: none; min-width: 44px; min-height: 44px; padding: 0 10px; background: none; border: 0; color: var(--g-text-2); font: 500 14px/18px var(--font-ui, system-ui, sans-serif); cursor: pointer; border-radius: 8px; }
 .rdo-dot { position: absolute; left: 0; top: 0; z-index: 8; width: 0; height: 0; pointer-events: none; }
 .rdo-dot::before { content: ""; position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--g-text); background: var(--g-surface); box-shadow: 0 0 0 1.5px var(--g-surface); }

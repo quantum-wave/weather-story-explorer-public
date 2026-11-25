@@ -17,11 +17,11 @@ clock.configure({
 });
 const reset = () => { clock.pause(); clock.seek(0); clock.pause(); store._reset(); q = []; now = 0; clock.refresh(); };
 
-test('range is the active case steps; short case defaults to 3 h/s and 1.5/3/6 choices', () => {
+test('range is the active case steps; short case defaults to 1.5 h/s and 0.75/1.5/3 choices', () => {
   reset();
   assert.deepEqual(clock.range(), [0, 36]);
-  assert.equal(store.get().speed, 3);
-  assert.deepEqual(clock.speeds(), [1.5, 3, 6]);
+  assert.equal(store.get().speed, 1.5);
+  assert.deepEqual(clock.speeds(), [0.75, 1.5, 3]);
 });
 test('playing advances t at speed, one rAF at a time, and loops', () => {
   reset();
@@ -30,8 +30,8 @@ test('playing advances t at speed, one rAF at a time, and loops', () => {
   const seen = new Set();
   for (let i = 0; i < 60; i++) { frame(); seen.add(store.get().t); }
   assert.ok(seen.size >= 55, 'distinct values ' + seen.size);
-  assert.ok(Math.abs(store.get().t - 0.96 * 3) < 0.2, 't after 0.96 s at 3 h/s: ' + store.get().t);
-  store.set({ t: 35.9 }); frame(100); frame(100); frame(100);
+  assert.ok(Math.abs(store.get().t - 0.96 * 1.5) < 0.1, 't after 0.96 s at 1.5 h/s: ' + store.get().t);
+  store.set({ t: 35.95 }); frame(100); frame(100); frame(100);
   assert.ok(store.get().t < 5, 'looped: ' + store.get().t);
   assert.equal(q.length, 1, 'exactly one frame queued');
 });
@@ -59,7 +59,7 @@ test('rAF timestamps that lag performance.now() do not stall the clock', () => {
   // the frame timestamp is 20 ms behind env.now(), as on a real browser when render work is long
   for (let i = 0; i < 30; i++) { now += 16; const run = q; q = []; for (const [, fn] of run) fn(now - 20); }
   const moved = store.get().t - t0;
-  assert.ok(moved > 0.8 * 3 * 0.48, 'moved ' + moved + ' h in 30 frames at 3 h/s');
+  assert.ok(moved > 0.8 * 1.5 * 0.48, 'moved ' + moved + ' h in 30 frames at 1.5 h/s');
 });
 test('tweenTo eases to the target over the time given, pauses playback, resolves true', async () => {
   reset(); clock.play();
@@ -107,7 +107,7 @@ test('a user-chosen speed survives a lens switch; a lens with a longer run chang
   store.set({ t: 30 }); store.set({ lens: 'j' });
   assert.deepEqual(clock.range(), [0, 360]);
   assert.equal(store.get().speed, 6);
-  assert.deepEqual(clock.speeds(), [6, 12, 24]);
+  assert.deepEqual(clock.speeds(), [3, 6, 12]);
   store.set({ lens: 'z' }); assert.equal(store.get().t, 30);
   store.set({ t: 100, lens: 'j' }); store.set({ lens: 'z' });
   assert.equal(store.get().t, 36, 't clamped into the new range');
@@ -147,6 +147,20 @@ test('speed names: Slow, Normal, Fast by position', () => {
   reset();
   assert.deepEqual(clock.speedChoices().map((c) => c.name), ['Slow', 'Normal', 'Fast']);
   assert.deepEqual(clock.speedChoices().map((c) => c.value), clock.speeds());
+});
+test('N24: a long case defaults to Normal, 6 forecast hours a second (one 6-hourly step a second), with Slow 3 and Fast 12', () => {
+  reset();
+  STEPS.ws250 = Array.from({ length: 61 }, (_, i) => i * 6);
+  store.set({ lens: 'j' }); // refresh() runs on the lens change; no speed was chosen since reset
+  clock.refresh();
+  assert.deepEqual(clock.range(), [0, 360]);
+  assert.deepEqual(clock.speedChoices().map((c) => [c.name, c.value]), [['Slow', 3], ['Normal', 6], ['Fast', 12]]);
+  delete STEPS.ws250; store.set({ lens: 'z' });
+});
+test('N24: the store default speed is the long-case Normal', () => {
+  store._reset();
+  assert.equal(store.get().speed, 6);
+  clock.refresh();
 });
 test('stepDay moves 24 h to the nearest step', async () => {
   reset(); reduced = true; STEPS.z500a = Array.from({ length: 13 }, (_, i) => i * 6); STEPS.z500 = STEPS.z500a; clock.refresh();

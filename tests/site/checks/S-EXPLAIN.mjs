@@ -61,6 +61,20 @@ async function guideChecks(page, assert, fixture, tag) {
   assert.equal(parts.cap, 'Warm air below lifts the surface; cold air lowers it.', tag('the diagram caption'));
   for (const h of ['Read it', 'How sure is this?', 'Worth knowing', 'About this data']) assert.ok(parts.heads.some((x) => x === h), tag(`section "${h}" present: ${parts.heads}`));
   assert.equal(parts.title, 'What am I looking at?', tag('sheet title'));
+  // About this data's Style and Constructions rows follow Map colors (N24 LOOK): Soft never claims ECMWF colours. The family is
+  // switched by store.set (set-up only) and the guide reopened by a real click, then put back as it was.
+  const aboutRow = (k) => page.eval(`(() => { const d = [...document.querySelectorAll('.wse-sheet-root .gd-dl dt')].find((e) => e.textContent === ${JSON.stringify(k)}); return d?.nextElementSibling?.textContent || ''; })()`);
+  const fam0 = await page.eval(`__wse.store.get().colors`);
+  for (const fam of [fam0, fam0 === 'reference' ? 'soft' : 'reference']) {
+    if (fam !== fam0) { await closeSheet(page, tag, 'the guide closes before the family switch'); await page.eval(`__wse.store.set({ colors: ${JSON.stringify(fam)} })`); await openGuide(page); }
+    const style = await aboutRow('Style'), cons = await aboutRow('Constructions');
+    if (fam === 'reference') {
+      assert.ok(style.startsWith('ECMWF colours') && /past ±40 dam/.test(cons), tag(`Reference: About this data says ECMWF colours: "${style}" / "${cons}"`));
+    } else {
+      assert.ok(style.startsWith('Soft colours, softened from ECMWF') && !/^ECMWF colours/.test(style) && /Every map colour, on Paper and on Night, is our own construction/.test(cons), tag(`Soft: About this data says the colours are our softened construction: "${style}" / "${cons}"`));
+    }
+  }
+  if ((await page.eval(`__wse.store.get().colors`)) !== fam0) { await closeSheet(page, tag, 'the guide closes before the family is put back'); await page.eval(`__wse.store.set({ colors: ${JSON.stringify(fam0)} })`); await openGuide(page); }
   // the read-it text is the descriptor's, verbatim
   const read = await page.eval(`import('/js/lenses/index.js').then((m) => m.lens('z').guide.read)`);
   const readShown = await page.eval(`[...document.querySelectorAll('.wse-sheet-root .gd-sec')].find((s) => s.querySelector('.gd-h')?.textContent === 'Read it')?.querySelector('p')?.textContent`);

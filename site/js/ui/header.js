@@ -119,6 +119,7 @@ export function applyTheme(theme) {
 const GROUPS = [
   { id: 'theme', label: 'Theme', key: 'themePref', opts: [['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']], note: 'Auto follows your device.' },
   { id: 'chart', label: 'Chart', key: 'ground', opts: [['paper', 'Paper'], ['night', 'Night']], note: 'The ground the map is drawn on.' },
+  { id: 'colors', label: 'Map colors', key: 'colors', opts: [['soft', 'Soft'], ['reference', 'Reference (ECMWF)']], note: 'Soft is easier on the eye. Reference is ECMWF’s own chart colours.' },
   { id: 'units', label: 'Units', key: 'units', opts: [['metric', 'Metric'], ['us', 'US']], note: 'Metric: mm and °C. US: in and °F.' },
   { id: 'time', label: 'Time', key: null, opts: [['local', 'Local']], note: null },
 ];
@@ -144,7 +145,7 @@ export function mountHeader({ store, bus }) {
 
   // ---------- Display preferences ----------
   const themePref = prefs.themePref();
-  store.set({ themePref, ground: prefs.ground(), units: prefs.units(), theme: resolveTheme(themePref) });
+  store.set({ themePref, ground: prefs.ground(), colors: prefs.colors(), units: prefs.units(), theme: resolveTheme(themePref) });
   applyTheme(store.get().theme);
   const setPref = (key, value) => {
     prefs.set(key, value);

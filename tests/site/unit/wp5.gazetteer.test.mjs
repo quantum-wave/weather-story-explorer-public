@@ -148,12 +148,13 @@ test('places-extra: curated entries carry kind and a coordinate source; midpoint
   for (const p of extra.places) {
     assert.ok(!ids.has(p.id)); ids.add(p.id);
     assert.ok(extra.kinds.includes(p.kind), p.name + ' kind');
-    assert.ok(p.source && ['geonames', 'midpoint', 'map'].includes(p.source.type) && p.source.note, p.name + ' source');
+    assert.ok(p.source && ['geonames', 'midpoint', 'map', 'cited'].includes(p.source.type) && p.source.note, p.name + ' source');
+    if (p.source.type === 'cited') assert.ok(/^https:\/\//.test(p.source.url) && p.source.fetched && p.source.check, p.name + ' cited source carries url, fetched and check');
     assert.match(String(p.cc), /^[A-Z]{2}$/);
     assert.ok(Number.isFinite(p.lat) && Number.isFinite(p.lon) && p.w > 0);
     assert.equal(Math.round(p.lat * 100) / 100, p.lat, 'two decimals'); assert.equal(Math.round(p.lon * 100) / 100, p.lon, 'two decimals');
     assert.ok(!/\d+\s+\w+\s+(st|street|ave|avenue|rd|road|blvd|drive|dr|lane|ln)\b/i.test(p.name), 'no street address');
-    if (p.source.type !== 'map') for (const id of p.source.ids) assert.ok(byId.has(id), p.name + ' cites GeoNames ' + id + ' which is in cities.json');
+    if (p.source.type !== 'map' && p.source.type !== 'cited') for (const id of p.source.ids) assert.ok(byId.has(id), p.name + ' cites GeoNames ' + id + ' which is in cities.json');
     if (p.source.type === 'midpoint') {
       const rs = p.source.ids.map((i) => byId.get(i));
       const la = rs.reduce((a, r) => a + r[4], 0) / rs.length, lo = rs.reduce((a, r) => a + r[5], 0) / rs.length;

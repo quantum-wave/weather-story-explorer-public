@@ -1,5 +1,5 @@
 // S-GESTURE (TEST-5, W3-03): real CDP touch and mouse on the map. Globe drag follows the finger within 1.5 degrees, the
-// flick coasts 40-200 px and rests within 600 ms, a drag past a Regional limit overshoots at most 24 px and springs back
+// flick coasts 40-200 px and rests within 600 ms, a Regional turn past its data limit overshoots at most 24 px and springs back
 // within 300 ms, Hemisphere spins at any zoom, pinch / wheel / double-tap zoom 1x-8x about the pointer, the far side of the
 // globe has no pixel, rotation allocates nothing per frame and rests 150 ms after the last input, arrow keys on the focused map
 // move the view and never step time, and a visible Reset view appears whenever the view is not the default.
@@ -108,28 +108,29 @@ export async function run({ page, baseUrl, assert }) {
     await sleep(250);
   }
 
-  // ---- 4. Regional: pan to the data edge, overshoot at most 24 px, spring back within 300 ms ----
+  // ---- 4. Regional: a horizontal drag turns the central meridian up to the data edge, overshoots at most 24 px, springs back within 300 ms ----
   await open('np', 1000, 600);
-  const tx0 = await W2('renderer.getTransform().tx');
-  const held = await hold([500, 300], [900, 300], { then: () => W2('renderer.getTransform()') });
+  const westX = `(() => { let m = 1e9; for (let lat = 10; lat <= 75; lat += 1) { const q = renderer.project([150, lat]); if (q) m = Math.min(m, q[0]); } return m; })()`;
+  const lam0 = (await W2('renderer.getTransform()')).rot[0];
+  const held = await hold([500, 300], [900, 300], { then: () => W2(westX) });
   const tRel = Date.now();
-  let back = -1, txs = [];
+  let back = -1, edges = [];
   while (Date.now() - tRel < 700) {
-    const x = await W2('renderer.getTransform().tx'); txs.push([Date.now() - tRel, x]);
+    edges.push([Date.now() - tRel, await W2(westX)]);
     await sleep(15);
   }
-  const rest = txs[txs.length - 1][1];
-  assert.ok(rest > tx0 + 4, `Regional pans at zoom 1 up to the data edge: tx ${tx0} -> ${rest.toFixed(1)}`);
-  assert.ok(held.tx - rest > 0.5, `a drag past the limit moves the map (${(held.tx - rest).toFixed(1)} px beyond the limit), never nothing`);
-  assert.ok(held.tx - rest <= 24, `overshoot ${(held.tx - rest).toFixed(1)} px, want at most 24`);
-  back = txs.find(([, x]) => Math.abs(x - rest) < 0.5);
+  const rest = edges[edges.length - 1][1], lam1 = (await W2('renderer.getTransform()')).rot[0];
+  assert.ok(lam1 > lam0 + 0.5, `Regional turns at zoom 1 up to the data edge: rot ${lam0} -> ${lam1.toFixed(2)}`);
+  assert.ok(held - rest > 0.5, `a drag past the limit moves the map (${(held - rest).toFixed(1)} px beyond the limit), never nothing`);
+  assert.ok(held - rest <= 24, `overshoot ${(held - rest).toFixed(1)} px at the data's west edge, want at most 24`);
+  back = edges.find(([, x]) => Math.abs(x - rest) < 0.5);
   assert.ok(back && back[0] <= 300, `back within 300 ms of release, took ${back ? back[0] : 'never'} ms`);
-  const edge = await W2(`(() => { let m = 1e9; for (let lat = 10; lat <= 75; lat += 1) { const q = renderer.project([${150}, lat]); if (q) m = Math.min(m, q[0]); } return m; })()`);
-  assert.ok(Math.abs(edge) < 2, `at the limit the data's west edge is on the frame edge: x = ${edge.toFixed(1)}`);
+  assert.ok(Math.abs(rest) < 2, `at the limit the data's west edge is on the frame edge: x = ${rest.toFixed(1)}`);
   // and a small drag inside the slack follows the finger exactly
   await W2('renderer.resetView(0)'); await sleep(150);
-  const small = await hold([500, 300], [506, 300], { then: () => W2('renderer.getTransform().tx') }); // 6 px: starts a drag, not a tap
-  assert.ok(Math.abs(small - 6) < 1.5 || small > 0, `a small drag moves the map: ${small}`);
+  const grabbed = await W2('renderer.invert([500, 300])');
+  const small = await hold([500, 300], [506, 300], { then: () => W2(`renderer.project(${JSON.stringify(grabbed)})`) }); // 6 px: starts a drag, not a tap
+  assert.ok(Math.abs(small[0] - 506) < 1.5 && Math.abs(small[1] - 300) < 1.5, `a small drag moves the grabbed point with the finger: ${small}`);
 
   // ---- 5. Zoom 1x-8x about the pointer: wheel, pinch, double-tap ----
   await open('np', 1000, 600);

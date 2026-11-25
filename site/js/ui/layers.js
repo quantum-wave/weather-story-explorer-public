@@ -165,7 +165,7 @@ export function mountLayers({ store, bus, links, toast }) {
 
   store.subscribe((s, p) => {
     if ('view' in p) paintViews();
-    if ('lens' in p || 'ground' in p || 'theme' in p || 'units' in p) { paintLegend(); if (isOpen()) buildPanel(); }
+    if ('lens' in p || 'ground' in p || 'colors' in p || 'theme' in p || 'units' in p) { paintLegend(); if (isOpen()) buildPanel(); }
     if ('overlays' in p && isOpen()) buildPanel();
     if ('t' in p) { const l = doubtLocked(s.t); if (l !== locked) { locked = l; if (isOpen()) buildPanel(); } }
   });

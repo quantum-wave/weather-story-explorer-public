@@ -5,7 +5,7 @@ import { VIEWS, LAYER_CODES, LENS_CODES, LENS_FILL } from '../contract.js';
 import { LENS_FIELDS } from '../render/palette.js';
 import { gifenc } from '../vendor.js';
 import { shareMeta, primeManifest, activeField, validDateFor } from './meta.js';
-import { formatValid } from './format.js';
+import { gifStamp } from './format.js';
 import { getRenderer } from './facade.js';
 import { STILL, drawStill, drawGifFrame, PALETTE } from './frame.js';
 
@@ -86,8 +86,9 @@ async function encodeAt(size, { times, holdIndex, state, meta, field, signal, on
   const draw = async (i) => {
     const t = times[i];
     await ensureFor(state, t);
-    const v = formatValid(validDateFor(t, state, field), { year: !!state.sample });
-    drawGifFrame(ctx, size, meta, state, renderer, { t, dateText: `${v.short} (${v.utc})`, frac: (t - from) / span, mark });
+    // the stamp the screen shows while playing (nearest hour), plus the UTC hour a viewer elsewhere needs: 'Tue 17 Nov' over '11 pm PST (07Z)'
+    const stamp = gifStamp(validDateFor(t, state, field), { year: !!state.sample });
+    drawGifFrame(ctx, size, meta, state, renderer, { t, stamp, frac: (t - from) / span, mark });
     return ctx.getImageData(0, 0, size, size);
   };
   // palette from three sample frames

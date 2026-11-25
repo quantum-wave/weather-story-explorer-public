@@ -10,7 +10,7 @@ const { choice } = await import(new URL('state.js', site).href);
 const { BRIEF_KEY } = await import(new URL('brief/contract.js', site).href);
 
 /** The renderer's public surface after this package: the test fails on a call to anything else. */
-const RENDERER_API = ['draw', 'resize', 'setView', 'centreOn', 'resetView', 'project', 'invert', 'addOverlay', 'setPadding', 'getTransform', 'setTransform', 'stats', 'sampleAt', 'ensureFor', 'renderTo', 'destroy'];
+const RENDERER_API = ['draw', 'resize', 'setView', 'centreOn', 'centreHere', 'resetView', 'project', 'invert', 'addOverlay', 'setPadding', 'getTransform', 'setTransform', 'stats', 'sampleAt', 'ensureFor', 'renderTo', 'destroy'];
 
 function world({ state = {}, rangeHi = 360, k = 2, lateCamera = false, glide = false, reduced = false, rate = 1, beats, gate = null } = {}) {
   const log = [];
