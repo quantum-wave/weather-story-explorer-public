@@ -12,7 +12,9 @@
 //   'rest'   raster at min(dpr, 2) px per CSS px capped at 1.5 MP, bicubic from 3x zoom; contours and labels.
 //   'motion' half that raster, bilinear: playing or a gesture. Contours kept (recomputed at most 10 times a second). Bounded in
 //            time too: when this scene's measured cost says half the rest scale would take over MOTION_RASTER_MS (6 ms), its
-//            side shrinks, down to a quarter of the rest scale (sample.js motionFit).
+//            side shrinks, down to a quarter of the rest scale (sample.js motionFit). A motion raster of the view the last one
+//            drew (playing) keeps its sampling geometry in a playback plan (sample.js acquirePlan): a planned frame costs about
+//            half as much per pixel, and is sized by its own measured cost, so the side grows back where the budget allows.
 //   'rotate' a quarter of it, no hairlines or hatch, no contours, the 110 m coast only.
 // `opts.sliceMs` (rest only) renders the raster in row slices: compose draws a coarse raster at once and returns
 // {pending: true}; the caller then calls scene.stepPending(budget) on successive frames and composes again when it reports
@@ -27,7 +29,7 @@ import { isolines, labelSpots } from './isolines.js';
 import { theme as themeTokens, groundFor, FONT_CHART } from './theme.js';
 import { chartTokens } from './chart-tokens.js';
 import { PALETTES, colorsOf } from './palette.js';
-import { RasterJob, rasterSize, qualityFrom, refine2x, motionFit, BICUBIC_FROM_ZOOM, SLICE_MS } from './sample.js';
+import { RasterJob, rasterSize, qualityFrom, refine2x, motionFit, planBytes, BICUBIC_FROM_ZOOM, SLICE_MS } from './sample.js';
 import { lens as lensOf } from '../lenses/index.js';
 import * as annotate from './annotate.js';
 
@@ -161,16 +163,17 @@ export function makeScene() {
   const rasters = new Map(); // `${slot}|${rw}x${rh}` -> {canvas, ctx, img, u32, key}
   const cState = { key: '', at: 0, iso: null, labels: null, refined: null };
   let pending = null; // {job, R, key, mv}
-  // measured raster cost (ms per raster pixel, bilinear), a moving average over the rasters this scene has painted; and the
-  // motion raster's current MOTION_FITS step
-  const cost = { msPerPx: 0, fit: 1 };
-  function learnCost(job, px) {
+  // measured raster cost (ms per raster pixel, bilinear), moving averages over the rasters this scene has painted: `msPerPx`
+  // without a playback plan, `planMsPerPx` with one (about half); the motion raster's current MOTION_FITS step; and the view
+  // the last motion raster drew (a motion raster of the same view again stands still: it plans)
+  const cost = { msPerPx: 0, planMsPerPx: 0, fit: 1, lastMotionKey: '' };
+  function learnCost(job, px, planned) {
     if (!(px > 0) || !(job.stats.ms > 0)) return;
-    const m = job.stats.ms / px;
-    cost.msPerPx = cost.msPerPx > 0 ? cost.msPerPx * 0.6 + m * 0.4 : m;
-    stats.rasterMsPerMpx = +(cost.msPerPx * 1e6).toFixed(2); stats.motionFit = cost.fit;
+    const m = job.stats.ms / px, k = planned ? 'planMsPerPx' : 'msPerPx';
+    cost[k] = cost[k] > 0 ? cost[k] * 0.6 + m * 0.4 : m;
+    stats.rasterMsPerMpx = +(cost.msPerPx * 1e6).toFixed(2); stats.planMsPerMpx = +(cost.planMsPerPx * 1e6).toFixed(2); stats.motionFit = cost.fit;
   }
-  const stats = { composeMs: 0, contourMs: 0, contourPaintMs: 0, rasterMs: 0, rasterPaintMs: 0, baseMs: 0, lastLookupMs: 0, contourSkips: 0, contourComputes: 0, labelMs: 0, labelCount: 0, bytes: 0, rasterPx: 0, restRasterPx: 0, sliceMaxMs: 0, slices: 0, rasterQuality: 'rest', rasterMsPerMpx: 0, motionFit: 1 };
+  const stats = { composeMs: 0, contourMs: 0, contourPaintMs: 0, rasterMs: 0, rasterPaintMs: 0, baseMs: 0, lastLookupMs: 0, contourSkips: 0, contourComputes: 0, labelMs: 0, labelCount: 0, bytes: 0, rasterPx: 0, restRasterPx: 0, sliceMaxMs: 0, slices: 0, rasterQuality: 'rest', rasterMsPerMpx: 0, planMsPerMpx: 0, motionFit: 1 };
 
   function viewFor(viewId, W, H, xf = IDENTITY(), inset = NO_PAD) {
     const bk = `${viewId}|${W}|${H}|${padKey(inset)}`;
@@ -233,8 +236,14 @@ export function makeScene() {
     const grids = gridsFor(pal.field, s.view, s.t, m);
     if (!grids) return { drew: false, pending: false, partial: false };
     // the motion raster is bounded in time: its side shrinks (to a quarter of the rest scale at most) when this scene's measured
-    // cost per pixel says half the rest scale would take more than MOTION_RASTER_MS
-    if (quality === 'motion' && !opts.cachedOnly) { const f1 = rasterSize(mv.W, mv.H, dpr, 'motion'); cost.fit = motionFit(cost.msPerPx, f1.rw * f1.rh, cost.fit); stats.motionFit = cost.fit; }
+    // cost per pixel says half the rest scale would take more than MOTION_RASTER_MS. A motion raster of the view the last one
+    // drew (playing) plans and is sized by the planned cost; any other (a gesture's first frame on a view) by the unplanned one.
+    let planIt = false;
+    if (quality === 'motion' && !opts.cachedOnly) {
+      planIt = mv.key === cost.lastMotionKey; cost.lastMotionKey = mv.key;
+      const f1 = rasterSize(mv.W, mv.H, dpr, 'motion'), c = planIt && cost.planMsPerPx > 0 ? cost.planMsPerPx : cost.msPerPx;
+      cost.fit = motionFit(c, f1.rw * f1.rh, cost.fit); stats.motionFit = cost.fit;
+    }
     const { rw, rh, scale } = rasterSize(mv.W, mv.H, dpr, quality, quality === 'motion' ? cost.fit : 1);
     const wantDoubt = p.doubt && quality !== 'rotate' && doubtWanted(s);
     const dgrids = wantDoubt ? gridsFor('z500sd', s.view, s.t, m) : null;
@@ -250,7 +259,7 @@ export function makeScene() {
     const R = rasterBuf(slot, rw, rh);
     if (opts.cachedOnly && R.key !== key) return { drew: false, pending: false, partial: false }; // the caller wants no new raster work
     stats.rasterPx = rw * rh; stats.rasterQuality = quality; if (quality === 'rest') stats.restRasterPx = rw * rh;
-    const spec = () => ({ mv, W: mv.W, H: mv.H, rw, rh, u32: R.u32, pool: quality === 'rotate', layers: grids, factor: pal.factor, palette: pal.palette, ground, colors, bicubic, hairlines, doubt });
+    const spec = () => ({ mv, W: mv.W, H: mv.H, rw, rh, u32: R.u32, pool: quality === 'rotate', layers: grids, factor: pal.factor, palette: pal.palette, ground, colors, bicubic, hairlines, doubt, plan: planIt });
     const paint = () => {
       const t2 = nowMs();
       R.ctx.putImageData(R.img, 0, 0);
@@ -284,7 +293,9 @@ export function makeScene() {
     job.step(Infinity);
     R.key = key;
     stats.rasterMs = nowMs() - t0;
-    if (!bicubic && quality !== 'rotate') learnCost(job, rw * rh); // a rotate raster skips hairlines and hatch: cheaper per pixel than the motion raster it would size
+    // a rotate raster skips hairlines and hatch: cheaper per pixel than the motion raster it would size; a raster that built a
+    // playback plan (sample.js acquirePlan) paid once for the frames after it, and teaches neither cost
+    if (!bicubic && quality !== 'rotate' && !job.stats.planRows) learnCost(job, rw * rh, !!(job.planL && job.planL.complete));
     paint();
     return { drew: true, pending: false, partial: false };
   }
@@ -462,7 +473,7 @@ export function makeScene() {
     for (const l of layers.values()) n += 2 * l.w * l.h * 4;
     if (pending) n += pending.job.ownBytes || 0;
     for (const mv of views.values()) {
-      for (const M of mv.meshes.values()) n += M.mgi.byteLength + M.mgj.byteLength + M.mok.byteLength + (M.kinds ? M.kinds.byteLength : 0);
+      for (const M of mv.meshes.values()) n += M.mgi.byteLength + M.mgj.byteLength + M.mok.byteLength + (M.kinds ? M.kinds.byteLength : 0) + planBytes(M);
       for (const P of mv.nodeCache.values()) n += P.byteLength;
       for (const Lk of mv.lookups.values()) n += Lk.li.byteLength + Lk.fx.byteLength + Lk.fy.byteLength;
     }

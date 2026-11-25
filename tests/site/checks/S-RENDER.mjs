@@ -364,6 +364,41 @@ async function run15d({ page, baseUrl, assert }) {
     return { bytes: sc.stats.bytes, peak, rasterPx: sc.stats.rasterPx };
   })()`);
   assert.ok(mem.bytes > 0 && mem.peak < 48e6, `scene.stats.bytes after 20 pans at 390 x 844 @2: ${(mem.bytes / 1e6).toFixed(1)} MB (peak ${(mem.peak / 1e6).toFixed(1)} MB), under 48 MB`);
+  // the same bound while playing on one view after another: each stands still long enough to build its playback plans
+  // (sample.js acquirePlan), at two motion sizes; the plans held stay one set, not one per view
+  const playMem = await page.eval(`(async () => {
+    const { makeScene } = await import('/js/render/compose.js'), { planBytes } = await import('/js/render/sample.js');
+    const W = 390, H = 844, dpr = 2, cv = document.createElement('canvas'); cv.width = W * dpr; cv.height = H * dpr; const c = cv.getContext('2d'); c.scale(dpr, dpr);
+    const sc = makeScene(), seen = new Set(); let peak = 0, built = 0;
+    for (let v = 0; v < 5; v++) {
+      const mv = sc.viewFor('np', W, H, sc.clampXf({ k: 2.2, tx: -40 - v * 30, ty: -60, rot: [0, 0, 0] }, W, H));
+      for (let f = 0; f < 6; f++) {
+        sc.compose(c, mv, { s: { t: 6 + f, view: 'np', lens: 'z', ground: 'paper', theme: 'light', overlays: { marks: false }, playing: true }, dpr, quality: 'motion', alpha: 1 });
+        peak = Math.max(peak, sc.stats.bytes);
+      }
+      for (const M of mv.meshes.values()) if (planBytes(M) > 0) seen.add(v);
+    }
+    return { bytes: sc.stats.bytes, peak, viewsWithPlans: seen.size };
+  })()`);
+  assert.ok(playMem.viewsWithPlans >= 1, `playing builds plans: ${playMem.viewsWithPlans} views had one`);
+  assert.ok(playMem.peak < 48e6, `scene.stats.bytes while playing on 5 views in turn at 390 x 844 @2: peak ${(playMem.peak / 1e6).toFixed(1)} MB, under 48 MB`);
+  // a gesture right after playback sizes its motion raster from the cost of an unplanned raster, not the cheaper planned one
+  const gest = await page.eval(`(async () => {
+    const { makeScene } = await import('/js/render/compose.js'), S = await import('/js/render/sample.js');
+    const W = 1440, H = 900, dpr = 2, cv = document.createElement('canvas'); cv.width = W * dpr; cv.height = H * dpr; const c = cv.getContext('2d'); c.scale(dpr, dpr);
+    const sc = makeScene(), opts = (t) => ({ s: { t, view: 'np', lens: 'z', ground: 'paper', theme: 'light', overlays: { contours: false }, playing: true }, dpr, quality: 'motion', alpha: 1 });
+    const still = sc.viewFor('np', W, H);
+    for (let f = 0; f < 30; f++) sc.compose(c, still, opts(12 + f * 0.4));
+    const played = { ...sc.stats };
+    const pan = sc.viewFor('np', W, H, sc.clampXf({ k: 1.3, tx: -80, ty: -40, rot: [0, 0, 0] }, W, H));
+    sc.compose(c, pan, opts(24));
+    const px1 = S.rasterSize(W, H, dpr, 'motion').rw * S.rasterSize(W, H, dpr, 'motion').rh;
+    let panPlans = 0; for (const M of pan.meshes.values()) panPlans += S.planBytes(M);
+    return { played, pan: { ...sc.stats }, panPlans, expect: S.motionFit(played.rasterMsPerMpx / 1e6, px1, played.motionFit) };
+  })()`);
+  assert.ok(gest.played.planMsPerMpx > 0 && gest.played.planMsPerMpx < 0.8 * gest.played.rasterMsPerMpx, `planned and unplanned raster costs are learnt apart: ${gest.played.planMsPerMpx} and ${gest.played.rasterMsPerMpx} ms per MP`);
+  assert.equal(gest.pan.motionFit, gest.expect, `the first gesture frame after playback is sized from the unplanned cost (fit ${gest.pan.motionFit}, expected ${gest.expect} from ${gest.played.rasterMsPerMpx} ms per MP; playback was at fit ${gest.played.motionFit})`);
+  assert.equal(gest.panPlans, 0, 'a gesture frame builds no playback plan');
 
   // ---- the basemap layers follow the 50 m swap in every renderer (S-LINEART's live-like flake) ----
   // loadBasemap runs only its first caller's onUpgrade, so a second renderer that drew before the 50 m files arrived kept its
