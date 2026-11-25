@@ -1,0 +1,11 @@
+{
+  "id": "brief-4",
+  "file": "site/js/brief/player.js",
+  "find": "      holdMs += dt;\n",
+  "replace": "      holdMs += dt; clock.seek(beats[idx].t0 + (beats[idx].t1 - beats[idx].t0) * Math.min(1, holdMs / duration(beats[idx])));\n",
+  "checks": [
+    "unit:c1.player.test.mjs"
+  ],
+  "expect": "killed",
+  "note": "store.t advances while the beat's data is still loading, so the film runs over an empty map. Killed by the holding test (t unchanged, no clock.seek before the data arrives)."
+}

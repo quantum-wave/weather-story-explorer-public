@@ -1,0 +1,11 @@
+{
+  "id": "brief-5",
+  "file": "site/js/brief/index.js",
+  "find": "    e.preventDefault(); e.stopImmediatePropagation();\n    if (e.repeat) return;\n    if (e.key === ' ')",
+  "replace": "    if (e.key !== ' ') { e.preventDefault(); e.stopImmediatePropagation(); }\n    if (e.repeat) return;\n    if (e.key === ' ')",
+  "checks": [
+    "S-BRIEF"
+  ],
+  "expect": "killed",
+  "note": "The briefing's key handler does not stop Space reaching the app clock: the app's own Space handler toggles store.playing while the briefing plays. Killed by S-BRIEF (store.playing must stay false after Space)."
+}

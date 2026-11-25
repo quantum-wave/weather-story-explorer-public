@@ -1,0 +1,11 @@
+{
+  "id": "brief-2",
+  "file": "site/js/brief/script.js",
+  "find": "beats.push(sureBeat(R));",
+  "replace": "if (people.length) beats.push(sureBeat(R));",
+  "checks": [
+    "unit:c1.script.test.mjs"
+  ],
+  "expect": "killed",
+  "note": "CONCEPTS-REVIEW H4 (the doubt chapter is not optional): the 'sure' chapter skipped when there are no people. Killed by the no-pins variant, the chapter-order test and the H4 chapter test."
+}

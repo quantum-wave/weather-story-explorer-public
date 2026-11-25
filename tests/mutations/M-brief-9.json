@@ -1,0 +1,11 @@
+{
+  "id": "brief-9",
+  "file": "site/js/brief/memory.js",
+  "find": "    if (!gradable(e) || !gradable(d)) continue; // a day without a clear signal or with low confidence is no basis\n",
+  "replace": "",
+  "checks": [
+    "unit:c2.memory.test.mjs"
+  ],
+  "expect": "killed",
+  "note": "A day with no clear signal (or low confidence) in either run is counted as a difference: the 'since' beat would show Then and Now over noise. Killed by the since-rule test on a no-signal and a low-confidence day."
+}

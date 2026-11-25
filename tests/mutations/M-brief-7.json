@@ -1,0 +1,11 @@
+{
+  "id": "brief-7",
+  "file": "site/js/brief/card.js",
+  "find": "if (!s || HIDDEN_CHAPTERS.has(beat.chapter)) { stamp.hidden = true;",
+  "replace": "if (!s || HIDDEN_CHAPTERS.has(beat.chapter) || beat.chapter === 'people') { stamp.hidden = true;",
+  "checks": [
+    "S-BRIEF-HONEST"
+  ],
+  "expect": "killed",
+  "note": "The stamp is omitted on people beats. Killed by S-BRIEF-HONEST (H2: every card between title and end shows .brief-stamp)."
+}

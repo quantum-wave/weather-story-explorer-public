@@ -101,7 +101,7 @@ export function mountReadout(app) {
     dot.hidden = false;
     card.hidden = false;
     const w = card.offsetWidth, hh = card.offsetHeight, pad = 8;
-    const avoid = ['#map-legend', '#map-tools .seg', '#map-tools .tools-end', '#layers-panel:not([hidden])'].flatMap((q) => [...stage.querySelectorAll(q)]).map((e) => { const r = e.getBoundingClientRect(); return { x: r.left - sr.left, y: r.top - sr.top, w: r.width, h: r.height }; }).filter((r) => r.w > 0);
+    const avoid = ['#map-legend', '#map-tools .seg', '#map-tools .tools-end', '#layers-panel:not([hidden])', '#brief-pill:not([hidden])'].flatMap((q) => [...stage.querySelectorAll(q)]).map((e) => { const r = e.getBoundingClientRect(); return { x: r.left - sr.left, y: r.top - sr.top, w: r.width, h: r.height }; }).filter((r) => r.w > 0);
     // the ridge and trough plates drawn on the canvas are obstacles too: a pinned card never half-covers one (4 px of slack)
     const plates = annotate.shown.map((q) => ({ x: cr.left - sr.left + q.x - q.w / 2, y: cr.top - sr.top + q.y - q.h / 2, w: q.w, h: q.h }));
     const offs = [14, 40, 70].flatMap((gx) => [14, 40, 70].map((gy) => [gx, gy])).sort((p, q) => (p[0] + p[1]) - (q[0] + q[1]));

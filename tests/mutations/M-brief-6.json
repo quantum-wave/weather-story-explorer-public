@@ -1,0 +1,11 @@
+{
+  "id": "brief-6",
+  "file": "site/js/brief/contract.js",
+  "find": "medium: 2, low: 1.4",
+  "replace": "medium: 3, low: 1.4",
+  "checks": [
+    "S-BRIEF-HONEST"
+  ],
+  "expect": "killed",
+  "note": "ZOOM_CAP.medium raised to 3: a fairly sure stretch zooms in as far as a confident one. Killed by S-BRIEF-HONEST (H1 on screen: k at most 2 where the spread at the place is 3 to 6 dam). The cap the spec named, ZOOM_CAP['pattern-only'], cannot be tested: zoomOf in script.js returns 1 for t past 168 and for pattern-only before it reads the table, so raising that entry changes nothing a viewer sees."
+}

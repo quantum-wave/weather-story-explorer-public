@@ -1,0 +1,11 @@
+{
+  "id": "brief-3",
+  "file": "site/js/brief/player.js",
+  "find": "store.set({ ...patch, view: r.view, lens: r.lens, focus: r.focus, speed: r.speed });",
+  "replace": "store.set({ ...patch, focus: r.focus, speed: r.speed });",
+  "checks": [
+    "unit:c1.player.test.mjs"
+  ],
+  "expect": "killed",
+  "note": "Close does not put the view and lens back: the person returns to whatever the last beat showed. Killed by the exit-restores test (view and lens compared with their recorded values)."
+}

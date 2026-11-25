@@ -102,6 +102,19 @@ export function mountHome(app) {
   const tzFor = (pl) => (pl.kind === 'home' || pl.kind === 'trip' ? 'viewer' : story.tzForLon(pl.lon));
 
   // ---------- stories ----------
+  /** The day classes of a trip or pin card: the one build every view of that place uses (its time zone, its range, its label). */
+  function placeDays(place) {
+    const r = rangeFor(place);
+    return story.buildDays(place.lat, place.lon, r.from, r.to, { tz: tzFor(place), anchor: anchorMs(), now: nowMs(), placeName: place.label });
+  }
+  /** The day classes the pin's card shows (its ready story, else the same build), for another view of the same place (the briefing). */
+  async function pinDays(id) {
+    const p = pins.all().find((x) => String(x.id) === String(id));
+    if (!p) return null;
+    const pl = pinPlace(p), st = stories.get(pl.key);
+    if (st?.status === 'ready' && st.place.lat === pl.lat && st.place.lon === pl.lon) return st.days;
+    return placeDays(pl);
+  }
   async function loadStory(place, { force = false } = {}) {
     let st = stories.get(place.key);
     const same = st && st.place.lat === place.lat && st.place.lon === place.lon && st.trip?.start === place.trip?.start && st.trip?.end === place.trip?.end && (place.kind !== 'home' || st.chosen === chosenRange());
@@ -120,10 +133,7 @@ export function mountHome(app) {
         st.range = effRange(st.avail);
         const to = anchorMs() + (st.range - 1) * DAY_MS;
         days = st.range === 15 ? full : await story.buildDays(place.lat, place.lon, anchorMs(), to, opts);
-      } else {
-        const r = rangeFor(place);
-        days = await story.buildDays(place.lat, place.lon, r.from, r.to, opts);
-      }
+      } else days = await placeDays(place);
       st.days = days;
       const have = days.filter(story.hasData).length;
       // The data client swallows a failed chunk, so a forecast that lists the story fields but yields no day failed to load;
@@ -721,7 +731,7 @@ export function mountHome(app) {
       if (!store.get().focus) await focusPlace(homePlace(), { quiet: true }).catch(() => {});
       return true;
     },
-    focusPlace, refresh, renderAll, loadStory,
+    focusPlace, refresh, renderAll, loadStory, pinDays,
     /** A place from a link (a friend's view): focus without a card of its own. */
     focusCity(city, opts = {}) { return focusPlace(placeOf('place', 'link', city, { key: 'link', title: cityLabel(city) }), opts); },
     stories, quick, pinsUi,

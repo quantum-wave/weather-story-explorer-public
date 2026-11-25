@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>brief card test page</title>
+<!-- Test page (C1-03): the Briefing's card and pill alone, with fixture beats and no app, no data facade, no store, no player.
+     S-BRIEF-CARD writes this file into a page on the site's origin (document.write), so the absolute paths below resolve to site/.
+     Names and places in the fixtures are synthetic. The stage stands in for the map; the dark bar for the timeline. -->
+<link rel="stylesheet" href="/css/tokens.css">
+<style>
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px var(--font-ui); }
+  #stage { position: relative; width: 100%; height: 100%; overflow: hidden; --brief-dock: 68px; background: var(--bg); }
+  #fake-timeline { position: absolute; left: 0; right: 0; bottom: 0; height: 56px; background: var(--raised); border-top: 1px solid var(--hairline); }
+  #pill-slot { position: absolute; left: 12px; top: 12px; right: 12px; }
+</style>
+<div id="stage"><div id="pill-slot"></div><div id="fake-timeline"></div></div>
+<script type="module">
+import { mountCard } from '/js/brief/card.js';
+import { mountPill } from '/js/brief/pill.js';
+
+const LONG = 'Rain moves in from the west late Thursday and clears Friday afternoon, with a cool breeze behind it.'; // 100 chars
+const L110 = 'A wet start to the day with showers heavy at times before lunch, then drier and brighter by the late afternoon.'; // 110
+const strip = (w = 338, h = 32) => `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="Seven day strip"><rect x="0" y="8" width="${w}" height="24" fill="currentColor" opacity=".25"/><path d="M0 28 C60 4 120 36 180 14 S300 30 ${w} 10" fill="none" stroke="currentColor" stroke-width="2"/></svg>`;
+const sure = (o) => ({ level: 'high', phrase: 'confident', source: 'spread', signal: 'clear', days: [3, 3], zone: 'hres', caption: 'one high-resolution forecast', ...o });
+const beat = (o) => ({ id: 'b', chapter: 'home', kicker: 'At home', title: 'Home', lines: [], view: 'nh', lens: 'z', camera: null, t0: 0, t1: 0, ms: 5000, place: null, sure: null, strip: false, ...o });
+
+const fixtures = {
+  title: beat({ id: 'title', chapter: 'title', kicker: 'Briefing', title: 'Briefing · San Francisco', lines: [] }),
+  hold: beat({ id: 'picture-hold', chapter: 'picture', hook: 'hold', kicker: 'The big picture', title: 'Where it lands', lines: [LONG], sure: sure({ days: [1, 1] }) }),
+  home: beat({ id: 'home-near', chapter: 'home', kicker: 'At home', title: 'The next three days', lines: [L110, L110], strip: true, sure: sure({ days: [1, 3], level: 'medium', phrase: 'fairly sure of the timing', zone: 'hres' }) }),
+  person: beat({ id: 'person-0', chapter: 'people', kicker: 'Your people', title: 'Wilhelmina-Alexandra Q.', lines: [L110, L110], strip: true,
+    sure: sure({ days: [4, 7], level: 'low', phrase: 'No clear signal yet: forecasts disagree', signal: 'none', zone: 'hres', caption: 'one high-resolution forecast' }) }),
+  trip: beat({ id: 'trip-0', chapter: 'trip', kicker: 'Your next trip', title: 'Lisbon, mid-month', lines: ['Too early for details. Firmer from Monday.'],
+    sure: sure({ days: [11, 15], level: 'pattern-only', phrase: 'pattern only, not specifics', source: 'lead', zone: 'mean', caption: 'average of 51 forecasts · pattern only' }) }),
+  late: beat({ id: 'trip-1', chapter: 'trip', kicker: 'Your next trip', title: 'Oslo', lines: ['Beyond the detailed days.'],
+    sure: sure({ days: [8, 15], level: 'pattern-only', phrase: 'pattern only, not specifics', source: 'lead', zone: 'hres-late', caption: 'one forecast, no ensemble average in this run · pattern only' }) }),
+  sure: beat({ id: 'sure', chapter: 'sure', hook: 'forward', kicker: 'How sure is this?', title: 'Where the forecasts agree', lines: ['Pale: the forecasts agree. Darker: they disagree.'],
+    sure: sure({ days: [1, 15], level: 'medium', phrase: 'fairly sure of the timing', zone: 'blend', caption: 'moving to the average of 51 forecasts · broad pattern' }) }),
+  rewind: beat({ id: 'picture-rewind', chapter: 'picture', hook: 'rewind', kicker: 'The big picture', title: 'Where it comes from', lines: ['Run it backwards to today. Watch where the blue comes from.'], sure: sure({ days: [1, 7] }) }),
+  end: beat({ id: 'end', chapter: 'end', kicker: 'The end', title: 'That’s the briefing.', lines: ['Add a trip or a person and they join the next briefing.', 'Next update usually about 4:10 pm.'] }),
+};
+const scriptNoPeople = { run: 'r', sample: true, dataLabel: 'sample', totalMs: 60000, morePeople: 0,
+  beats: [fixtures.title, fixtures.hold, fixtures.home, fixtures.rewind, fixtures.sure, fixtures.end] };
+const scriptFull = { ...scriptNoPeople, beats: [fixtures.title, fixtures.hold, fixtures.home, fixtures.trip, fixtures.person, fixtures.sure, fixtures.end] };
+
+const calls = [];
+const stage = document.getElementById('stage');
+const B = window.__brief = { fixtures, scripts: { noPeople: scriptNoPeople, full: scriptFull }, calls, card: null, pill: null, strip };
+const cb = (name) => () => { calls.push(name); if (name === 'close' || name === 'stay') B.card && B.card.destroy(), (B.card = null); };
+B.open = () => {
+  B.card = mountCard(stage, { onPause: cb('pause'), onResume: cb('resume'), onNext: cb('next'), onPrev: cb('prev'), onClose: cb('close'), onStay: cb('stay'), onReplay: cb('replay'), onAdd: cb('add') });
+  return B.card;
+};
+B.pill = mountPill(document.getElementById('pill-slot'), { onOpen: () => { calls.push('open'); } });
+B.pill.set({ text: 'Play the briefing', isNew: false, inert: false });
+/** Show fixture `name` of script `which` the way the wiring would. */
+B.show = (name, { which = 'full', state = 'playing', progress = 0.5, withStrip = true, date = 'Thu 4 pm', caption } = {}) => {
+  const s = B.scripts[which], b = fixtures[name], i = s.beats.indexOf(b);
+  B.card.show(b, s, i);
+  B.card.setState(state); B.card.setProgress(progress); B.card.setDate(date);
+  if (caption) B.card.setZoneCaption(caption);
+  B.card.setStrip(b.strip && withStrip ? strip() : '');
+};
+B.open();
+window.__briefReady = true;
+</script>

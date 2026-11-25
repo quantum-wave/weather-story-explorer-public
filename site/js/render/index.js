@@ -507,6 +507,8 @@ export function createRenderer(canvas) {
     },
     /** Current pan/zoom/rotation, for tests and debug: {k, tx, ty, rot: [lambda, phi, gamma]}. */
     getTransform() { return copyXf(live || xf); },
+    /** Move to a transform {k, tx, ty, rot} over `ms` (0 = at once), clamped like a gesture. Resolves when it arrives. */
+    setTransform(x, ms = 0) { return animateTo({ k: x.k, tx: x.tx, ty: x.ty, rot: rot3(x.rot) }, ms); },
     /** Frame cost and counters: the scene's stage timings and `bytes`, plus frameMs (script time of the last frame), frames, composes. */
     stats() { return { ...scene.stats, frameMs: counters.frameMs, frames: counters.frames, composes: counters.composes, quality: counters.quality, lastInputAt: counters.lastInputAt, restStartedAt: counters.restStartedAt, width: W, height: H, dpr }; },
     /** The fields behind what is drawn, at a place and the current time: {values: {fieldId: number}, t, signal: 'clear' | 'none'}. */

@@ -1,0 +1,11 @@
+{
+  "id": "brief-1",
+  "file": "site/js/brief/script.js",
+  "find": "let z = ZOOM_CAP[sure.level];",
+  "replace": "let z = 3;",
+  "checks": [
+    "unit:c1.script.test.mjs"
+  ],
+  "expect": "killed",
+  "note": "CONCEPTS-REVIEW H1 (zoom is earned): ZOOM_CAP ignored, every camera zooms to 3 whatever the stamp says. Killed by the 7 dam spread at lead 4 (low, 1.4), the one weak step and the every-camera-within-its-cap sweep."
+}

@@ -280,5 +280,22 @@ export async function run({ page, baseUrl, assert }) {
   await key(page, null, '0'); await sleep(600);
   assert.equal(await page.eval('__wse.renderer.getTransform().k'), 1, '0 resets');
   assert.equal(await page.eval('__wse.store.get().t'), t0, 'no key on the map stepped time');
+
+  // ---- 11. setTransform (C1-02): after setTransform(getTransform()) the transform is unchanged, instantly and over a glide ----
+  // The Briefing puts the person's map back with this on exit, so a drift in animateTo or clampX would move their view. Run in the
+  // real app on desktop and phone, from a zoomed, panned, turned transform on each view, with ms 0 and ms 300 (awaited on the page).
+  for (const [w, h] of [[1000, 700], [390, 844]]) {
+    await page.setViewport(w, h, 1);
+    await sleep(300);
+    for (const view of ['np', 'nh', 'gl']) {
+      const res = await page.eval(`(async () => { const r = __wse.renderer; __wse.store.set({ view: '${view}' });
+        await new Promise((f) => requestAnimationFrame(f)); await r.resetView(0); await r.centreOn(40.7, -100, 0, 2.5);
+        const x0 = r.getTransform(); await r.setTransform(x0, 0); const x1 = r.getTransform();
+        await r.setTransform(x1, 300); const x2 = r.getTransform(); return { x0, x1, x2 }; })()`);
+      assert.ok(res.x0.k > 2 && (res.x0.tx !== 0 || res.x0.ty !== 0 || res.x0.rot.some((v) => v !== 0)), `${view} ${w}x${h}: a non-default start ${JSON.stringify(res.x0)}`);
+      assert.deepEqual(res.x1, res.x0, `${view} ${w}x${h}: setTransform(getTransform(), 0) leaves the transform unchanged`);
+      assert.deepEqual(res.x2, res.x0, `${view} ${w}x${h}: setTransform(getTransform(), 300) lands on the same transform`);
+    }
+  }
   assert.deepEqual(page.errors(), [], 'console errors: ' + JSON.stringify(page.errors()));
 }

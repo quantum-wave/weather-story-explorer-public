@@ -1,0 +1,102 @@
+/* brief.css (C1-03): The Briefing's card and entry pill. Colour comes only from tokens.css custom properties, both themes.
+   Phone: docked above the timeline (--brief-dock sets the gap from the stage's bottom), 12 px side margins, at most 300 px.
+   Desktop (700 px and up): 420 px wide, bottom-right of the stage, 24 px margin, at most 320 px.
+   The card reads like a bulletin: a progress rail on its top edge, a small kicker and date, a serif title, the sentences, a ruled
+   stamp that says how sure (words plus a texture that matches the timeline's zones), the strip, and text buttons. */
+.brief-card {
+  position: absolute; z-index: 7; left: 12px; right: 12px; bottom: var(--brief-dock, 12px);
+  box-sizing: border-box; max-height: 300px; display: flex; flex-direction: column; gap: 4px;
+  padding: 0 14px calc(6px + env(safe-area-inset-bottom, 0px));
+  background: var(--glass-solid); color: var(--text); border: 1px solid var(--hairline); border-radius: var(--r-sheet);
+  box-shadow: var(--shadow); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  font: 400 15px/20px var(--font-ui); font-variant-numeric: tabular-nums; overflow: clip;
+  animation: brief-rise 240ms cubic-bezier(.2, .7, .2, 1) both;
+}
+@keyframes brief-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.brief-card p, .brief-card h2 { margin: 0; }
+.brief-card [hidden] { display: none !important; }
+
+/* progress rail: one segment per chapter beat, flush with the card's top edge */
+.brief-segs { display: flex; gap: 3px; margin: 0 -14px; padding: 0 10px; height: 4px; align-items: stretch; flex: none; }
+.brief-seg { flex: 1 1 0; position: relative; overflow: hidden; background: var(--hairline); border-radius: 0 0 2px 2px; }
+.brief-seg i { position: absolute; inset: 0; background: var(--accent); transform-origin: left center; transform: scaleX(0); transition: transform 120ms linear; }
+.brief-seg[data-state="todo"] i { transform: scaleX(0); }
+
+.brief-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-top: 3px; }
+.brief-kicker { font: 600 12px/14px var(--font-ui); color: var(--text-2); min-width: 0; }
+.brief-date { font: 400 12px/14px var(--font-ui); color: var(--text-2); text-align: right; flex: none; }
+.brief-title { font: 600 19px/27px var(--font-serif); letter-spacing: -0.005em; overflow-wrap: anywhere; }
+.brief-body { display: flex; flex-direction: column; gap: 0; }
+.brief-line { font: 400 15px/18px var(--font-ui); color: var(--text); overflow-wrap: anywhere; }
+
+/* the stamp: a ruled label, the zone's texture on the left, then words */
+.brief-card[data-chapter="end"] .brief-line + .brief-line { margin-top: 6px; } /* the end card has the room to separate its two sentences */
+.brief-stamp { display: grid; grid-template-columns: 24px 1fr; column-gap: 8px; align-items: start; box-sizing: border-box;
+  padding: 0; font: 400 12px/15px var(--font-ui); color: var(--text-2); }
+.brief-stamp-mark { display: block; width: 24px; height: 10px; margin-top: 2.5px; box-sizing: border-box; background: var(--text-2); }
+.brief-stamp[data-texture="dashed"] .brief-stamp-mark { background: var(--hairline); border-top: 2px dashed var(--text-2); }
+.brief-stamp[data-texture="hatch"] .brief-stamp-mark { background: repeating-linear-gradient(135deg, var(--text-2) 0 1.5px, transparent 1.5px 5px); border: 1px solid var(--text-3); }
+.brief-stamp-words { min-width: 0; }
+.brief-stamp-lead { font-weight: 600; color: var(--text); }
+.brief-stamp-phrase::before { content: " · "; white-space: pre; }
+.brief-stamp-cap { display: block; }
+.brief-stamp[data-texture="hatch"] .brief-stamp-cap { font-style: italic; }
+
+.brief-strip { color: var(--text-2); }
+.brief-strip svg { display: block; width: 100%; height: auto; }
+
+/* controls: text buttons, 44 px on the phone */
+.brief-controls { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
+.brief-btn { flex: 1 1 0; min-width: 44px; min-height: 44px; padding: 0 10px; box-sizing: border-box; cursor: pointer;
+  font: 600 15px/18px var(--font-ui); color: var(--text); background: transparent; border: 1px solid var(--hairline); border-radius: var(--r-input);
+  transition: background-color 120ms ease; }
+.brief-btn:hover { background: var(--raised); }
+.brief-btn[data-primary="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.brief-btn[data-act="close"] { color: var(--text-2); border-color: transparent; }
+.brief-btn[data-act="stay"] { flex: 2 1 0; }
+.brief-btn:focus-visible, .brief-pill:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.brief-card[data-state="ended"] .brief-btn { flex-grow: 1; }
+
+/* the announcement: read by screen readers once per beat, never painted */
+.brief-live { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+@media (min-width: 700px) {
+  .brief-card { left: auto; right: 24px; bottom: var(--brief-dock-wide, 24px); width: 420px; max-height: 320px; padding: 0 16px 10px; gap: 6px; }
+  .brief-line + .brief-line { margin-top: 4px; }
+  .brief-segs { margin: 0 -16px; padding: 0 12px; }
+  .brief-btn { flex: 0 0 auto; min-height: 36px; padding: 0 16px; font-size: 14px; }
+  .brief-btn[data-act="close"] { margin-left: auto; }
+  .brief-btn[data-act="stay"] { flex: 0 0 auto; }
+}
+
+/* the entry pill: a text button; a triangle drawn with borders, not an icon */
+.brief-pill { display: inline-flex; align-items: center; gap: 8px; box-sizing: border-box; max-width: calc(100% - 24px); min-height: 44px;
+  padding: 6px 16px 6px 14px; cursor: pointer; text-align: left; font: 600 14px/18px var(--font-ui); color: var(--text);
+  background: var(--glass-solid); border: 1px solid var(--hairline); border-radius: var(--r-chip); box-shadow: var(--shadow);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); transition: background-color 120ms ease; }
+.brief-pill:hover:not(:disabled) { background: var(--raised); }
+.brief-pill:disabled { cursor: default; color: var(--text-3); border-style: dashed; box-shadow: none; }
+.brief-pill-mark { flex: none; width: 0; height: 0; border-style: solid; border-width: 5px 0 5px 8px; border-color: transparent transparent transparent currentColor; }
+.brief-pill-new { flex: none; white-space: pre; font-weight: 700; margin-right: -8px; }
+.brief-pill-text { min-width: 0; overflow-wrap: anywhere; }
+@media (min-width: 700px) { .brief-pill { min-height: 32px; padding-block: 4px; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .brief-card, .brief-card *, .brief-pill, .brief-pill * { transition: none !important; animation: none !important; }
+}
+
+.brief-pill[hidden] { display: none; }
+/* where the pill stands in the stage: bottom-left, standing on the legend (index.js sets `bottom` so it clears the legend whatever its
+   height, expanded or not). The top of the stage belongs to the view switch, the tools, the sample chip, the status line and the toasts. */
+#stage > .brief-pill { position: absolute; z-index: 6; left: 12px; bottom: 60px; }
+
+/* H8: while a briefing is open it owns the chart. The map tools and the renderer's Reset view button are hidden, the timeline stays
+   visible (the playhead and the zone textures still show) but takes no press, the legend stands above the card, and a transparent layer
+   over the chart takes the left and right thirds and blocks pan, pinch and wheel. */
+#app[data-brief] #map-tools, #app[data-brief] #btn-reset { display: none !important; }
+#app[data-brief] #timeline { pointer-events: none; }
+#app[data-brief] .mlg { pointer-events: none; }
+#brief-taps { position: absolute; z-index: 5; left: 0; right: 0; top: 0; bottom: var(--brief-tl, 0px); touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+@media (max-width: 899px) {
+  #app[data-brief] .mlg { bottom: calc(var(--brief-tl, 0px) + var(--brief-card-h, 0px) + 20px); max-height: calc(100% - var(--brief-tl, 0px) - var(--brief-card-h, 0px) - 128px); }
+}

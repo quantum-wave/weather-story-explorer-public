@@ -167,6 +167,7 @@ const missingFields = () => { try { const r = typeof data.missing === 'function'
 
 const app = { store, bus, data, pins, clock, renderer, story, layout, friend, canvas, manifest: null, now: () => Date.now(), sampleAt, openAddSheet, missingFields, toast };
 const home = mountHome(app);
+app.home = home; // the briefing reads a pin's day classes from the card's own build (one source per place)
 wse.ui = { home, layers, layout, header, app, mapLegend };
 mountStatus({ store });
 // Feature stubs: each package fills its own module.
@@ -319,3 +320,8 @@ if (manifest) {
   }
 }
 wse.storyReady = true;
+
+// The Briefing (C1-04): one dynamic import, mounted last. A failure here is logged and the app carries on without the pill.
+if (manifest) {
+  try { const { mountBriefing } = await import('./brief/index.js'); wse.ui.brief = await mountBriefing(app); } catch (e) { console.warn('briefing: not mounted', e?.stack || e); }
+}
